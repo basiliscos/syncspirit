@@ -111,9 +111,10 @@ TEST_CASE("entities & presences", "[model]") {
 
     SECTION("iteration") {
         using strings_t = std::vector<std::string>;
-        auto iterate = [&]() -> strings_t {
+        auto iterate = [&](std::int64_t min_sequence = 0) -> strings_t {
             auto r = strings_t();
             auto it = folder_info->iterate();
+            it->set_min_sequence(min_sequence);
             for (auto n = it->next(); n; n = it->next()) {
                 auto str = std::string(n->get_entity()->get_path()->get_full_name());
                r.push_back(str);
@@ -124,6 +125,8 @@ TEST_CASE("entities & presences", "[model]") {
             auto it = folder_info->iterate();
             CHECK(iterate() == strings_t{});
             CHECK(it->next() == nullptr);
+            CHECK(it->next() == nullptr);
+            it->reset(true);
             CHECK(it->next() == nullptr);
         }
         SECTION("single file") {
@@ -150,6 +153,21 @@ TEST_CASE("entities & presences", "[model]") {
             CHECK(it->next() == nullptr);
             CHECK(it->get_seen_sequnece() == sequence);
             CHECK(iterate() == strings_t{"a", "b", "c"});
+            it->reset(true);
+            CHECK(iterate() == strings_t{"a", "b", "c"});
+        }
+        SECTION("filter by sequence") {
+            auto f_1 = mk_file("a", FT::DIRECTORY);
+            auto f_2 = mk_file("b", FT::DIRECTORY);
+            auto f_3 = mk_file("c", FT::DIRECTORY);
+            folder_info->add_relaxed(f_3.get());
+            folder_info->add_relaxed(f_2.get());
+            folder_info->add_relaxed(f_1.get());
+            auto it = folder_info->iterate();
+            auto seq = f_2->get_sequence();
+            CHECK(iterate(seq) == strings_t{"b", "c"});
+            it->reset(true);
+            CHECK(iterate(seq) == strings_t{"b", "c"});
         }
         SECTION("simple hierarchy (1)") {
             auto f_1 = mk_file("a", FT::DIRECTORY);
@@ -168,6 +186,9 @@ TEST_CASE("entities & presences", "[model]") {
             CHECK(it->next() == f_2);
             CHECK(it->next() == nullptr);
             CHECK(it->get_seen_sequnece() == sequence);
+            CHECK(iterate() == strings_t{"a", "a/a0", "a/a1", "b"});
+
+            it.reset();
             CHECK(iterate() == strings_t{"a", "a/a0", "a/a1", "b"});
         }
         SECTION("simple hierarchy (2)") {
@@ -188,7 +209,38 @@ TEST_CASE("entities & presences", "[model]") {
             CHECK(it->next() == nullptr);
             CHECK(it->get_seen_sequnece() == sequence);
             CHECK(iterate() == strings_t{"a", "b", "b/b0", "b/b1"});
+
+            it.reset();
+            CHECK(iterate() == strings_t{"a", "b", "b/b0", "b/b1"});
         }
+        SECTION("updates during itration") {
+            auto f_1 = mk_file("b");
+            auto f_2 = mk_file("c");
+            auto f_3 = mk_file("d");
+            auto f_4 = mk_file("e");
+            auto f_0 = mk_file("a");
+            folder_info->add_relaxed(f_1.get());
+            folder_info->add_relaxed(f_2.get());
+            folder_info->add_relaxed(f_3.get());
+
+            auto it = folder_info->iterate();
+            CHECK(it->next() == f_1);
+            CHECK(it->next() == f_2);
+
+            SECTION("tail") {
+                folder_info->add_relaxed(f_4.get());
+                CHECK(it->next() == f_3);
+                CHECK(it->next() == f_4);
+                CHECK(it->next() == nullptr);
+            }
+            SECTION("head") {
+                folder_info->add_relaxed(f_0.get());
+                CHECK(it->next() == f_3);
+                CHECK(it->next() == f_0);
+                CHECK(it->next() == nullptr);
+            }
+        }
+
     }
 
     folder_info->clear();

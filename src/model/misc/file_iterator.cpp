@@ -1,49 +1,99 @@
-#if 0
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
 
 #include "file_iterator.h"
 #include "resolver.h"
 #include "model/cluster.h"
-
-#include <spdlog/spdlog.h>
+#include "model/misc/folder_info_iterator.h"
 
 using namespace syncspirit::model;
 
-bool file_iterator_t::file_comparator_t::operator()(const file_info_t *l, const file_info_t *r) const {
-    using P = db::PullOrder;
+file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
+    : cluster{cluster_}, peer{peer_.get()}, folder_index{0} {
 
-    auto le = l->iterate_blocks().get_total() == 0;
-    auto re = r->iterate_blocks().get_total() == 0;
-
-    if (le && !re) {
-        return true;
-    } else if (re && !le) {
-        return false;
+    for (auto& it: cluster.get_folders()) {
+        check(it.item->is_shared_with(*peer));
     }
+};
 
-    auto cmp = std::strong_ordering::equal;
-    if (pull_order == P::newest) {
-        cmp = r->get_modified_s() <=> l->get_modified_s();
-    } else if (pull_order == P::oldest) {
-        cmp = l->get_modified_s() <=> r->get_modified_s();
-    } else if (pull_order == P::smallest) {
-        cmp = l->get_size() <=> r->get_size();
-    } else if (pull_order == P::largest) {
-        cmp = r->get_size() <=> l->get_size();
+file_iterator_t::~file_iterator_t() {}
+
+void file_iterator_t::check(model::folder_info_t* peer_folder) noexcept {
+    if (peer_folder) {
+        auto can_receive = peer_folder->get_folder()->get_folder_type() != db::FolderType::send;
+        if (can_receive) {
+            auto it = model::folder_info_iterator_ptr_t(new model::folder_info_iterator_t(peer_folder));
+            auto ss = substate_t{peer_folder, std::move(it), peer_folder->get_index(), 0};
+            substates.push_back(std::move(ss));
+        }
     }
-
-    if (cmp == std::strong_ordering::less) {
-        return true;
-    } else if (cmp == std::strong_ordering::greater) {
-        return false;
-    }
-
-    auto ln = l->get_name()->get_full_name();
-    auto rn = r->get_name()->get_full_name();
-
-    return std::lexicographical_compare(ln.begin(), ln.end(), rn.begin(), rn.end());
 }
+
+void file_iterator_t::on_upsert(folder_t &folder) noexcept {
+    check(folder.is_shared_with(*peer));
+}
+
+auto file_iterator_t::next() noexcept -> result_t {
+    auto folders_count = substates.size();
+    auto folder_scans = size_t{0};
+
+    while (folder_scans < folders_count) {
+        auto &ss = substates[folder_index];
+        auto& [peer_folder, it, seen_index, seen_sequence] = ss;
+        auto folder = peer_folder->get_folder();
+        auto &local_folder = *folder->get_folder_info(*cluster.get_device());
+        auto do_scan = !folder->is_paused() && !folder->is_scheduled() && !folder->is_suspended() && !it->is_finished();
+        auto local_device = cluster.get_device().get();
+
+        if (do_scan) {
+            if (auto view = peer->get_remote_view_map().get(peer->device_id().get_sha256(), folder->get_id()); view) {
+                do_scan = view->max_sequence <= peer_folder->get_max_sequence();
+            } else {
+                do_scan = false;
+            }
+        }
+        // check other files
+        if (do_scan) {
+            for (auto file = it->next(); file; file = it->next()) {
+                if (!cluster.is_locked(file->get_name().get())) {
+                    auto local_file = static_cast<model::file_info_t*>(file->get_entity()->get_presence(local_device));
+                    auto action = resolve(*file, local_file, local_folder);
+                    if (action != advance_action_t::ignore) {
+                        return {file, peer_folder.get(), local_file, action};
+                    }
+                }
+
+            }
+        }
+        folder_index = (folder_index + 1) % folders_count;
+        ++folder_scans;
+    }
+    return {nullptr, nullptr, nullptr, advance_action_t::ignore};
+}
+
+void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
+    auto folder = peer_folder->get_folder();
+    auto can_receive = peer_folder->get_folder()->get_folder_type() != db::FolderType::send;
+    if (can_receive) {
+        for (auto& ss: substates) {
+            if (ss.fi->get_folder() == folder) {
+                auto peer_index = peer_folder->get_index();
+                if (peer_index != ss.seen_index) {
+                    ss.seen_index = peer_index;
+                    ss.it->reset(true);
+                } else {
+                    ss.it->reset(false);
+                }
+            }
+        }
+        auto it = model::folder_info_iterator_ptr_t(new model::folder_info_iterator_t(peer_folder));
+        auto ss = substate_t{peer_folder, std::move(it), peer_folder->get_index(), 0};
+        substates.push_back(std::move(ss));
+    }
+}
+
+#if 0
+#include <spdlog/spdlog.h>
 
 file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
     : cluster{cluster_}, peer{peer_.get()}, folder_index{0} {
@@ -95,48 +145,6 @@ auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> 
     folders_list.emplace_back(
         folder_iterator_t{peer_folder, std::move(set), seen_index, seen_sequence, it, can_receive});
     return folders_list.back();
-}
-
-auto file_iterator_t::next() noexcept -> result_t {
-    auto folders_count = folders_list.size();
-    auto folder_scans = size_t{0};
-
-    while (folder_scans < folders_count) {
-        auto &fi = folders_list[folder_index];
-        auto &peer_folder = *fi.peer_folder;
-        auto folder = peer_folder.get_folder();
-        auto &local_folder = *folder->get_folder_info(*cluster.get_device());
-        auto &local_files = local_folder.get_file_infos();
-
-        auto &queue = fi.files_queue;
-        auto do_scan = !folder->is_paused() && !folder->is_scheduled() && !folder->is_suspended() && !queue->empty();
-
-        if (do_scan) {
-            if (auto view = peer->get_remote_view_map().get(peer->device_id().get_sha256(), folder->get_id()); view) {
-                do_scan = view->max_sequence <= peer_folder.get_max_sequence();
-            } else {
-                do_scan = false;
-            }
-        }
-        // check other files
-        if (do_scan) {
-            auto it = queue->begin();
-            while (it != queue->end()) {
-                auto file = *it;
-                it = queue->erase(it);
-                if (!cluster.is_locked(file->get_name().get())) {
-                    auto local_file = local_files.by_name(file->get_name()->get_full_name()).get();
-                    auto action = resolve(*file, local_file, local_folder);
-                    if (action != advance_action_t::ignore) {
-                        return {file, &peer_folder, local_file, action};
-                    }
-                }
-            }
-        }
-        folder_index = (folder_index + 1) % folders_count;
-        ++folder_scans;
-    }
-    return {nullptr, nullptr, nullptr, advance_action_t::ignore};
 }
 
 void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {

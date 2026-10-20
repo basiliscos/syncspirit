@@ -197,7 +197,7 @@ void presence_t::add_child(presence_t* child, std::string_view name) noexcept {
     auto normalized = features & F::normalized;
     if (children_.size() > 0) {
         auto comparator = child_comparator_t{};
-        reset_normalization = comparator(children_.back(), child);
+        reset_normalization = !comparator(children_.back(), child);
     }
     children_.push_back(std::move(child));
     if (reset_normalization) {

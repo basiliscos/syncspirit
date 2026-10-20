@@ -8,11 +8,6 @@
 
 using namespace syncspirit::model;
 
-folder_info_iterator_t::folder_info_iterator_t(folder_info_ptr_t fi_) noexcept:
-    fi{std::move(fi_)} {
-    current = fi.get();
-}
-
 static presence_t* next_sibling(presence_t* current) noexcept {
     auto parent = current->get_parent();
     if (parent) {
@@ -29,7 +24,58 @@ static presence_t* next_sibling(presence_t* current) noexcept {
     return nullptr;
 }
 
+folder_info_iterator_t::folder_info_iterator_t(folder_info_ptr_t fi_) noexcept:
+    fi{std::move(fi_)} {
+    reset(true);
+}
+
+bool folder_info_iterator_t::is_finished() const noexcept {
+    return current == nullptr;
+}
+
+void folder_info_iterator_t::reset(bool full) noexcept {
+    current = fi.get();
+    if (full) {
+        seen_sequence = 0;
+        min_sequence = 0;
+        max_sequence = fi->get_max_sequence();
+    }
+}
+
+void folder_info_iterator_t::set_min_sequence(std::int64_t value) noexcept {
+    min_sequence = value;
+}
+
 file_info_t* folder_info_iterator_t::next() noexcept {
+    if (current) {
+        for (auto file = advance(); file; file = advance()) {
+            auto seq = file->get_sequence();
+            if (seq > max_sequence) {
+                continue;
+            }
+            if (seq < min_sequence) {
+                continue;
+            }
+            if (seen_sequence < seq) {
+                seen_sequence = seq;
+            }
+            if (seq > seen_sequence) {
+                seen_sequence = seq;
+            }
+            return file;
+        }
+        min_sequence = seen_sequence + 1;
+        auto seq = fi->get_max_sequence();
+        if (seq != max_sequence) {
+            current = fi.get();
+            max_sequence = fi->get_max_sequence();
+            return next();
+        }
+    }
+    return nullptr;
+}
+
+file_info_t* folder_info_iterator_t::advance() noexcept {
     if (current) {
         auto children = &current->get_children();
         if (children->size() > 0) {
@@ -49,12 +95,7 @@ file_info_t* folder_info_iterator_t::next() noexcept {
         }
     }
     if (current) {
-        auto r = static_cast<model::file_info_t*>(current);
-        auto seq = r->get_sequence();
-        if (seq > seen_sequence) {
-            seen_sequence = seq;
-        }
-        return r;
+        return static_cast<model::file_info_t*>(current);
     }
     return nullptr;
 }
