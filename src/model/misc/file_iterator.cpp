@@ -84,6 +84,7 @@ void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
                 } else {
                     ss.it->reset(false);
                 }
+                return;
             }
         }
         auto it = model::folder_info_iterator_ptr_t(new model::folder_info_iterator_t(peer_folder));
