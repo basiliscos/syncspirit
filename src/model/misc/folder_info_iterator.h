@@ -18,7 +18,7 @@ struct SYNCSPIRIT_API folder_info_iterator_t: arc_base_t<folder_info_iterator_t>
     folder_info_iterator_t(folder_info_ptr_t fi) noexcept;
 
     file_info_t* next() noexcept;
-    void reset(bool full) noexcept;
+    void reset() noexcept;
     void set_min_sequence(std::int64_t value) noexcept;
     bool is_finished() const noexcept;
     inline std::int64_t get_seen_sequnece() const noexcept { return seen_sequence; }

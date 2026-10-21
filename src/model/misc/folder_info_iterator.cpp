@@ -26,20 +26,18 @@ static presence_t* next_sibling(presence_t* current) noexcept {
 
 folder_info_iterator_t::folder_info_iterator_t(folder_info_ptr_t fi_) noexcept:
     fi{std::move(fi_)} {
-    reset(true);
+    reset();
 }
 
 bool folder_info_iterator_t::is_finished() const noexcept {
     return current == nullptr;
 }
 
-void folder_info_iterator_t::reset(bool full) noexcept {
+void folder_info_iterator_t::reset() noexcept {
     current = fi.get();
-    if (full) {
-        seen_sequence = 0;
-        min_sequence = 0;
-        max_sequence = fi->get_max_sequence();
-    }
+    seen_sequence = 0;
+    min_sequence = 0;
+    max_sequence = fi->get_max_sequence();
 }
 
 void folder_info_iterator_t::set_min_sequence(std::int64_t value) noexcept {

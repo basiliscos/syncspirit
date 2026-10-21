@@ -126,7 +126,7 @@ TEST_CASE("entities & presences", "[model]") {
             CHECK(iterate() == strings_t{});
             CHECK(it->next() == nullptr);
             CHECK(it->next() == nullptr);
-            it->reset(true);
+            it->reset();
             CHECK(it->next() == nullptr);
         }
         SECTION("single file") {
@@ -153,7 +153,7 @@ TEST_CASE("entities & presences", "[model]") {
             CHECK(it->next() == nullptr);
             CHECK(it->get_seen_sequnece() == sequence);
             CHECK(iterate() == strings_t{"a", "b", "c"});
-            it->reset(true);
+            it->reset();
             CHECK(iterate() == strings_t{"a", "b", "c"});
         }
         SECTION("filter by sequence") {
@@ -166,7 +166,7 @@ TEST_CASE("entities & presences", "[model]") {
             auto it = folder_info->iterate();
             auto seq = f_2->get_sequence();
             CHECK(iterate(seq) == strings_t{"b", "c"});
-            it->reset(true);
+            it->reset();
             CHECK(iterate(seq) == strings_t{"b", "c"});
         }
         SECTION("simple hierarchy (1)") {

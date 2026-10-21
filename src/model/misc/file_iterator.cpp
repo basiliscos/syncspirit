@@ -80,9 +80,7 @@ void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
                 auto peer_index = peer_folder->get_index();
                 if (peer_index != ss.seen_index) {
                     ss.seen_index = peer_index;
-                    ss.it->reset(true);
-                } else {
-                    ss.it->reset(false);
+                    ss.it->reset();
                 }
                 return;
             }

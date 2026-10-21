@@ -191,9 +191,9 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 }
             }
         }
-#if 0
         SECTION("2+ files") {
-            auto files = model::file_infos_map_t();
+            auto path_1 = utils::path_t::make_generic("a.txt");
+            auto path_2= utils::path_t::make_generic("b.txt");
             auto pr_fi_1 = proto::FileInfo();
             proto::set_name(pr_fi_1, "a.txt");
             proto::set_sequence(pr_fi_1, 10ul);
@@ -205,7 +205,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 .add(pr_fi_2, peer_device)
                 .finish();
             REQUIRE(builder.apply());
-
             SECTION("both files are missing on my side") {
                 auto [f, fi, lf, action] = file_iterator->next();
                 REQUIRE(f);
@@ -213,7 +212,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(action == A::remote_copy);
                 auto full_name = f->get_name()->get_full_name();
                 CHECK((full_name == "a.txt" || full_name == "b.txt"));
-                files.put(f);
                 REQUIRE(builder.apply());
 
                 REQUIRE(builder.remote_copy(*f, *fi).apply());
@@ -224,18 +222,14 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 full_name = f_2->get_name()->get_full_name();
                 CHECK((full_name == "a.txt" || full_name == "b.txt"));
                 CHECK(action_2 == A::remote_copy);
-                files.put(f_2);
                 REQUIRE(builder.apply());
                 REQUIRE(builder.remote_copy(*f_2, *fi_2).apply());
 
                 CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
-
-                CHECK(files.by_name("a.txt"));
-                CHECK(files.by_name("b.txt"));
             }
-
             SECTION("1 file is missing on my side") {
-                auto peer_file = peer_files.by_name("a.txt");
+                auto [peer_file, _] = peer_folder->get_by_path(path_1);
+                REQUIRE(peer_file);
                 REQUIRE(peer_file);
                 REQUIRE(builder.remote_copy(*peer_file, *peer_folder).apply());
                 auto [f, fi, lf, action] = file_iterator->next();
@@ -252,8 +246,8 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
             }
             SECTION("0 files are missing on my side") {
-                auto peer_file_1 = peer_files.by_name("a.txt");
-                auto peer_file_2 = peer_files.by_name("b.txt");
+                auto peer_file_1 = peer_folder->get_by_path(path_1).first;
+                auto peer_file_2 = peer_folder->get_by_path(path_2).first;
                 builder.remote_copy(*peer_file_1, *peer_folder).remote_copy(*peer_file_2, *peer_folder);
                 REQUIRE(builder.apply());
                 CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
@@ -263,18 +257,13 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 REQUIRE(f_1);
                 CHECK(!lf_1);
                 CHECK(action_1 == A::remote_copy);
-                CHECK((f_1->get_name()->get_full_name() == "a.txt" || f_1->get_name()->get_full_name() == "b.txt"));
-                files.put(f_1);
+                CHECK(f_1->get_name()->get_full_name() == "a.txt");
 
                 auto [f_2, fi_2, lf_2, action_2] = file_iterator->next();
                 REQUIRE(f_2);
                 CHECK(!lf_2);
                 CHECK(action_2 == A::remote_copy);
-                CHECK((f_2->get_name()->get_full_name() == "a.txt" || f_2->get_name()->get_full_name() == "b.txt"));
-                files.put(f_2);
-
-                CHECK(files.by_name("a.txt"));
-                CHECK(files.by_name("b.txt"));
+                CHECK(f_2->get_name()->get_full_name() == "b.txt");
 
                 auto pr_fi_3 = proto::FileInfo();
                 proto::set_name(pr_fi_3, "c.txt");
@@ -292,7 +281,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
             }
         }
-#endif
     }
 #if 0
     SECTION("synchronizing non-empty files") {
