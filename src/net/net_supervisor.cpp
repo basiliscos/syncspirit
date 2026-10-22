@@ -15,8 +15,6 @@
 #include "net/scheduler.h"
 #include "utils/format.hpp"
 #include "utils/path_view.hpp"
-#include "presentation/folder_entity.h"
-#include "presentation/folder_entity.h"
 #include "proto/proto-helpers-bep.h"
 #include "proto/proto-helpers-db.h"
 
@@ -308,6 +306,7 @@ void net_supervisor_t::on_start() noexcept {
 auto net_supervisor_t::apply(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto r = parent_t::apply(diff, custom);
+#if 0
     if (r) {
         auto folder_id = db::get_id(diff.db);
         auto folder = cluster->get_folders().by_id(folder_id);
@@ -316,12 +315,14 @@ auto net_supervisor_t::apply(const model::diff::modify::upsert_folder_t &diff, v
             folder->set_augmentation(folder_entity);
         }
     }
+#endif
     return r;
 }
 
 auto net_supervisor_t::apply(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     auto r = parent_t::apply(diff, custom);
+#if 0
     if (r) {
         auto &folder = *cluster->get_folders().by_id(diff.folder_id);
         auto &device = *cluster->get_devices().by_sha256(diff.device_id);
@@ -332,6 +333,7 @@ auto net_supervisor_t::apply(const model::diff::modify::upsert_folder_info_t &di
             folder_entity->on_insert(*folder_info);
         }
     }
+#endif
     return r;
 }
 

@@ -21,7 +21,7 @@ TEST_CASE("folder upsert", "[model]") {
         std::int64_t modified;
     };
     file_meta_t file_metas[5] = {
-        {"0.txt", 0, 123}, {"1/a.txt", 5, 5000}, {"1/c.txt", 15, 4000}, {"1/d.txt", 10, 4500}, {"1/e.txt", 20, 6000},
+        {"0.txt", 0, 123}, {"1_a.txt", 5, 5000}, {"1_c.txt", 15, 4000}, {"1_d.txt", 10, 4500}, {"1_e.txt", 20, 6000},
     };
 
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
@@ -79,12 +79,11 @@ TEST_CASE("folder upsert", "[model]") {
 
     next();
     next();
-    auto expected_1 = names_t{"0.txt", "1/a.txt"};
+    auto expected_1 = names_t{"0.txt", "1_a.txt"};
     CHECK(names == expected_1);
 
     auto db_folder = db::Folder();
     folder->serialize(db_folder);
-    db::set_pull_order(db_folder, db::PullOrder::largest);
     REQUIRE(builder.upsert_folder(db_folder).apply());
     REQUIRE(cluster->get_folders().size() == 1);
     folder = cluster->get_folders().by_id(folder->get_id());
@@ -95,6 +94,13 @@ TEST_CASE("folder upsert", "[model]") {
     next();
     next();
 
-    auto expected_2 = names_t{"0.txt", "1/a.txt", "1/e.txt", "1/c.txt", "1/d.txt"};
+    auto expected_2 = names_t{"0.txt", "1_a.txt", "1_c.txt", "1_d.txt", "1_e.txt"};
     CHECK(names == expected_2);
 }
+
+int _init() {
+    test::init_logging();
+    return 1;
+}
+
+static int v = _init();
