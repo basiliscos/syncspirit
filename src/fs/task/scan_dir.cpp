@@ -1,3 +1,4 @@
+#if 0
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
@@ -131,3 +132,4 @@ bool scan_dir_t::process(fs_slave_t &slave, execution_context_t &context) noexce
 
     return false;
 }
+#endif

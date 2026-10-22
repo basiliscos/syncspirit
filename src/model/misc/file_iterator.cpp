@@ -209,11 +209,12 @@ void file_iterator_t::on_upsert(folder_t &folder) noexcept {
         }
     }
 }
+#endif
 
-void file_iterator_t::on_remove(folder_info_ptr_t peer_folder) noexcept {
-    for (auto it = folders_list.begin(); it != folders_list.end(); ++it) {
-        if (it->peer_folder == peer_folder) {
-            folders_list.erase(it);
+void file_iterator_t::on_remove(const folder_info_t* peer_folder) noexcept {
+    for (auto it = substates.begin(); it != substates.end(); ++it) {
+        if (it->fi == peer_folder) {
+            substates.erase(it);
             folder_index = 0;
             return;
         }
@@ -221,19 +222,19 @@ void file_iterator_t::on_remove(folder_info_ptr_t peer_folder) noexcept {
 }
 
 void file_iterator_t::recheck(const folder_info_t &remote_fi, file_info_t &remote) noexcept {
-    for (auto &fi : folders_list) {
-        if (fi.peer_folder.get() == &remote_fi) {
-            if (fi.can_receive) {
-                auto folder = fi.peer_folder->get_folder();
-                auto &local_folder = *folder->get_folder_info(*folder->get_cluster()->get_device());
-                auto &local_files = local_folder.get_file_infos();
-                auto local_file = local_files.by_name(remote.get_name()->get_full_name());
-                if (resolve(remote, local_file.get(), local_folder) != advance_action_t::ignore) {
-                    fi.files_queue->emplace(&remote);
+    for (auto &ss: substates) {
+        if (ss.fi.get() == &remote_fi) {
+            auto folder = ss.fi->get_folder();
+            auto can_receive = folder->get_folder_type() != db::FolderType::send;
+            if (can_receive) {
+                auto local_device = folder->get_cluster()->get_device().get();
+                auto local_folder = folder->get_folder_info(*local_device);
+                auto local_file = static_cast<file_info_t*>(remote.get_entity()->get_presence(local_device));
+                if (resolve(remote, local_file, *local_folder) != advance_action_t::ignore) {
+                    ss.it->set_min_sequence(remote.get_sequence() - 1);
                 }
             }
             break;
         }
     }
 }
-#endif

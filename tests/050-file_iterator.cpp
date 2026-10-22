@@ -2,12 +2,10 @@
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "test-utils.h"
-#include "access.h"
 #include "model/cluster.h"
 #include "model/misc/file_iterator.h"
 #include "model/misc/sequencer.h"
 #include "diff-builder.h"
-#include <set>
 
 using namespace syncspirit;
 using namespace syncspirit::test;
@@ -282,7 +280,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
             }
         }
     }
-#if 0
     SECTION("synchronizing non-empty files") {
         auto b1_hash = utils::sha256_digest(as_bytes("12345")).value();
         auto b1 = proto::BlockInfo();
@@ -328,6 +325,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
         }
 
         SECTION("have local, but outdated") {
+            auto path = utils::path_t::make_generic("a.txt");
             auto pr_fi = proto::FileInfo();
             proto::set_name(pr_fi, "a.txt");
             proto::set_sequence(pr_fi, 10);
@@ -339,14 +337,14 @@ TEST_CASE("file iterator, single folder", "[model]") {
             proto::add_counters(v, proto::Counter(1, 1));
 
             auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
-            my_files.put(my_file);
+            REQUIRE(my_folder->add_strict(my_file.get(), false));
 
             proto::add_counters(v, proto::Counter(2, 2));
             REQUIRE(
                 builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
 
             SECTION("has not bee scanned") {
-                auto &peer_file = *peer_files.begin();
+                auto [peer_file, _] = peer_folder->get_by_path(path);
                 file_iterator->recheck(*peer_folder, *peer_file);
                 CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
             }
@@ -362,8 +360,8 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
                 REQUIRE(builder.apply());
             }
-        }
 
+        }
         SECTION("have local, local is newer") {
             auto pr_fi = proto::FileInfo();
             proto::set_name(pr_fi, "a.txt");
@@ -379,13 +377,14 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
             proto::add_counters(v, proto::Counter(2, 2));
             auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
-            my_files.put(my_file);
+            REQUIRE(my_folder->add_strict(my_file.get(), false));
 
             REQUIRE(builder.apply());
             CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
         }
 
         SECTION("peer file is unreacheable") {
+            auto path = utils::path_t::make_generic("a.txt");
             auto pr_fi = proto::FileInfo();
             proto::set_name(pr_fi, "a.txt");
             proto::set_sequence(pr_fi, 10);
@@ -395,16 +394,14 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
             REQUIRE(
                 builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
-            auto f = peer_files.by_name(proto::get_name(pr_fi));
+            auto [f, _] = peer_folder->get_by_path(path);
             REQUIRE(builder.remote_copy(*f, *peer_folder).mark_reacheable(f, *peer_folder, false).apply());
 
             CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
         }
     }
-#endif
 }
 
-#if 0
 TEST_CASE("file iterator for 2 folders", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
@@ -597,6 +594,8 @@ TEST_CASE("file iterator, create, share, iterae, unshare, share, iterate", "[mod
     CHECK(file_iterator->next().action == A::ignore);
 }
 
+#if 0
+
 TEST_CASE("file pull order", "[model]") {
     using names_t = std::vector<std::string>;
     struct file_meta_t {
@@ -736,6 +735,7 @@ TEST_CASE("file pull order", "[model]") {
         CHECK(names == expected);
     }
 }
+#endif
 
 TEST_CASE("no file iteration for send-only folder", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
@@ -793,7 +793,6 @@ TEST_CASE("no file iteration for send-only folder", "[model]") {
         CHECK(f->get_name()->get_full_name() == "a.txt");
     }
 }
-#endif
 
 int _init() {
     test::init_logging();

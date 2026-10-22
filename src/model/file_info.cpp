@@ -414,15 +414,15 @@ void file_info_t::mark_local(bool available) noexcept {
 void file_info_t::recheck(const folder_info_t &folder_info) noexcept {
     auto self = folder_info.get_device();
     auto folder = folder_info.get_folder();
+    auto entity = get_entity();
     for (auto& p : folder->get_presences()) {
         auto peer = const_cast<model::device_t *>(p->get_device());
         if (peer != self) {
             auto fit = peer->get_iterator();
             if (fit) {
-                auto fi = static_cast<model::folder_info_t *>(p.get());
-                auto [peer_file, _] = fi->get_by_path(*name);
-                std::abort(); // GET SIBLING
+                auto peer_file = static_cast<file_info_t*>(entity->get_presence(peer));
                 if (peer_file) {
+                    auto fi = folder->get_folder_info(*peer);
                     fit->recheck(*fi, *peer_file);
                 }
             }
