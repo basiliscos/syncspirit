@@ -40,6 +40,7 @@ TEST_CASE("block iterator", "[model]") {
     auto folder = folders.by_id("1234-5678");
     auto my_folder = folder->get_folder_info(*my_device);
 
+    auto path = utils::path_t::make_generic("a.txt");
     auto p_file = proto::FileInfo();
     proto::set_name(p_file, "a.txt");
     proto::set_sequence(p_file, 2);
@@ -47,7 +48,7 @@ TEST_CASE("block iterator", "[model]") {
     SECTION("no blocks") {
         REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
-        auto my_file = my_folder->get_file_infos().by_name(proto::get_name(p_file));
+        auto [my_file, _] = my_folder->get_by_path(path);
         REQUIRE(!next(my_file, *my_folder, true));
     }
 
@@ -72,14 +73,14 @@ TEST_CASE("block iterator", "[model]") {
 
             REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
-            auto my_file = my_folder->get_file_infos().by_name(proto::get_name(p_file));
+            auto [my_file, _] = my_folder->get_by_path(path);
             CHECK(!next(my_file, *my_folder, true));
         }
 
         SECTION("normal iteration") {
             REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
-            auto my_file = my_folder->get_file_infos().by_name(proto::get_name(p_file));
+            auto [my_file, _] = my_folder->get_by_path(path);
             auto bi1 = cluster->get_blocks().by_hash(b1_hash);
             auto bi2 = cluster->get_blocks().by_hash(b2_hash);
             my_file->remove_blocks();
@@ -90,13 +91,13 @@ TEST_CASE("block iterator", "[model]") {
             REQUIRE(fb1);
             CHECK(fb1.block()->get_hash() == b1_hash);
             CHECK(fb1.block_index() == 0);
-            CHECK(fb1.file() == my_file.get());
+            CHECK(fb1.file() == my_file);
 
             auto fb2 = next(my_file, *my_folder);
             REQUIRE(fb2);
             CHECK(fb2.block()->get_hash() == b2_hash);
             CHECK(fb2.block_index() == 1);
-            CHECK(fb2.file() == my_file.get());
+            CHECK(fb2.file() == my_file);
 
             REQUIRE(!next(my_file, *my_folder));
         }
@@ -104,7 +105,7 @@ TEST_CASE("block iterator", "[model]") {
         SECTION("no iteration upon unavailable file") {
             REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
-            auto my_file = my_folder->get_file_infos().by_name(proto::get_name(p_file));
+            auto [my_file, _] = my_folder->get_by_path(path);
             auto bi1 = cluster->get_blocks().by_hash(b1_hash);
             auto bi2 = cluster->get_blocks().by_hash(b2_hash);
             my_file->remove_blocks();
@@ -117,6 +118,7 @@ TEST_CASE("block iterator", "[model]") {
     }
 
     SECTION("block is available on some other local file") {
+        auto path_2 = utils::path_t::make_generic("b.txt");
         auto p_file_2 = proto::FileInfo();
         proto::set_name(p_file_2, "b.txt");
         proto::set_sequence(p_file_2, 2);
@@ -128,12 +130,12 @@ TEST_CASE("block iterator", "[model]") {
 
         REQUIRE(builder.local_update(folder->get_id(), p_file_2).apply());
 
-        auto my_file_2 = my_folder->get_file_infos().by_name(proto::get_name(p_file_2));
+        auto [my_file_2, _] = my_folder->get_by_path(path_2);
         REQUIRE(my_file_2->is_locally_available());
 
         REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
-        auto my_file = my_folder->get_file_infos().by_name(proto::get_name(p_file));
+        auto my_file = my_folder->get_by_path(path).first;
         auto bi1 = cluster->get_blocks().by_hash(b1_hash);
         my_file->remove_blocks();
         my_file->assign_block(bi1.get(), 0);
@@ -143,6 +145,6 @@ TEST_CASE("block iterator", "[model]") {
         REQUIRE(fb1);
         CHECK(fb1.block()->get_hash() == b1_hash);
         CHECK(fb1.block_index() == 0);
-        CHECK(fb1.file() == my_file.get());
+        CHECK(fb1.file() == my_file);
     }
 }
