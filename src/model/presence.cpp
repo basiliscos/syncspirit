@@ -147,6 +147,11 @@ presence_t *presence_t::get_child(std::string_view name, bool is_dir) noexcept {
     return nullptr;
 }
 
+presence_t *presence_t::get_sibling(device_t* device_) noexcept {
+    assert(device_ != device);
+    return entity->get_presence(device_);
+}
+
 void presence_t::forget_entity() noexcept { entity = nullptr; }
 
 void presence_t::forget_presence() noexcept {

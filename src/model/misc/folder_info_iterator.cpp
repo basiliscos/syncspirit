@@ -29,6 +29,10 @@ folder_info_iterator_t::folder_info_iterator_t(folder_info_ptr_t fi_) noexcept:
     reset();
 }
 
+folder_info_t* folder_info_iterator_t::get_folder_info() noexcept {
+    return fi.get();
+}
+
 bool folder_info_iterator_t::is_finished() const noexcept {
     return current == nullptr;
 }

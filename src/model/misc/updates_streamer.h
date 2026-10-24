@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2023-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023-2026 Ivan Baidakou
 
 #pragma once
 
@@ -7,9 +7,10 @@
 #include "model/file_info.h"
 #include "model/device.h"
 #include "model/folder_info.h"
+#include "model/misc/folder_info_iterator.h"
 #include "syncspirit-export.h"
-#include <optional>
-#include <unordered_map>
+#include <deque>
+#include <vector>
 #include <tuple>
 
 namespace syncspirit::model {
@@ -28,21 +29,22 @@ struct SYNCSPIRIT_API updates_streamer_t {
     void on_upsert(const folder_info_t &) noexcept;
 
   private:
-#if 0
-    struct streaming_info_t {
-        folder_info_ptr_t folder_info;
-        file_infos_map_t unseen_files;
+    using updated_files_t = std::deque<model::file_info_t*>;
+    struct update_info_t {
+        folder_info_ptr_t local_folder;
+        updated_files_t updated_files;
+        std::int64_t seen_sequence{0};
+        bool fetched{false};
+        void fetch() noexcept;
     };
-    using streaming_option_t = std::optional<streaming_info_t>;
-    using seen_info_t = std::unordered_map<folder_info_ptr_t, std::int64_t>;
+    using update_infos_t = std::vector<update_info_t>;
+
     void refresh_remote() noexcept;
 
     cluster_t &cluster;
     device_ptr_t peer;
-    device_ptr_t self;
-    seen_info_t seen_info;
-    streaming_option_t streaming;
-#endif
+    update_infos_t update_infos;
+    int current{-1};
 };
 
 } // namespace syncspirit::model

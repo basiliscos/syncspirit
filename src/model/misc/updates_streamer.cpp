@@ -2,126 +2,134 @@
 // SPDX-FileCopyrightText: 2023-2025 Ivan Baidakou
 
 #include "updates_streamer.h"
+#include <cassert>
 #include <algorithm>
-#include <spdlog/spdlog.h>
-
-#if 0
 
 using namespace syncspirit::model;
 
+void updates_streamer_t::update_info_t::fetch() noexcept {
+    assert(!fetched);
+    fetched = true;
+    auto it = folder_info_iterator_t(local_folder);
+    it.set_min_sequence(seen_sequence + 1);
+    auto file = it.next();
+    while (file) {
+        updated_files.push_front(file);
+        file = it.next();
+    }
+    auto comparator = [](const file_info_t* lhs, file_info_t* rhs) -> bool {
+        return lhs->get_sequence() < rhs->get_sequence();
+    };
+    std::sort(updated_files.begin(), updated_files.end(), comparator);
+}
+
 updates_streamer_t::updates_streamer_t(cluster_t &cluster_, device_t &device) noexcept
-    : cluster{cluster_}, peer{&device}, self{cluster.get_device()} {
+    : cluster{cluster_}, peer{&device} {
     refresh_remote();
 }
 
 void updates_streamer_t::refresh_remote() noexcept {
     auto &folders = cluster.get_folders();
+    auto local_device = cluster.get_device().get();
+    auto local_sha256 = local_device ->device_id().get_sha256();
     auto &remote_views = peer->get_remote_view_map();
-    auto streaming_folder = (model::folder_info_t *)(nullptr);
-    auto prev_seen = std::move(seen_info);
-    auto self_sha256 = cluster.get_device()->device_id().get_sha256();
-    seen_info = {};
+    auto current_folder = std::string_view();
+    if (current != -1) {
+        current_folder = update_infos[current].local_folder->get_folder()->get_id();
+    }
+    auto updates = std::uint_fast32_t{0};
     for (auto &it : folders) {
         auto &folder = *it.item;
         if (folder.get_folder_type() != db::FolderType::receive) {
-            auto peer_folder = folder.is_shared_with(*peer);
+            auto local_folder = static_cast<folder_info_t*>(folder.get_presence(local_device));
+            auto peer_folder = static_cast<folder_info_t*>(local_folder->get_sibling(peer.get()));
+            auto predicate = [&](const update_info_t& item) {return item.local_folder == local_folder; };
+            auto it_update = std::find_if( update_infos.begin(), update_infos.end(), predicate);
+            auto remove_update = false;
             if (peer_folder) {
-                auto local_folder = folder.get_folder_info(*self);
-                if (streaming && streaming->folder_info == local_folder) {
-                    streaming_folder = local_folder;
-                }
-                auto remote_view = remote_views.get(self_sha256, folder.get_id());
+                auto remote_view = remote_views.get(local_sha256, folder.get_id());
                 if (remote_view) {
                     auto index_match = remote_view->index_id == local_folder->get_index();
-                    auto remote_max = index_match ? remote_view->max_sequence : 0;
-                    auto previously_seen = prev_seen[local_folder];
-                    auto seen = std::max(remote_max, previously_seen);
-                    seen_info[local_folder] = seen;
+                    auto min_sequence = index_match ? remote_view->max_sequence : 0;
+                    if (it_update != update_infos.end()) {
+                        it_update->seen_sequence = min_sequence;
+                        if (!index_match) {
+                            it_update->seen_sequence = min_sequence;
+                            it_update->updated_files.clear();
+                        }
+                    } else {
+                        update_infos.push_back({local_folder, {}, min_sequence, false});
+                        ++updates;
+                    }
+                } else {
+                    remove_update = true;
                 }
+            } else {
+                remove_update = true;
+            }
+            if (remove_update && it_update != update_infos.end()) {
+                update_infos.erase(it_update);
             }
         }
     }
-    if (streaming && !streaming_folder) {
-        streaming.reset();
-    } else if (streaming_folder) {
-        auto &folder = *streaming_folder->get_folder();
-        auto remote_view = remote_views.get(self_sha256, folder.get_id());
-        if (remote_view) {
-            if (remote_view->index_id != streaming_folder->get_index()) {
-                streaming.reset();
+    if (updates) {
+        current = -1;
+    }
+    if (current == -1) {
+        if (!current_folder.empty()) {
+            int index{0};
+            for(auto& it_update: update_infos) {
+                if (it_update.local_folder->get_folder()->get_id() == current_folder) {
+                    current = index;
+                    break;
+                }
+                ++index;
             }
-        } else {
-            // TODO, refresh files?
+        }
+        if (current == -1 && !update_infos.empty()) {
+            current  = 0;
         }
     }
+}
+
+auto updates_streamer_t::next() noexcept -> update_t {
+    auto iterations = std::size_t{0};
+    if (current != -1) {
+        while (iterations < update_infos.size()) {
+            auto& update = update_infos[current];
+            auto& [folder_info, updated_files, seen_sequence, fetched] = update_infos[current];
+            if (!fetched) {
+                update.fetch();
+            }
+            if (!updated_files.empty()) {
+                auto initial = seen_sequence == 0;
+                if (initial) {
+                    ++seen_sequence;
+                }
+                auto fi = updated_files.front();
+                updated_files.pop_front();
+                return {fi, folder_info.get(), initial};
+            }
+            current = (current + 1) % static_cast<int>(update_infos.size());
+            ++iterations;
+        }
+        current = -1;
+    }
+    return {{}, {}, false};
 }
 
 bool updates_streamer_t::on_update(file_info_t &file, const folder_info_t &fi) noexcept {
-    assert(fi.get_device() == self);
-    bool r = false;
-    if (!streaming) {
-        for (auto &[folder_info, seen_sequence] : seen_info) {
-            if (folder_info.get() == &fi) {
-                auto max = folder_info->get_max_sequence();
-                auto unseen_files = file_infos_map_t();
-                auto [it, end] = folder_info->get_file_infos().range(seen_sequence + 1, max);
-                for (; it != end; ++it) {
-                    auto &f = *it;
-                    unseen_files.put(f.get());
+    for (auto& update: update_infos) {
+        if (update.local_folder == &fi) {
+            if (update.fetched) {
+                update.updated_files.push_back(&file);
+                if (current == -1) {
+                    current = 0;
                 }
-                streaming = streaming_info_t(folder_info, std::move(unseen_files));
-                r = true;
-                break;
+                return true;
             }
-        }
-    } else if (streaming) {
-        auto &info = *streaming;
-        if (info.folder_info.get() == &fi) {
-            info.unseen_files.put(&file);
-            r = true;
+            break;
         }
     }
-    return r;
+    return false;
 }
-
-void updates_streamer_t::on_remote_refresh() noexcept { refresh_remote(); }
-
-auto updates_streamer_t::next() noexcept -> update_t {
-    if (streaming) {
-        auto &files = streaming->unseen_files;
-        auto &proj = files.sequence_projection();
-        if (!proj.empty()) {
-            auto file = *proj.begin();
-            files.remove(file);
-            auto &seen_sequence = seen_info[streaming->folder_info];
-            auto initial = seen_sequence == 0;
-            seen_sequence = file->get_sequence();
-            return {file, streaming->folder_info.get(), initial};
-        }
-        streaming.reset();
-    }
-    for (auto &[folder_info, seen_sequence] : seen_info) {
-        auto max = folder_info->get_max_sequence();
-        if (seen_sequence < max) {
-            auto [it, end] = folder_info->get_file_infos().range(seen_sequence + 1, max);
-            if (it != end) {
-                auto initial = seen_sequence == 0;
-                auto &file = *it;
-                seen_info[folder_info] = file->get_sequence();
-                ++it;
-                if (it != end) {
-                    auto unseen_files = file_infos_map_t();
-                    for (; it != end; ++it) {
-                        auto &f = *it;
-                        unseen_files.put(f.get());
-                    }
-                    streaming = streaming_info_t(folder_info, std::move(unseen_files));
-                }
-                return {file, folder_info.get(), initial};
-            }
-        }
-    }
-    return {{}, {}, false};
-    std::abort();
-}
-#endif
