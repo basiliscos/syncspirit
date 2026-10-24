@@ -62,7 +62,13 @@ struct SYNCSPIRIT_API presence_t : model::augmentable_t {
 
     children_t& get_children() noexcept;
     presence_t *get_child(std::string_view name, bool is_dir) noexcept ;
-    presence_t *get_sibling(device_t* device) noexcept;
+    presence_t *get_sibling(const device_t* device) noexcept;
+
+    template<typename T>
+    T* get_typed_sibling(const device_t* device) noexcept {
+        return static_cast<T*>(get_sibling(device));
+    }
+
     void remove_child(const presence_t &) noexcept;
     void add_child(presence_t*, std::string_view name) noexcept;
     void forget_presence() noexcept;

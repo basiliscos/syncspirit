@@ -123,6 +123,7 @@ struct SYNCSPIRIT_API file_info_t: presence_t {
     const utils::path_ptr_t &get_name() const noexcept;
     inline version_t &get_version() noexcept { return version; }
     inline const version_t &get_version() const noexcept { return version; }
+    file_info_t* get_sibling_file(const device_t*) noexcept;
 
     inline std::int64_t get_sequence() const noexcept { return sequence; }
     void set_sequence(std::int64_t value) noexcept;
@@ -199,17 +200,6 @@ struct SYNCSPIRIT_API file_info_t: presence_t {
     guard_t guard(const model::folder_info_t &folder_info) noexcept;
 
     utils::poly_path_view_t make_conflicting_name(const utils::allocator_t &) const noexcept;
-
-#if 0
-    inline void refcouner_inc() const noexcept { ++counter; }
-    inline std::uint32_t refcouner_dec() const noexcept { return --counter; }
-    inline std::uint32_t use_count() const noexcept { return counter; }
-
-    void set_augmentation(augmentation_t &value) noexcept;
-    void set_augmentation(augmentation_ptr_t value) noexcept;
-    augmentation_ptr_t &get_augmentation() noexcept;
-    void notify_update() noexcept;
-#endif
 
     template <typename T> auto &access() noexcept;
     template <typename T> auto &access() const noexcept;

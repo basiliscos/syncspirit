@@ -207,6 +207,10 @@ utils::bytes_t file_info_t::create_key(const bu::uuid &uuid, const folder_info_p
     return key;
 }
 
+file_info_t* file_info_t::get_sibling_file(const device_t* device) noexcept {
+    return get_typed_sibling<file_info_t>(device);
+}
+
 auto file_info_t::get_name() const noexcept -> const utils::path_ptr_t & { return name; }
 
 std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
