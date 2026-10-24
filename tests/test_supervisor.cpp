@@ -7,7 +7,6 @@
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/advance/advance.h"
 #include "model/diff/peer/update_folder.h"
-#include "presentation/folder_entity.h"
 #include "proto/proto-helpers-bep.h"
 #include "proto/proto-helpers-db.h"
 #include "net/names.h"
@@ -32,7 +31,6 @@ inline auto rotor::actor_base_t::access<to::on_timer_trigger, request_id_t, bool
 
 using namespace syncspirit::net;
 using namespace syncspirit::test;
-using namespace syncspirit::presentation;
 
 supervisor_t::supervisor_t(config_t &cfg) : parent_t(cfg) {
     auto_finish = cfg.auto_finish;
@@ -147,12 +145,14 @@ void supervisor_t::on_io(fs::message::io_commands_t &message) noexcept {
 auto supervisor_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     if (make_presentation) {
+#if 0
         auto folder_id = db::get_id(diff.db);
         auto folder = cluster->get_folders().by_id(folder_id);
         if (!folder->get_augmentation()) {
             auto folder_entity = folder_entity_ptr_t(new folder_entity_t(folder));
             folder->set_augmentation(folder_entity);
         }
+#endif
     }
     return diff.visit_next(*this, custom);
 }
@@ -161,6 +161,7 @@ auto supervisor_t::operator()(const model::diff::modify::upsert_folder_info_t &d
     -> outcome::result<void> {
     auto r = diff.visit_next(*this, custom);
     if (make_presentation) {
+#if 0
         auto &folder = *cluster->get_folders().by_id(diff.folder_id);
         auto &device = *cluster->get_devices().by_sha256(diff.device_id);
         auto folder_info = folder.is_shared_with(device);
@@ -169,14 +170,15 @@ auto supervisor_t::operator()(const model::diff::modify::upsert_folder_info_t &d
             auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
             folder_entity->on_insert(*folder_info);
         }
+#endif
     }
     return r;
 }
 
 auto supervisor_t::operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-#if 0
     if (make_presentation) {
+#if 0
         auto folder = cluster->get_folders().by_id(diff.folder_id);
         auto augmentation = folder->get_augmentation().get();
         auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
@@ -188,15 +190,15 @@ auto supervisor_t::operator()(const model::diff::advance::advance_t &diff, void 
                 folder_entity->on_insert(*local_file, *local_fi);
             }
         }
-    }
 #endif
+    }
     return diff.visit_next(*this, custom);
 }
 
 auto supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
-#if 0
     if (make_presentation) {
+#if 0
         auto folder = cluster->get_folders().by_id(diff.folder_id);
         auto folder_aug = folder->get_augmentation().get();
         auto folder_entity = static_cast<presentation::folder_entity_t *>(folder_aug);
@@ -214,8 +216,8 @@ auto supervisor_t::operator()(const model::diff::peer::update_folder_t &diff, vo
                 folder_entity->on_insert(*file_info, *folder_info);
             }
         }
-    }
 #endif
+    }
     return diff.visit_next(*this, custom);
 }
 

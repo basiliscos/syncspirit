@@ -18,7 +18,7 @@ add_library(syncspirit_test_lib
     $<$<PLATFORM_ID:Windows>:win32-resource.rc>
     managed_hasher.cpp
     test_peer.cpp
-#    test_supervisor.cpp
+    test_supervisor.cpp
     test-db.cpp
     test-utils.cpp
     test-watcher.cpp
@@ -105,7 +105,7 @@ create_test(060-proto-bep.cpp)
 create_test(061-proto-db.cpp)
 # create_test(062-presentation.cpp)
 create_test(069-model-messaging.cpp)
-# create_test(070-db.cpp)
+create_test(070-db.cpp)
 # create_test(071-fs_actor.cpp)
 # create_test(072-global_discovery.cpp)
 # create_test(073-dialer.cpp)
