@@ -5,9 +5,7 @@
 
 #include "task.h"
 #include <cstdint>
-#if 0
-#include "presentation/presence.h"
-#endif
+#include "model/presence.h"
 
 namespace syncspirit::fs::task {
 
@@ -23,16 +21,12 @@ struct SYNCSPIRIT_API scan_dir_t {
     };
     using child_infos_t = std::vector<child_info_t>;
 
-#if 0
-    scan_dir_t(utils::path_t path, presentation::presence_ptr_t presence, utils::path_t single_child, bool notify,
+    scan_dir_t(utils::path_t path, model::presence_ptr_t presence, utils::path_t single_child, bool notify,
                bool recurse, bool requires_refinement) noexcept;
-#endif
     bool process(fs_slave_t &fs_slave, execution_context_t &context) noexcept;
 
     utils::path_t path;
-#if 0
-    presentation::presence_ptr_t presence;
-#endif
+    model::presence_ptr_t presence;
     std::error_code ec;
     child_infos_t child_infos;
     utils::path_t single_child;

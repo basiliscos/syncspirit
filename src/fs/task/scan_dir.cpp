@@ -1,4 +1,3 @@
-#if 0
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
@@ -34,7 +33,7 @@ struct comparator_t {
     }
 };
 
-scan_dir_t::scan_dir_t(utils::path_t path_, presentation::presence_ptr_t presence_, utils::path_t single_child_,
+scan_dir_t::scan_dir_t(utils::path_t path_, model::presence_ptr_t presence_, utils::path_t single_child_,
                        bool notify_, bool recurse_, bool requires_refinement_) noexcept
     : path{std::move(path_)}, presence{std::move(presence_)},
       ec(utils::make_error_code(utils::error_code_t::no_action)), single_child{std::move(single_child_)},
@@ -132,4 +131,3 @@ bool scan_dir_t::process(fs_slave_t &slave, execution_context_t &context) noexce
 
     return false;
 }
-#endif
