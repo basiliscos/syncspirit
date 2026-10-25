@@ -475,9 +475,6 @@ void test_index_sending() {
     F(true, 10).run();
 }
 
-#if 0
-
-
 void test_downloading() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
@@ -503,6 +500,7 @@ void test_downloading() {
                 auto index = proto::Index{};
                 proto::set_folder(index, folder_1->get_id());
                 auto file_name = std::string_view("some-file");
+                auto path = utils::path_t::make_generic(file_name);
                 auto &file = proto::add_files(index);
                 proto::set_name(file, file_name);
                 proto::set_type(file, proto::FileInfoType::FILE);
@@ -536,8 +534,7 @@ void test_downloading() {
                 CHECK(!folder_my->get_folder()->is_synchronizing());
                 REQUIRE(folder_my);
                 CHECK(folder_my->get_max_sequence() == 1ul);
-                REQUIRE(folder_my->get_file_infos().size() == 1);
-                auto f = *folder_my->get_file_infos().begin();
+                auto [f, _] = folder_my->get_by_path(path);
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 5);
@@ -567,7 +564,7 @@ void test_downloading() {
                     sup->do_process();
                     CHECK(peer_actor->blocks_requested == 1);
                     CHECK(folder_my->get_max_sequence() == 2ul);
-                    f = *folder_my->get_file_infos().begin();
+                    CHECK(folder_my->get_by_path(path).first == f);
                     CHECK(f->is_locally_available());
                     CHECK(f->get_sequence() == 2ul);
                 }
@@ -577,6 +574,7 @@ void test_downloading() {
                 auto index = proto::Index{};
                 proto::set_folder(index, folder_1->get_id());
                 auto file_name_1 = std::string_view("file-1");
+                auto path_1 = utils::path_t::make_generic(file_name_1);
                 auto file_1 = &proto::add_files(index);
                 proto::set_name(*file_1, file_name_1);
                 proto::set_type(*file_1, proto::FileInfoType::FILE);
@@ -604,6 +602,7 @@ void test_downloading() {
                 proto::set_offset(b2, 5);
 
                 auto file_name_2 = std::string_view("file-2");
+                auto path_2 = utils::path_t::make_generic(file_name_2);
                 auto file_2 = &proto::add_files(index);
                 proto::set_name(*file_2, file_name_2);
                 proto::set_type(*file_2, proto::FileInfoType::FILE);
@@ -635,16 +634,16 @@ void test_downloading() {
                     CHECK(peer_actor->blocks_requested == 2);
                     REQUIRE(folder_my);
                     CHECK(folder_my->get_max_sequence() == 2ul);
-                    REQUIRE(folder_my->get_file_infos().size() == 2);
+                    REQUIRE(folder_my->get_children().size()== 2);
                     {
-                        auto f = folder_my->get_file_infos().by_name(file_name_1);
+                        auto f = folder_my->get_by_path(path_1).first;
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
                         CHECK(f->iterate_blocks().get_total() == 1);
                         CHECK(f->is_locally_available());
                     }
                     {
-                        auto f = folder_my->get_file_infos().by_name(file_name_2);
+                        auto f = folder_my->get_by_path(path_2).first;
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
                         CHECK(f->iterate_blocks().get_total() == 1);
@@ -667,16 +666,16 @@ void test_downloading() {
                     CHECK(peer_actor->blocks_requested == 1);
                     REQUIRE(folder_my);
                     CHECK(folder_my->get_max_sequence() == 2ul);
-                    REQUIRE(folder_my->get_file_infos().size() == 2);
+                    REQUIRE(folder_my->get_children().size()== 2);
                     {
-                        auto f = folder_my->get_file_infos().by_name(file_name_1);
+                        auto f = folder_my->get_by_path(path_1).first;
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
                         CHECK(f->iterate_blocks().get_total() == 1);
                         CHECK(f->is_locally_available());
                     }
                     {
-                        auto f = folder_my->get_file_infos().by_name(file_name_2);
+                        auto f = folder_my->get_by_path(path_2).first;
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
                         CHECK(f->iterate_blocks().get_total() == 1);
@@ -702,16 +701,16 @@ void test_downloading() {
                     CHECK(peer_actor->blocks_requested == 1);
                     REQUIRE(folder_my);
                     CHECK(folder_my->get_max_sequence() == 2ul);
-                    REQUIRE(folder_my->get_file_infos().size() == 2);
+                    REQUIRE(folder_my->get_children().size() == 2);
                     {
-                        auto f = folder_my->get_file_infos().by_name(file_name_1);
+                        auto f = folder_my->get_by_path(path_1).first;
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
                         CHECK(f->iterate_blocks().get_total() == 1);
                         CHECK(f->is_locally_available());
                     }
                     {
-                        auto f = folder_my->get_file_infos().by_name(file_name_2);
+                        auto f = folder_my->get_by_path(path_2).first;
                         REQUIRE(f);
                         CHECK(f->get_size() == 10);
                         CHECK(f->iterate_blocks().get_total() == 2);
@@ -752,9 +751,9 @@ void test_downloading() {
                     CHECK(peer_actor->blocks_requested == 2);
                     REQUIRE(folder_my);
                     CHECK(folder_my->get_max_sequence() == 1ul);
-                    REQUIRE(folder_my->get_file_infos().size() == 1);
+                    REQUIRE(folder_my->get_children().size() == 1);
                     {
-                        auto f = folder_my->get_file_infos().by_name(file_name_1);
+                        auto f = folder_my->get_by_path(path_1).first;
                         REQUIRE(f);
                         CHECK(f->get_size() == 10);
                         CHECK(f->iterate_blocks().get_total() == 2);
@@ -771,7 +770,7 @@ void test_downloading() {
                     CHECK(!folder_my->get_folder()->is_synchronizing());
                     CHECK(peer_actor->blocks_requested == 2);
                     {
-                        auto f = folder_my->get_file_infos().by_name(file_name_2);
+                        auto f = folder_my->get_by_path(path_2).first;
                         REQUIRE(f);
                         CHECK(f->get_size() == 20);
                         CHECK(f->iterate_blocks().get_total() == 4);
@@ -779,10 +778,10 @@ void test_downloading() {
                     }
                 }
             }
-
             SECTION("don't attempt to download a file, which is deleted") {
                 auto folder_peer = folder_1->get_folder_info(*peer_device);
                 auto file_name = std::string_view("some-file");
+                auto path = utils::path_t::make_generic(file_name);
 
                 proto::set_max_sequence(*d_peer, folder_1_peer->get_max_sequence() + 1);
                 peer_actor->forward(cc);
@@ -829,8 +828,8 @@ void test_downloading() {
                 sup->do_process();
 
                 CHECK(folder_my->get_max_sequence() == 1ul);
-                REQUIRE(folder_my->get_file_infos().size() == 1);
-                auto f = *folder_my->get_file_infos().begin();
+                REQUIRE(folder_my->get_children().size() == 1);
+                auto f = folder_my->get_by_path(path).first;
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 0);
@@ -852,6 +851,7 @@ void test_downloading() {
                 proto::set_folder(index_update, folder_1->get_id());
 
                 auto file_name = std::string_view("some-file");
+                auto path = utils::path_t::make_generic(file_name);
                 auto &file = proto::add_files(index_update);
                 proto::set_name(file, file_name);
                 proto::set_type(file, proto::FileInfoType::FILE);
@@ -874,15 +874,15 @@ void test_downloading() {
 
                 auto folder_my = folder_1->get_folder_info(*my_device);
                 CHECK(folder_my->get_max_sequence() == 1);
-                REQUIRE(folder_my->get_file_infos().size() == 1);
-                auto f = *folder_my->get_file_infos().begin();
+                REQUIRE(folder_my->get_children().size() == 1);
+                auto f = folder_my->get_by_path(path).first;
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 5);
                 CHECK(f->iterate_blocks().get_total() == 1);
                 CHECK(f->is_locally_available());
 
-                auto fp = *folder_1_peer->get_file_infos().begin();
+                auto fp = folder_1_peer->get_by_path(path).first;
                 REQUIRE(fp);
             }
 
@@ -894,6 +894,7 @@ void test_downloading() {
                 proto::set_folder(index, folder_1->get_id());
 
                 auto file_name = std::string_view("file-1");
+                auto path = utils::path_t::make_generic(file_name);
                 auto &file_1 = proto::add_files(index);
                 proto::set_name(file_1, file_name);
                 proto::set_type(file_1, proto::FileInfoType::FILE);
@@ -933,8 +934,8 @@ void test_downloading() {
                 peer_actor->push_response(data_1, 0);
                 sup->do_process();
 
-                REQUIRE(folder_my->get_file_infos().size() == 1);
-                auto f = *folder_my->get_file_infos().begin();
+                REQUIRE(folder_my->get_children().size() == 1);
+                auto f = folder_my->get_by_path(path).first;
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 5);
@@ -942,6 +943,7 @@ void test_downloading() {
                 CHECK(f->is_locally_available());
                 CHECK(!f->is_deleted());
             }
+
             SECTION("download a file, which has the same blocks locally") {
                 peer_actor->forward(cc);
                 sup->do_process();
@@ -951,6 +953,7 @@ void test_downloading() {
 
                 auto file_name_1 = std::string_view("file-1");
                 auto &file_1 = proto::add_files(index);
+                auto path_1 = utils::path_t::make_generic(file_name_1);
                 proto::set_name(file_1, file_name_1);
                 proto::set_type(file_1, proto::FileInfoType::FILE);
                 proto::set_sequence(file_1, 10);
@@ -998,15 +1001,15 @@ void test_downloading() {
                 auto file_my = model::file_info_t::create(uuid, pr_file_my, folder_my).value();
                 file_my->assign_block(bi_1.get(), 0);
                 file_my->mark_local_available(0);
-                REQUIRE(folder_my->add_strict(file_my));
+                REQUIRE(folder_my->add_strict(file_my.get(), false));
 
                 peer_actor->forward(index);
                 peer_actor->push_response(data_2, 0);
                 cluster->modify_write_requests(10);
                 sup->do_process();
 
-                REQUIRE(folder_my->get_file_infos().size() == 2);
-                auto f = folder_my->get_file_infos().by_name(file_name_1);
+                REQUIRE(folder_my->get_children().size() == 2);
+                auto f = folder_my->get_by_path(path_1).first;
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name_1);
                 CHECK(f->get_size() == 10);
@@ -1017,6 +1020,8 @@ void test_downloading() {
     };
     F(true, 10).run();
 }
+
+#if 0
 
 void test_downloading_special() {
     struct F : fixture_t {
@@ -2688,7 +2693,7 @@ int _init() {
     REGISTER_TEST_CASE(test_overwhelm, "test_overwhelm", "[net]");
     REGISTER_TEST_CASE(test_index_receiving, "test_index_receiving", "[net]");
     REGISTER_TEST_CASE(test_index_sending, "test_index_sending", "[net]");
-    // REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
+    REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
     // REGISTER_TEST_CASE(test_downloading_special, "test_downloading_special", "[net]");
     // REGISTER_TEST_CASE(test_downloading_errors, "test_downloading_errors", "[net]");
     // REGISTER_TEST_CASE(test_download_from_scratch, "test_download_from_scratch", "[net]");
