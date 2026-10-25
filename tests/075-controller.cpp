@@ -1316,9 +1316,6 @@ void test_downloading_errors() {
     F(true, 10).run();
 }
 
-#if 0
-
-
 void test_download_from_scratch() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
@@ -1363,6 +1360,7 @@ void test_download_from_scratch() {
             auto index = proto::Index{};
             proto::set_folder(index, folder_1->get_id());
             auto file_name = std::string_view("some-file");
+            auto path = utils::path_t::make_generic(file_name);
             auto &file = proto::add_files(index);
             proto::set_name(file, file_name);
             proto::set_type(file, proto::FileInfoType::FILE);
@@ -1396,7 +1394,7 @@ void test_download_from_scratch() {
             CHECK(folder_my->get_max_sequence() == 1ul);
             CHECK(!folder_my->get_folder()->is_synchronizing());
 
-            auto f = folder_my->get_file_infos().by_name(file_name);
+            auto f = folder_my->get_by_path(path).first;
             REQUIRE(f);
             CHECK(f->get_size() == 10);
             CHECK(f->iterate_blocks().get_total() == 2);
@@ -1434,6 +1432,8 @@ void test_download_from_scratch() {
     };
     F(false, 10, false).run();
 }
+
+#if 0
 
 void test_download_resuming() {
     struct F : fixture_t {
@@ -2700,7 +2700,7 @@ int _init() {
     REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
     REGISTER_TEST_CASE(test_downloading_special, "test_downloading_special", "[net]");
     REGISTER_TEST_CASE(test_downloading_errors, "test_downloading_errors", "[net]");
-    // REGISTER_TEST_CASE(test_download_from_scratch, "test_download_from_scratch", "[net]");
+    REGISTER_TEST_CASE(test_download_from_scratch, "test_download_from_scratch", "[net]");
     // REGISTER_TEST_CASE(test_download_resuming, "test_download_resuming", "[net]");
     // REGISTER_TEST_CASE(test_uniqueness, "test_uniqueness", "[net]");
     // REGISTER_TEST_CASE(test_initiate_my_sharing, "test_initiate_my_sharing", "[net]");
