@@ -1021,8 +1021,6 @@ void test_downloading() {
     F(true, 10).run();
 }
 
-#if 0
-
 void test_downloading_special() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
@@ -1103,6 +1101,7 @@ void test_downloading_special() {
                 proto::set_folder(index, folder_1->get_id());
 
                 auto file_name = std::string_view("file-1");
+                auto path = utils::path_t::make_generic(file_name);
                 auto &file = proto::add_files(index);
                 proto::set_name(file, file_name);
                 proto::set_type(file, proto::FileInfoType::FILE);
@@ -1158,9 +1157,9 @@ void test_downloading_special() {
                 CHECK(peer_actor->blocks_requested == 6);
                 REQUIRE(folder_my);
                 CHECK(folder_my->get_max_sequence() == 1ul);
-                REQUIRE(folder_my->get_file_infos().size() == 1);
+                REQUIRE(folder_my->get_children().size() == 1);
 
-                auto f = folder_my->get_file_infos().by_name(file_name);
+                auto f = folder_my->get_by_path(path).first;
                 REQUIRE(f);
                 CHECK(f->get_size() == 9 * 5);
                 CHECK(f->iterate_blocks().get_total() == 9);
@@ -1170,6 +1169,9 @@ void test_downloading_special() {
     };
     F(true, 10).run();
 }
+
+#if 0
+
 
 void test_downloading_errors() {
     struct F : fixture_t {
@@ -2694,7 +2696,7 @@ int _init() {
     REGISTER_TEST_CASE(test_index_receiving, "test_index_receiving", "[net]");
     REGISTER_TEST_CASE(test_index_sending, "test_index_sending", "[net]");
     REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
-    // REGISTER_TEST_CASE(test_downloading_special, "test_downloading_special", "[net]");
+    REGISTER_TEST_CASE(test_downloading_special, "test_downloading_special", "[net]");
     // REGISTER_TEST_CASE(test_downloading_errors, "test_downloading_errors", "[net]");
     // REGISTER_TEST_CASE(test_download_from_scratch, "test_download_from_scratch", "[net]");
     // REGISTER_TEST_CASE(test_download_resuming, "test_download_resuming", "[net]");
