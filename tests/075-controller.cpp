@@ -1433,8 +1433,6 @@ void test_download_from_scratch() {
     F(false, 10, false).run();
 }
 
-#if 0
-
 void test_download_resuming() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
@@ -1463,6 +1461,7 @@ void test_download_resuming() {
             proto::set_folder(index, folder_1->get_id());
 
             auto file_name = std::string_view("some-file");
+            auto path = utils::path_t::make_generic(file_name);
             auto &file = proto::add_files(index);
             proto::set_name(file, file_name);
             proto::set_type(file, proto::FileInfoType::FILE);
@@ -1508,7 +1507,8 @@ void test_download_resuming() {
 
             SECTION("mark peer block locally available => just flush unfinished") {
                 auto folder_peer = folder_1->get_folder_info(*peer_device);
-                auto f_peer = folder_peer->get_file_infos().by_name(file_name);
+                auto f_peer = folder_peer->get_by_path(path).first;
+                REQUIRE(f_peer);
                 f_peer->mark_local_available(1);
 
                 peer_actor->forward(cc);
@@ -1519,7 +1519,7 @@ void test_download_resuming() {
             CHECK(folder_my->get_max_sequence() == 1ul);
             CHECK(!folder_my->get_folder()->is_synchronizing());
 
-            auto f = folder_my->get_file_infos().by_name(file_name);
+            auto f = folder_my->get_by_path(path).first;
             REQUIRE(f);
             CHECK(f->get_size() == 10);
             CHECK(f->iterate_blocks().get_total() == 2);
@@ -1561,13 +1561,14 @@ void test_uniqueness() {
                 .apply(*sup, target.get());
 
 #if defined(SYNCSPIRIT_WIN) || defined(SYNCSPIRIT_MAC)
-            REQUIRE(folder_my->get_file_infos().size() == 0);
+            REQUIRE(folder_my->get_children().size() == 0);
 #else
-            REQUIRE(folder_my->get_file_infos().size() == 2);
+            REQUIRE(folder_my->get_children().size() == 2);
 #endif
         }
     };
     F(true, 10, true).run();
+
 }
 
 void test_initiate_my_sharing() {
@@ -1805,6 +1806,8 @@ void test_sending_index_updates() {
     };
     F(true, 10).run();
 }
+
+#if 0
 
 void test_uploading() {
     struct F : fixture_t {
@@ -2701,11 +2704,11 @@ int _init() {
     REGISTER_TEST_CASE(test_downloading_special, "test_downloading_special", "[net]");
     REGISTER_TEST_CASE(test_downloading_errors, "test_downloading_errors", "[net]");
     REGISTER_TEST_CASE(test_download_from_scratch, "test_download_from_scratch", "[net]");
-    // REGISTER_TEST_CASE(test_download_resuming, "test_download_resuming", "[net]");
-    // REGISTER_TEST_CASE(test_uniqueness, "test_uniqueness", "[net]");
-    // REGISTER_TEST_CASE(test_initiate_my_sharing, "test_initiate_my_sharing", "[net]");
-    // REGISTER_TEST_CASE(test_initiate_peer_sharing, "test_initiate_peer_sharing", "[net]");
-    // REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
+    REGISTER_TEST_CASE(test_download_resuming, "test_download_resuming", "[net]");
+    REGISTER_TEST_CASE(test_uniqueness, "test_uniqueness", "[net]");
+    REGISTER_TEST_CASE(test_initiate_my_sharing, "test_initiate_my_sharing", "[net]");
+    REGISTER_TEST_CASE(test_initiate_peer_sharing, "test_initiate_peer_sharing", "[net]");
+    REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
     // REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");
     // REGISTER_TEST_CASE(test_overload_uploading, "test_overload_uploading", "[net]");
     // REGISTER_TEST_CASE(test_peer_down, "test_peer_down", "[net]");
