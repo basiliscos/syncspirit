@@ -266,10 +266,22 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 auto pr_fi_3 = proto::FileInfo();
                 proto::set_name(pr_fi_3, "c.txt");
                 proto::set_sequence(pr_fi_3, 12ul);
-                auto ec = builder.make_index(peer_id.get_sha256(), folder->get_id())
-                              .add(pr_fi_3, peer_device)
-                              .finish()
-                              .apply();
+
+                SECTION("when iteration isn't finished") {
+                    auto ec = builder.make_index(peer_id.get_sha256(), folder->get_id())
+                                  .add(pr_fi_3, peer_device)
+                                  .finish()
+                                  .apply();
+                    REQUIRE(!ec.has_error());
+                }
+                SECTION("when iteration is finished") {
+                    CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
+                    auto ec = builder.make_index(peer_id.get_sha256(), folder->get_id())
+                                  .add(pr_fi_3, peer_device)
+                                  .finish()
+                                  .apply();
+                    REQUIRE(!ec.has_error());
+                }
 
                 auto [f_3, fi_3, lf_3, action_3] = file_iterator->next();
                 REQUIRE(f_3);

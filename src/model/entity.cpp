@@ -6,6 +6,7 @@
 #include "folder.h"
 #include "cluster.h"
 #include "utils/path_view.hpp"
+#include "entity/file.h"
 #include <cassert>
 #include <memory_resource>
 

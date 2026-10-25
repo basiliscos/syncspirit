@@ -44,29 +44,6 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
         std::int64_t seen_sequence;
     };
     using substates_t = std::vector<substate_t>;
-#if 0
-    using file_comparator_ptr_t = std::unique_ptr<file_comparator_t>;
-    using queue_t = std::set<file_info_t *, file_comparator_t>;
-    using queue_ptr_t = std::unique_ptr<queue_t>;
-
-    struct folder_iterator_t {
-        using it_t = typename queue_t::iterator;
-        model::folder_info_ptr_t peer_folder;
-        queue_ptr_t files_queue;
-        std::uint64_t seen_index;
-        std::int64_t seen_sequence;
-        it_t it;
-        bool can_receive;
-    };
-    using folder_iterators_t = std::vector<folder_iterator_t>;
-
-    folder_iterator_t &prepare_folder(folder_info_ptr_t peer_folder) noexcept;
-    folder_iterator_t &find_folder(folder_t *folder) noexcept;
-    void populate(folder_iterator_t &it) noexcept;
-
-    std::size_t folder_index;
-    folder_iterators_t folders_list;
-#endif
     void check(model::folder_info_t* fi) noexcept;
     std::size_t folder_index;
     cluster_t &cluster;

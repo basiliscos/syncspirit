@@ -242,7 +242,7 @@ add_library(syncspirit_core
     src/model/version.cpp
     src/net/acceptor_actor.cpp
     src/net/cluster_supervisor.cpp
-    # src/net/controller_actor.cpp
+    src/net/controller_actor.cpp
     src/net/db_actor.cpp
     src/net/dialer_actor.cpp
     src/net/global_discovery_actor.cpp

@@ -1,4 +1,3 @@
-#if 0
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
@@ -19,8 +18,6 @@
 #include "model/diff/peer/cluster_update.h"
 #include "model/diff/peer/update_folder.h"
 #include "model/misc/resolver.h"
-#include "presentation/entity.h"
-#include "presentation/presence.h"
 #include "proto/bep_support.h"
 #include "proto/proto-helpers-bep.h"
 #include "proto/proto-helpers-db.h"
@@ -151,10 +148,10 @@ struct C::stack_context_t : model::diff::diff_assember_t {
     void ack_block(block_ack_context_t *io_ctx, bool unlock_block) noexcept {
         using namespace model::diff;
         auto folder_id = io_ctx->folder->get_id();
-        auto name = std::string(io_ctx->target_file->get_name()->get_full_name());
+        auto& path = io_ctx->target_file->get_name();
         auto device_id = utils::bytes_t(io_ctx->target_folder->get_device()->device_id().get_sha256());
         auto hash = utils::bytes_t(io_ctx->block->get_hash());
-        auto diff = new modify::block_ack_t(std::move(name), std::string(folder_id), std::move(device_id),
+        auto diff = new modify::block_ack_t(path->clone(), std::string(folder_id), std::move(device_id),
                                             std::move(hash), io_ctx->block_index, unlock_block);
         push_back(diff);
     }
@@ -166,14 +163,14 @@ struct C::stack_context_t : model::diff::diff_assember_t {
         return locked_blocks.count(&block) || block.is_locked();
     }
 
-    void mark_unreachable(std::string_view name, std::string_view folder_id) noexcept {
+    void mark_unreachable(const utils::path_base_t& path, std::string_view folder_id) noexcept {
         auto folder = actor.cluster->get_folders().by_id(folder_id);
         if (folder) {
             auto peer_folder = folder->get_folder_info(*actor.peer);
             if (peer_folder) {
-                auto peer_file = peer_folder->get_file_infos().by_name(name);
+                auto [peer_file, _] = peer_folder->get_by_path(path);
                 if (peer_file && !peer_file->is_unreachable()) {
-                    LOG_DEBUG(actor.log, "marking '{}' marking unreachable", peer_file);
+                    LOG_DEBUG(actor.log, "marking '{}' marking unreachable", *peer_file);
                     peer_file->mark_unreachable(true);
                     push_back(new model::diff::modify::mark_reachable_t(*peer_file, *peer_folder, false));
                 }
@@ -564,10 +561,8 @@ OUTER:
             if (in_sync) {
                 continue;
             }
-            auto augmentation = file->get_augmentation();
-            auto presence = static_cast<presentation::presence_t *>(augmentation.get());
-            if (!presence->is_unique()) {
-                LOG_WARN(log, "file '{}' is not unique in folder '{}', skipping", file->get_name()->get_full_name(),
+            if (!file->is_unique()) {
+                LOG_WARN(log, "file '{}' is not unique in folder '{}', skipping", *file->get_name(),
                          peer_folder->get_folder()->get_label());
                 continue;
             }
@@ -855,10 +850,17 @@ auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &di
     auto ctx = reinterpret_cast<update_context_t *>(custom);
     if (ctx->from_self) {
         auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto &files_map = folder->get_folder_info(*peer)->get_file_infos();
-        for (auto &f : diff.files) {
-            auto file = files_map.by_name(proto::get_name(f));
-            cancel_sync(file.get());
+        auto folder_peer = folder->get_folder_info(*peer);
+        if (folder_peer) {
+            auto buffer = std::array<std::byte, 1024 * 32>();
+            auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+            auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+            for (auto &f : diff.files) {
+                auto name = proto::get_name(f);
+                auto path = utils::make_generic_view(name, allocator);
+                auto [file, _] = folder_peer->get_by_path(path);
+                cancel_sync(file);
+            }
         }
     }
     return diff.visit_next(*this, custom);
@@ -869,25 +871,30 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     auto ctx = reinterpret_cast<update_context_t *>(custom);
     if (folder && !folder->is_suspended()) {
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
         auto &self = *cluster->get_device();
         auto local_folder = folder->get_folder_info(self);
         auto peer_folder = folder->get_folder_info(diff.peer_id);
         auto local_file = model::file_info_ptr_t();
         if (peer_folder) {
             auto name = proto::get_name(diff.proto_source);
-            auto file = peer_folder->get_file_infos().by_name(name);
+            auto path = utils::make_generic_view(name, allocator);
+            auto [file, _] = peer_folder->get_by_path(path);
             if (file) {
                 if (diff.peer_id == peer->device_id().get_sha256()) {
-                    local_file = local_folder->get_file_infos().by_name(name);
+                    local_file = file->get_sibling_file(&self);
                     if (file->is_file() && file->iterate_blocks().get_total()) {
-                        cancel_sync(file.get());
+                        cancel_sync(file);
                     }
                 }
             }
         }
         if (diff.peer_id == self.device_id().get_sha256()) {
             auto name = proto::get_name(diff.proto_local);
-            local_file = local_folder->get_file_infos().by_name(name);
+            auto path = utils::make_generic_view(name, allocator);
+            local_file = local_folder->get_by_path(path).first;
             assert(local_file);
         }
         if (local_file) {
@@ -980,13 +987,13 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
     -> outcome::result<void> {
     auto ctx = reinterpret_cast<update_context_t *>(custom);
     auto &folder_id = diff.folder_id;
-    auto &file_name = diff.file_name;
+    auto &path = diff.path;
     auto folder = cluster->get_folders().by_id(folder_id);
     auto device = cluster->get_devices().by_sha256(diff.device_id);
     auto folder_info = folder->get_folder_info(*device);
-    auto file = folder_info->get_file_infos().by_name(file_name);
+    auto [file, _] = folder_info->get_by_path(path);
     if (ctx->from_self) {
-        cancel_sync(file.get());
+        cancel_sync(file);
     }
     if (device == cluster->get_device() && updates_streamer) {
         updates_streamer->on_update(*file, *folder_info);
@@ -1002,21 +1009,22 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
         if (folder) {
             auto folder_info = folder->get_folder_info(diff.device_id);
             if (folder_info) {
-                auto file = folder_info->get_file_infos().by_name(diff.file_name);
+                auto [file, _] = folder_info->get_by_path(diff.path);
                 if (file) {
                     if (file->is_locally_available()) {
-                        auto local_fi = folder->get_folder_info(*cluster->get_device());
+                        auto local_device = cluster->get_device().get();
+                        auto local_fi = folder->get_folder_info(*local_device);
                         if (local_fi) {
                             auto it = synchronizing_files.find(file->get_full_id());
                             if (it != synchronizing_files.end()) {
                                 auto &guard = it->second;
                                 if (!guard.finished) {
                                     guard.finished = true;
-                                    auto local_file = local_fi->get_file_infos().by_name(diff.file_name);
-                                    auto action = resolve(*file, local_file.get(), *local_fi);
+                                    auto local_file = file->get_sibling_file(local_device);
+                                    auto action = resolve(*file, local_file, *local_fi);
                                     if (action != model::advance_action_t::ignore) {
                                         LOG_TRACE(log, "on_block_update, finalizing '{}'", *file);
-                                        io_finish_file(local_file.get(), *file, *folder_info, action, *ctx);
+                                        io_finish_file(local_file, *file, *folder_info, action, *ctx);
                                     } else {
                                         LOG_DEBUG(log, "on_block_update, already have actual '{}', noop", *file);
                                     }
@@ -1109,9 +1117,13 @@ void controller_actor_t::on_message(proto::Request &req, stack_context_t &ctx) n
             if (!peer_folder) {
                 code = proto::ErrorCode::NO_SUCH_FILE;
             } else {
+                auto buffer = std::array<std::byte, 1024 * 32>();
+                auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+                auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
                 local_folder = folder->get_folder_info(*cluster->get_device());
                 auto name = proto::get_name(req);
-                local_file = local_folder->get_file_infos().by_name(name);
+                auto path = utils::make_generic_view(name, allocator);
+                local_file = local_folder->get_by_path(path).first;
                 if (!local_file) {
                     code = proto::ErrorCode::NO_SUCH_FILE;
                 } else {
@@ -1171,12 +1183,16 @@ void controller_actor_t::on_message(proto::Response &message, stack_context_t &c
     auto file = model::file_info_ptr_t();
     auto block = (const model::block_info_t *)(nullptr);
     auto file_block = (const model::file_block_t *)(nullptr);
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    auto path = utils::make_generic_view(file_name, allocator);
 
     if (folder && !folder->is_suspended()) {
         peer_folder = folder->get_folder_info(*peer);
     }
     if (peer_folder) {
-        auto f = peer_folder->get_file_infos().by_name(file_name);
+        auto [f, _] = peer_folder->get_by_path(path);
         if (f->get_sequence() == peer_context->sequence) {
             file = std::move(f);
         }
@@ -1202,9 +1218,9 @@ void controller_actor_t::on_message(proto::Response &message, stack_context_t &c
     if (state != r::state_t::OPERATIONAL) {
         do_release_block = true;
         try_next = false;
-        LOG_DEBUG(log, "on_block, file = '{}',  non-operational ignoring", file_name);
+        LOG_DEBUG(log, "on_block, file = '{}',  non-operational ignoring", path);
     } else if (!file) {
-        LOG_DEBUG(log, "on_block, file '{}' is not longer available in '{}'", file_name, folder_id);
+        LOG_DEBUG(log, "on_block, file '{}' is not longer available in '{}'", path, folder_id);
         do_release_block = true;
     } else {
         auto code = proto::get_code(message);
@@ -1213,7 +1229,7 @@ void controller_actor_t::on_message(proto::Response &message, stack_context_t &c
             do_release_block = true;
             if (!file->is_unreachable()) {
                 LOG_WARN(log, "can't receive block from file '{}': {}", *file, code_int);
-                stack_ctx.mark_unreachable(file_name, folder_id);
+                stack_ctx.mark_unreachable(path, folder_id);
                 cancel_sync(file.get());
             }
         } else {
@@ -1262,9 +1278,9 @@ void controller_actor_t::postprocess_io(fs::payload::remote_copy_t &res, stack_c
         auto diff = advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer, allocator);
         ctx.push_back(diff.get());
     } else {
-        auto name = io_ctx->peer_file->get_name()->get_full_name();
+        auto& path = io_ctx->peer_file->get_name();
         auto folder_id = io_ctx->peer_folder->get_folder()->get_id();
-        ctx.mark_unreachable(name, folder_id);
+        ctx.mark_unreachable(*path, folder_id);
     }
 }
 
@@ -1273,9 +1289,9 @@ void controller_actor_t::postprocess_io(fs::payload::append_block_t &res, stack_
     if (res.result) {
         ctx.ack_block(io_ctx, true);
     } else {
-        auto name = io_ctx->target_file->get_name()->get_full_name();
+        auto& path = io_ctx->target_file->get_name();
         auto folder_id = io_ctx->folder->get_id();
-        ctx.mark_unreachable(name, folder_id);
+        ctx.mark_unreachable(*path, folder_id);
     }
 }
 
@@ -1284,9 +1300,9 @@ void controller_actor_t::postprocess_io(fs::payload::clone_block_t &res, stack_c
     if (res.result) {
         ctx.ack_block(io_ctx, false);
     } else {
-        auto name = io_ctx->target_file->get_name()->get_full_name();
+        auto& path = io_ctx->target_file->get_name();
         auto folder_id = io_ctx->folder->get_id();
-        ctx.mark_unreachable(name, folder_id);
+        ctx.mark_unreachable(*path, folder_id);
     }
 }
 
@@ -1300,9 +1316,9 @@ void controller_actor_t::postprocess_io(fs::payload::finish_file_t &res, stack_c
             advance::advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer, allocator);
         ctx.push_back(diff.get());
     } else {
-        auto name = io_ctx->peer_file->get_name()->get_full_name();
+        auto& path = io_ctx->peer_file->get_name();
         auto folder_id = io_ctx->peer_folder->get_folder()->get_id();
-        ctx.mark_unreachable(name, folder_id);
+        ctx.mark_unreachable(*path, folder_id);
     }
 }
 
@@ -1316,9 +1332,9 @@ void controller_actor_t::postprocess_io(fs::payload::update_meta_t &res, stack_c
             advance::advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer, allocator);
         ctx.push_back(diff.get());
     } else {
-        auto name = io_ctx->peer_file->get_name()->get_full_name();
+        auto& path = io_ctx->peer_file->get_name();
         auto folder_id = io_ctx->peer_folder->get_folder()->get_id();
-        ctx.mark_unreachable(name, folder_id);
+        ctx.mark_unreachable(*path, folder_id);
     }
 }
 
@@ -1328,9 +1344,13 @@ void controller_actor_t::on_digest(hasher::message::digest_t &res) noexcept {
 
     auto peer_context = static_cast<peer_request_context_t *>(res.payload.context.get());
 
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto block_hash = proto::get_hash(peer_context->request);
     auto folder_id = proto::get_folder(peer_context->request);
-    auto file_name = proto::get_name(peer_context->request);
+    auto file_name_ = proto::get_name(peer_context->request);
+    auto path = utils::make_generic_view(file_name_, allocator);
     auto folder = cluster->get_folders().by_id(folder_id);
     auto peer_folder = model::folder_info_ptr_t();
     auto file = model::file_info_ptr_t();
@@ -1341,7 +1361,8 @@ void controller_actor_t::on_digest(hasher::message::digest_t &res) noexcept {
         peer_folder = folder->get_folder_info(*peer);
     }
     if (peer_folder) {
-        auto f = peer_folder->get_file_infos().by_name(file_name);
+        auto [f, _] = peer_folder->get_by_path(path);
+        assert(f);
         if (f->get_sequence() == peer_context->sequence) {
             file = std::move(f);
         }
@@ -1365,13 +1386,13 @@ void controller_actor_t::on_digest(hasher::message::digest_t &res) noexcept {
     auto stack_ctx = stack_context_t(*this);
     auto &result = res.payload.result;
     if (state != r::state_t::OPERATIONAL) {
-        LOG_DEBUG(log, "on_validation, non-operational, ingoring block from '{}'", file_name);
+        LOG_DEBUG(log, "on_validation, non-operational, ingoring block from '{}'", path);
         do_release_block = true;
     } else if (!file) {
-        LOG_DEBUG(log, "on_validation, file '{}' is not longer available in '{}'", file_name, folder_id);
+        LOG_DEBUG(log, "on_validation, file '{}' is not longer available in '{}'", path, folder_id);
         do_release_block = true;
     } else if (!peer_address) {
-        LOG_DEBUG(log, "on_validation, file: '{}', peer is no longer available", file_name);
+        LOG_DEBUG(log, "on_validation, file: '{}', peer is no longer available", path);
         do_release_block = true;
     } else {
         if (result.has_error() || result.assume_value() != block->get_hash()) {
@@ -1382,7 +1403,7 @@ void controller_actor_t::on_digest(hasher::message::digest_t &res) noexcept {
                     LOG_WARN(log, "digest mismatch for file '{}', expected '{}', got '{}'", *file, block->get_hash(),
                              result.assume_value());
                 }
-                stack_ctx.mark_unreachable(file_name, folder_id);
+                stack_ctx.mark_unreachable(path, folder_id);
             }
             do_release_block = true;
             try_next = true;
@@ -1521,4 +1542,3 @@ auto controller_actor_t::compare_with_local(model::file_info_t &peer_file, model
 
     return peer_file.is_locally_available() ? LD::unflushed : LD::content;
 }
-#endif

@@ -34,7 +34,7 @@ folder_info_t* folder_info_iterator_t::get_folder_info() noexcept {
 }
 
 bool folder_info_iterator_t::is_finished() const noexcept {
-    return current == nullptr;
+    return current == nullptr && seen_sequence >= fi->get_max_sequence();
 }
 
 void folder_info_iterator_t::reset() noexcept {
@@ -67,8 +67,10 @@ file_info_t* folder_info_iterator_t::next() noexcept {
             return file;
         }
         min_sequence = seen_sequence + 1;
+    }
+    if (!current) {
         auto seq = fi->get_max_sequence();
-        if (seq != max_sequence) {
+        if (seen_sequence < seq && seq != max_sequence) {
             current = fi.get();
             max_sequence = fi->get_max_sequence();
             return next();
