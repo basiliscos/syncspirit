@@ -1170,8 +1170,6 @@ void test_downloading_special() {
     F(true, 10).run();
 }
 
-#if 0
-
 
 void test_downloading_errors() {
     struct F : fixture_t {
@@ -1219,6 +1217,7 @@ void test_downloading_errors() {
             auto index = proto::Index{};
             proto::set_folder(index, folder_1->get_id());
             auto file_name = std::string_view("some-file");
+            auto path = utils::path_t::make_generic(file_name);
             auto &file = proto::add_files(index);
             proto::set_name(file, file_name);
             proto::set_type(file, proto::FileInfoType::FILE);
@@ -1300,13 +1299,13 @@ void test_downloading_errors() {
             CHECK(static_cast<r::actor_base_t *>(target.get())->access<to::state>() == expected_state);
 
             auto folder_peer = folder_1->get_folder_info(*peer_device);
-            REQUIRE(folder_peer->get_file_infos().size() == 1);
-            auto f = *folder_peer->get_file_infos().begin();
+            REQUIRE(folder_peer->get_children().size() == 1);
+            auto f = folder_peer->get_by_path(path).first;
             REQUIRE(f);
             CHECK(f->is_unreachable() == expected_unreachability);
             CHECK(!f->is_synchronizing());
 
-            auto f_local = folder_my->get_file_infos().by_name(f->get_name()->get_full_name());
+            auto f_local = folder_my->get_by_path(path).first;
             CHECK(!f_local);
             CHECK(!folder_my->get_folder()->is_synchronizing());
 
@@ -1316,6 +1315,9 @@ void test_downloading_errors() {
     };
     F(true, 10).run();
 }
+
+#if 0
+
 
 void test_download_from_scratch() {
     struct F : fixture_t {
@@ -2697,7 +2699,7 @@ int _init() {
     REGISTER_TEST_CASE(test_index_sending, "test_index_sending", "[net]");
     REGISTER_TEST_CASE(test_downloading, "test_downloading", "[net]");
     REGISTER_TEST_CASE(test_downloading_special, "test_downloading_special", "[net]");
-    // REGISTER_TEST_CASE(test_downloading_errors, "test_downloading_errors", "[net]");
+    REGISTER_TEST_CASE(test_downloading_errors, "test_downloading_errors", "[net]");
     // REGISTER_TEST_CASE(test_download_from_scratch, "test_download_from_scratch", "[net]");
     // REGISTER_TEST_CASE(test_download_resuming, "test_download_resuming", "[net]");
     // REGISTER_TEST_CASE(test_uniqueness, "test_uniqueness", "[net]");
