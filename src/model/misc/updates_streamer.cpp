@@ -92,6 +92,10 @@ void updates_streamer_t::refresh_remote() noexcept {
     }
 }
 
+void updates_streamer_t::on_remote_refresh() noexcept {
+    refresh_remote();
+}
+
 auto updates_streamer_t::next() noexcept -> update_t {
     auto iterations = std::size_t{0};
     if (current != -1) {
