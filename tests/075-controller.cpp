@@ -1807,8 +1807,6 @@ void test_sending_index_updates() {
     F(true, 10).run();
 }
 
-#if 0
-
 void test_uploading() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
@@ -1861,7 +1859,7 @@ void test_uploading() {
             auto uuid = sup->sequencer->next_uuid();
             auto file_info = model::file_info_t::create(uuid, file, folder_my).value();
             file_info->assign_block(b.get(), 0);
-            REQUIRE(folder_my->add_strict(file_info));
+            REQUIRE(folder_my->add_strict(file_info.get(), false));
 
             auto req = proto::Request();
             proto::set_id(req, 1);
@@ -2041,6 +2039,8 @@ void test_peer_down() {
     };
     F(false, 10, false).run();
 }
+
+#if 0
 
 void test_conflicts() {
     struct F : fixture_t {
@@ -2709,10 +2709,10 @@ int _init() {
     REGISTER_TEST_CASE(test_initiate_my_sharing, "test_initiate_my_sharing", "[net]");
     REGISTER_TEST_CASE(test_initiate_peer_sharing, "test_initiate_peer_sharing", "[net]");
     REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
-    // REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");
-    // REGISTER_TEST_CASE(test_overload_uploading, "test_overload_uploading", "[net]");
-    // REGISTER_TEST_CASE(test_peer_down, "test_peer_down", "[net]");
-    // REGISTER_TEST_CASE(test_peer_removal, "test_peer_removal", "[net]");
+    REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");
+    REGISTER_TEST_CASE(test_overload_uploading, "test_overload_uploading", "[net]");
+    REGISTER_TEST_CASE(test_peer_down, "test_peer_down", "[net]");
+    REGISTER_TEST_CASE(test_peer_removal, "test_peer_removal", "[net]");
     // REGISTER_TEST_CASE(test_conflicts, "test_conflicts", "[net]");
     // REGISTER_TEST_CASE(test_download_interrupting, "test_download_interrupting", "[net]");
     // REGISTER_TEST_CASE(test_change_folder_type, "test_change_folder_type", "[net]");
