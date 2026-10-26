@@ -278,7 +278,7 @@ diff_builder_t &diff_builder_t::advance(const model::file_info_t &source,
     auto local_fi = folder->get_folder_info(*folder->get_cluster()->get_device());
     auto [local_file, _] = local_fi->get_by_path(*source.get_name());
     auto action = model::resolve(source, local_file, *local_fi);
-    auto diff = diff::advance::remote_copy_t::create(action, source, source_fi, *sequencer, allocator);
+    auto diff = diff::advance::advance_t::create(action, source, source_fi, *sequencer, allocator);
     return assign(diff.get());
 }
 

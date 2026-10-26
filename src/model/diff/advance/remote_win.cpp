@@ -40,6 +40,7 @@ auto remote_win_t::apply_impl(apply_controller_t &controller, void *custom) cons
         LOG_DEBUG(log, "remote_win_t, folder = {}, name = {}, peer folder is not available, ignoring", folder_id,
                   proto::get_name(proto_source));
     } else {
+#if 0
         auto buffer = std::array<std::byte, 1024 * 32>();
         auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
         auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
@@ -47,7 +48,9 @@ auto remote_win_t::apply_impl(apply_controller_t &controller, void *custom) cons
         auto path = utils::make_generic_view(name, allocator);
         auto local_fi = folder->get_folder_info(self);
         auto [prev_file, parent_presence] = local_fi->get_by_path(path);
+        prev_file->forget_presence();
         parent_presence->remove_child(*prev_file);
+#endif
         return parent_t::apply_impl(controller, custom);
     }
     return applicator_t::apply_sibling(controller, custom);

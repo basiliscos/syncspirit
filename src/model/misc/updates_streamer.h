@@ -29,7 +29,11 @@ struct SYNCSPIRIT_API updates_streamer_t {
     void on_upsert(const folder_info_t &) noexcept;
 
   private:
-    using updated_files_t = std::deque<model::file_info_t*>;
+    struct sequenced_file_t {
+        model::file_info_t* file;
+        std::int64_t sequence;
+    };
+    using updated_files_t = std::deque<sequenced_file_t>;
     struct update_info_t {
         folder_info_ptr_t local_folder;
         updated_files_t updated_files;

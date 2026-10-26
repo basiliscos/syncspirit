@@ -2040,8 +2040,6 @@ void test_peer_down() {
     F(false, 10, false).run();
 }
 
-#if 0
-
 void test_conflicts() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
@@ -2087,6 +2085,7 @@ void test_conflicts() {
             proto::set_folder(index, folder_1->get_id());
 
             auto file_name = std::string_view("some-file.txt");
+            auto path = utils::path_t::make_generic(file_name);
             auto &file = proto::add_files(index);
             proto::set_name(file, file_name);
             proto::set_type(file, proto::FileInfoType::FILE);
@@ -2110,7 +2109,7 @@ void test_conflicts() {
             sup->do_process();
 
             auto local_folder = folder_1->get_folder_info(*my_device);
-            auto local_file = local_folder->get_file_infos().by_name(file_name);
+            auto local_file = local_folder->get_by_path(path).first;
             auto pr_file = local_file->as_proto(false);
             proto::set_modified_s(pr_file, 1734680000);
 
@@ -2154,8 +2153,8 @@ void test_conflicts() {
                 peer_actor->forward(index_update);
                 sup->do_process();
 
-                REQUIRE(local_folder->get_file_infos().size() == 1);
-                auto lf = local_folder->get_file_infos().by_sequence(local_seq);
+                REQUIRE(local_folder->get_children().size() == 1);
+                auto lf = local_folder->get_by_path(path).first;
                 REQUIRE(local_seq == lf->get_sequence());
                 CHECK(cluster->get_blocks().size() == 2);
 
@@ -2164,6 +2163,7 @@ void test_conflicts() {
                 CHECK(sup->file_finishes.size() == 0);
             }
             SECTION("remote win (non-empty)") {
+                auto conflict_name = local_file->make_conflicting_name(allocator);
                 proto::set_modified_s(file, 1734690000);
                 proto::set_value(c_1, proto::get_value(local_file->get_version().get_best()) + 1);
                 proto::add_files(index_update, file);
@@ -2172,14 +2172,13 @@ void test_conflicts() {
                 sup->do_process();
 
                 auto local_folder = folder_1->get_folder_info(*my_device);
-                auto conflict_name = local_file->make_conflicting_name(allocator);
-                auto local_conflict = local_folder->get_file_infos().by_name(conflict_name.get_full_name());
+                auto local_conflict = local_folder->get_by_path(conflict_name).first;
                 REQUIRE(local_conflict);
                 CHECK(local_conflict->get_size() == 5);
                 REQUIRE(local_conflict->iterate_blocks().get_total() == 1);
                 CHECK(local_conflict->iterate_blocks(0).next()->get_hash() == data_2_h);
 
-                auto file = local_folder->get_file_infos().by_name(local_file->get_name()->get_full_name());
+                auto file = local_folder->get_by_path(path).first;
                 REQUIRE(file);
                 CHECK(file->get_size() == 5);
                 REQUIRE(file->iterate_blocks().get_total() == 1);
@@ -2195,6 +2194,8 @@ void test_conflicts() {
                 auto &f2 = proto::get_files(index_update_sent, 1);
                 CHECK(proto::get_name(f1) == local_conflict->get_name()->get_full_name());
                 CHECK(proto::get_name(f2) == file->get_name()->get_full_name());
+                CHECK(proto::get_sequence(f1) == local_conflict->get_sequence());
+                CHECK(proto::get_sequence(f2) == file->get_sequence());
 
                 REQUIRE(sup->appended_blocks.size() == 1);
                 auto &appended_block = sup->appended_blocks.front();
@@ -2210,6 +2211,7 @@ void test_conflicts() {
                 CHECK(file_finish.file_size == 5);
                 CHECK(file_finish.modification_s == file->get_modified_s());
             }
+#if 0
             SECTION("remote win (empty, new file type: directory)") {
                 proto::set_modified_s(file, 1734690000);
                 proto::set_value(c_1, proto::get_value(local_file->get_version().get_best()) + 1);
@@ -2222,13 +2224,13 @@ void test_conflicts() {
 
                 auto local_folder = folder_1->get_folder_info(*my_device);
                 auto conflict_name = local_file->make_conflicting_name(allocator);
-                auto local_conflict = local_folder->get_file_infos().by_name(conflict_name.get_full_name());
+                auto local_conflict = local_folder->get_by_path(conflict_name).first;
                 REQUIRE(local_conflict);
                 CHECK(local_conflict->get_size() == 5);
                 REQUIRE(local_conflict->iterate_blocks().get_total() == 1);
                 CHECK(local_conflict->iterate_blocks(0).next()->get_hash() == data_2_h);
 
-                auto file = local_folder->get_file_infos().by_name(local_file->get_name()->get_full_name());
+                auto file = local_folder->get_by_path(path).first;
                 REQUIRE(file);
                 CHECK(file->get_size() == 0);
                 REQUIRE(file->iterate_blocks().get_total() == 0);
@@ -2246,10 +2248,14 @@ void test_conflicts() {
                 REQUIRE(sup->appended_blocks.size() == 0);
                 REQUIRE(sup->file_finishes.size() == 0);
             }
+#endif
         }
     };
     F(false, 10, false).run();
 }
+
+#if 0
+
 
 void test_download_interrupting() {
     struct F : fixture_t {
@@ -2711,9 +2717,9 @@ int _init() {
     REGISTER_TEST_CASE(test_sending_index_updates, "test_sending_index_updates", "[net]");
     REGISTER_TEST_CASE(test_uploading, "test_uploading", "[net]");
     REGISTER_TEST_CASE(test_overload_uploading, "test_overload_uploading", "[net]");
-    REGISTER_TEST_CASE(test_peer_down, "test_peer_down", "[net]");
     REGISTER_TEST_CASE(test_peer_removal, "test_peer_removal", "[net]");
-    // REGISTER_TEST_CASE(test_conflicts, "test_conflicts", "[net]");
+    REGISTER_TEST_CASE(test_peer_down, "test_peer_down", "[net]");
+    REGISTER_TEST_CASE(test_conflicts, "test_conflicts", "[net]");
     // REGISTER_TEST_CASE(test_download_interrupting, "test_download_interrupting", "[net]");
     // REGISTER_TEST_CASE(test_change_folder_type, "test_change_folder_type", "[net]");
     // REGISTER_TEST_CASE(test_pausing, "test_pausing", "[net]");

@@ -14,11 +14,11 @@ void updates_streamer_t::update_info_t::fetch() noexcept {
     it.set_min_sequence(seen_sequence + 1);
     auto file = it.next();
     while (file) {
-        updated_files.push_front(file);
+        updated_files.push_back({file, file->get_sequence()});
         file = it.next();
     }
-    auto comparator = [](const file_info_t* lhs, file_info_t* rhs) -> bool {
-        return lhs->get_sequence() < rhs->get_sequence();
+    auto comparator = [](const sequenced_file_t& lhs, sequenced_file_t& rhs) -> bool {
+        return lhs.sequence < rhs.sequence;
     };
     std::sort(updated_files.begin(), updated_files.end(), comparator);
 }
@@ -110,9 +110,13 @@ auto updates_streamer_t::next() noexcept -> update_t {
                 if (initial) {
                     ++seen_sequence;
                 }
-                auto fi = updated_files.front();
-                updated_files.pop_front();
-                return {fi, folder_info.get(), initial};
+                while (updated_files.size()) {
+                    auto [file, sequence] = updated_files.front();
+                    updated_files.pop_front();
+                    if (file->get_sequence() == sequence) {
+                        return {file, folder_info.get(), initial};
+                    }
+                }
             }
             current = (current + 1) % static_cast<int>(update_infos.size());
             ++iterations;
@@ -126,7 +130,7 @@ bool updates_streamer_t::on_update(file_info_t &file, const folder_info_t &fi) n
     for (auto& update: update_infos) {
         if (update.local_folder == &fi) {
             if (update.fetched) {
-                update.updated_files.push_back(&file);
+                update.updated_files.push_back({&file, file.get_sequence()});
                 if (current == -1) {
                     current = 0;
                 }

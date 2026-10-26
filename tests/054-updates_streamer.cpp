@@ -113,6 +113,24 @@ TEST_CASE("updates_streamer", "[model]") {
         CHECK(streamer.next() == update_t({}, {}, false));
     }
 
+    SECTION("3 files, 2nd updated, outdated isn't streamed") {
+        auto f1 = add_file("a.txt");
+        auto f2 = add_file("b.txt");
+        auto f3 = add_file("c.txt");
+        add_remote(my_folder->get_index(), 0);
+
+        auto streamer = model::updates_streamer_t(*cluster, *peer_device);
+        CHECK(streamer.next() == update_t(f1, my_folder, true));
+
+        auto f2_proto = f2->as_proto();
+        REQUIRE(builder.local_update(my_folder->get_folder()->get_id(), f2_proto).apply());
+
+        streamer.on_update(*f2, *my_folder);
+        CHECK(streamer.next() == update_t(f3, my_folder, false));
+        CHECK(streamer.next() == update_t(f2, my_folder, false));
+        CHECK(streamer.next() == update_t({}, {}, false));
+    }
+
     SECTION("empty streamer ignores updates") {
         add_remote(0, seq);
         auto peer_folder = folder->get_folder_info(*peer_device);

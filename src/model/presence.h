@@ -84,6 +84,7 @@ struct SYNCSPIRIT_API presence_t : model::augmentable_t {
     };
 
     bool is_unique() const noexcept;
+    void reset_normalization() noexcept;
 
   protected:
     friend struct entity_t;

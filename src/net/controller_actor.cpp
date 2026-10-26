@@ -878,23 +878,33 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
         auto local_folder = folder->get_folder_info(self);
         auto peer_folder = folder->get_folder_info(diff.peer_id);
         auto local_file = model::file_info_ptr_t();
+        auto fetch_local_file = diff.peer_id == self.device_id().get_sha256() || diff.action == model::advance_action_t::resolve_remote_win;
+        auto peer_host = (model::presence_t *){nullptr};
+        auto peer_file = (model::file_info_t *){nullptr};
         if (peer_folder) {
             auto name = proto::get_name(diff.proto_source);
             auto path = utils::make_generic_view(name, allocator);
-            auto [file, _] = peer_folder->get_by_path(path);
-            if (file) {
+            std::tie(peer_file, peer_host) = peer_folder->get_by_path(path);
+            if (peer_file) {
                 if (diff.peer_id == peer->device_id().get_sha256()) {
-                    local_file = file->get_sibling_file(&self);
-                    if (file->is_file() && file->iterate_blocks().get_total()) {
-                        cancel_sync(file);
+                    local_file = peer_file->get_sibling_file(&self);
+                    if (peer_file->is_file() && peer_file->iterate_blocks().get_total()) {
+                        cancel_sync(peer_file);
                     }
                 }
             }
         }
-        if (diff.peer_id == self.device_id().get_sha256()) {
+        if (fetch_local_file) {
             auto name = proto::get_name(diff.proto_local);
             auto path = utils::make_generic_view(name, allocator);
-            local_file = local_folder->get_by_path(path).first;
+            if (peer_host) {
+                auto is_dir = proto::get_type(diff.proto_local) == proto::FileInfoType::DIRECTORY;
+                auto host = peer_host->get_device() != &self ? peer_host->get_sibling(&self) : peer_host;
+                auto child = host->get_child(name, is_dir);
+                local_file = static_cast<model::file_info_t*>(child);
+            } else {
+                local_file = local_folder->get_by_path(path).first;
+            }
             assert(local_file);
         }
         if (local_file) {

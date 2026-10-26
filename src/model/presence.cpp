@@ -220,6 +220,8 @@ void presence_t::remove_child(const presence_t & child) noexcept {
     }
 }
 
-
+void presence_t::reset_normalization() noexcept {
+    features = features & ~F::normalized;
+}
 
 } // namespace syncspirit::model

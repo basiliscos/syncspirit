@@ -77,11 +77,13 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
 
     if (!local_file) {
         uuid = sequencer.next_uuid();
-    } else if (!disable_blocks_removal) {
+    } else {
         assign(uuid, local_file->get_uuid());
-        auto orphaned = orphaned_blocks_t();
-        orphaned.record(*local_file);
-        orphans = orphaned.deduce();
+        if (!disable_blocks_removal) {
+            auto orphaned = orphaned_blocks_t();
+            orphaned.record(*local_file);
+            orphans = orphaned.deduce();
+        }
     }
 
     auto new_blocks = modify::add_blocks_t::blocks_t{};
@@ -167,7 +169,9 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
         return local_file_opt.assume_error();
     }
     auto local_file = std::move(local_file_opt.assume_value());
+    auto was_dir = false;
     if (prev_file) {
+        was_dir = prev_file->is_dir();
         prev_file->update(*local_file);
         local_file = std::move(prev_file);
     }
@@ -193,6 +197,11 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
     local_file_ptr->set_sequence(sequence);
     if (!prev_file) {
         parent->add_child(local_file_ptr, path.get_filename());
+    } else {
+        auto is_dir = local_file->is_dir();
+        if (is_dir xor was_dir) {
+            parent->reset_normalization();
+        }
     }
     local_folder->add_strict(local_file_ptr, true);
 
