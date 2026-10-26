@@ -2211,8 +2211,8 @@ void test_conflicts() {
                 CHECK(file_finish.file_size == 5);
                 CHECK(file_finish.modification_s == file->get_modified_s());
             }
-#if 0
             SECTION("remote win (empty, new file type: directory)") {
+                auto conflict_name = local_file->make_conflicting_name(allocator);
                 proto::set_modified_s(file, 1734690000);
                 proto::set_value(c_1, proto::get_value(local_file->get_version().get_best()) + 1);
                 proto::clear_blocks(file);
@@ -2223,7 +2223,6 @@ void test_conflicts() {
                 sup->do_process();
 
                 auto local_folder = folder_1->get_folder_info(*my_device);
-                auto conflict_name = local_file->make_conflicting_name(allocator);
                 auto local_conflict = local_folder->get_by_path(conflict_name).first;
                 REQUIRE(local_conflict);
                 CHECK(local_conflict->get_size() == 5);
@@ -2248,7 +2247,6 @@ void test_conflicts() {
                 REQUIRE(sup->appended_blocks.size() == 0);
                 REQUIRE(sup->file_finishes.size() == 0);
             }
-#endif
         }
     };
     F(false, 10, false).run();
