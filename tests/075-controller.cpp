@@ -10,7 +10,6 @@
 #include "model/cluster.h"
 #include "diff-builder.h"
 #include "net/controller_actor.h"
-#include "net/names.h"
 #include "fs/messages.h"
 #include "utils/error_code.h"
 #include "utils/format.hpp"
@@ -2620,8 +2619,6 @@ void test_pausing() {
     F(true, 10).run();
 }
 
-#if 0
-
 void test_races() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
@@ -2641,6 +2638,7 @@ void test_races() {
                 .apply(*sup, target.get());
 
             auto file_name = std::string_view("some-file");
+            auto path = utils::path_t::make_generic(file_name);
             auto pr_file = proto::FileInfo();
             proto::set_name(pr_file, file_name);
             proto::set_type(pr_file, proto::FileInfoType::FILE);
@@ -2687,7 +2685,7 @@ void test_races() {
 
                 sup->resume_io(2)->do_process();
             }
-            auto file = folder_my->get_file_infos().by_name(file_name);
+            auto [file, _] = folder_my->get_by_path(path);
             REQUIRE(file);
             CHECK(file->is_locally_available());
             CHECK(file->get_size() == 10);
@@ -2695,7 +2693,6 @@ void test_races() {
     };
     F(true, 10).run();
 };
-#endif
 
 int _init() {
     test::init_logging();
@@ -2719,8 +2716,8 @@ int _init() {
     REGISTER_TEST_CASE(test_conflicts, "test_conflicts", "[net]");
     REGISTER_TEST_CASE(test_download_interrupting, "test_download_interrupting", "[net]");
     REGISTER_TEST_CASE(test_change_folder_type, "test_change_folder_type", "[net]");
-    // REGISTER_TEST_CASE(test_pausing, "test_pausing", "[net]");
-    // REGISTER_TEST_CASE(test_races, "test_races", "[net]");
+    REGISTER_TEST_CASE(test_pausing, "test_pausing", "[net]");
+    REGISTER_TEST_CASE(test_races, "test_races", "[net]");
     return 1;
 }
 
