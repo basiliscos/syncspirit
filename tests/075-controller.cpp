@@ -2252,9 +2252,6 @@ void test_conflicts() {
     F(false, 10, false).run();
 }
 
-#if 0
-
-
 void test_download_interrupting() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
@@ -2327,7 +2324,7 @@ void test_download_interrupting() {
                     peer_actor->process_block_requests();
                     sup->do_process();
                     auto folder_my = folder_1->get_folder_info(*my_device);
-                    CHECK(folder_my->get_file_infos().size() == 0);
+                    CHECK(folder_my->get_children().size() == 0);
                 }
                 SECTION("remove folder") {
                     sup->auto_ack_io = false;
@@ -2360,7 +2357,7 @@ void test_download_interrupting() {
 
                     hasher->process_requests();
                     auto folder_my = folder_1->get_folder_info(*my_device);
-                    CHECK(folder_my->get_file_infos().size() == 0);
+                    CHECK(folder_my->get_children().size() == 0);
                 }
                 SECTION("remove folder") {
                     builder.remove_folder(*folder_1).apply(*sup);
@@ -2386,7 +2383,7 @@ void test_download_interrupting() {
                     sup->resume_io(1);
                     builder.apply(*sup);
                     auto folder_my = folder_1->get_folder_info(*my_device);
-                    CHECK(folder_my->get_file_infos().size() == 0);
+                    CHECK(folder_my->get_children().size() == 0);
                 }
                 SECTION("remove") {
                     builder.remove_folder(*folder_1).apply(*sup);
@@ -2491,7 +2488,6 @@ void test_change_folder_type() {
                 sup->do_process();
 
                 REQUIRE(peer_actor->blocks_requested == 1);
-
                 SECTION("folder type is kept as send/receive") {
                     peer_actor->push_response(data_1, 0);
                     peer_actor->process_block_requests();
@@ -2517,6 +2513,7 @@ void test_change_folder_type() {
                     }
                 }
             }
+
             SECTION("send & receive -> recv only") {
                 proto::FileInfo pr_file_1;
                 auto file_name_1 = std::string_view("file-name.1");
@@ -2542,7 +2539,7 @@ void test_change_folder_type() {
                     auto &index_update_2 = std::get<proto::IndexUpdate>(last_message);
                     CHECK(proto::get_files_size(index_update_2) == 1);
                 }
-                SECTION("folder type changed to send only") {
+                SECTION("folder type changed to receive only") {
                     auto db_folder = db::Folder();
                     folder_1->serialize(db_folder);
                     db::set_folder_type(db_folder, db::FolderType::receive);
@@ -2622,6 +2619,8 @@ void test_pausing() {
     };
     F(true, 10).run();
 }
+
+#if 0
 
 void test_races() {
     struct F : fixture_t {
@@ -2718,8 +2717,8 @@ int _init() {
     REGISTER_TEST_CASE(test_peer_removal, "test_peer_removal", "[net]");
     REGISTER_TEST_CASE(test_peer_down, "test_peer_down", "[net]");
     REGISTER_TEST_CASE(test_conflicts, "test_conflicts", "[net]");
-    // REGISTER_TEST_CASE(test_download_interrupting, "test_download_interrupting", "[net]");
-    // REGISTER_TEST_CASE(test_change_folder_type, "test_change_folder_type", "[net]");
+    REGISTER_TEST_CASE(test_download_interrupting, "test_download_interrupting", "[net]");
+    REGISTER_TEST_CASE(test_change_folder_type, "test_change_folder_type", "[net]");
     // REGISTER_TEST_CASE(test_pausing, "test_pausing", "[net]");
     // REGISTER_TEST_CASE(test_races, "test_races", "[net]");
     return 1;

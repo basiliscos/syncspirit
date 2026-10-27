@@ -159,7 +159,25 @@ TEST_CASE("updates_streamer", "[model]") {
 
         CHECK(streamer.next() == update_t(f2, my_folder, true));
         CHECK(streamer.next() == update_t(f1, my_folder, false));
-        REQUIRE(streamer.next() == update_t({}, {}, false));
+        CHECK(streamer.next() == update_t({}, {}, false));
+    }
+
+    SECTION("2 files, no update") {
+        add_remote(my_folder->get_index(), 0);
+
+        auto f1 = add_file("a.txt");
+        auto f2 = add_file("b.txt");
+
+        my_folder->add_strict(f1.get(), true);
+        my_folder->add_strict(f2.get(), true);
+        auto streamer = model::updates_streamer_t(*cluster, *peer_device);
+        CHECK(streamer.next() == update_t(f1, my_folder, true));
+
+        auto &folder_type = ((model::folder_data_t *)folder.get())->access<test::to::folder_type>();
+        folder_type = db::FolderType::receive;
+        streamer.on_remote_refresh();
+
+        CHECK(streamer.next() == update_t({}, {}, false));
     }
 
     SECTION("no files streaming for receive-only folder") {

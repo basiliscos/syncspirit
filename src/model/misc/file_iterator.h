@@ -44,7 +44,7 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
         std::int64_t seen_sequence;
     };
     using substates_t = std::vector<substate_t>;
-    void check(model::folder_info_t* fi) noexcept;
+    void check(folder_info_t* fi, model::folder_t& folder) noexcept;
     std::size_t folder_index;
     cluster_t &cluster;
     device_t *peer;

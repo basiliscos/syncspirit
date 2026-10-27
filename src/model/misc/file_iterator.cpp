@@ -12,25 +12,39 @@ file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_)
     : cluster{cluster_}, peer{peer_.get()}, folder_index{0} {
 
     for (auto& it: cluster.get_folders()) {
-        check(it.item->is_shared_with(*peer));
+        auto& folder = *it.item;
+        check(folder.is_shared_with(*peer), folder);
     }
 };
 
 file_iterator_t::~file_iterator_t() {}
 
-void file_iterator_t::check(model::folder_info_t* peer_folder) noexcept {
+void file_iterator_t::check(model::folder_info_t* peer_folder, model::folder_t& folder) noexcept {
+    auto predicate = [&](const substate_t& ss) { return ss.fi->get_folder() == &folder; };
+    auto it = std::find_if(substates.begin(), substates.end(), predicate);
+    bool erase = false;
     if (peer_folder) {
-        auto can_receive = peer_folder->get_folder()->get_folder_type() != db::FolderType::send;
+        auto can_receive = folder.get_folder_type() != db::FolderType::send;
         if (can_receive) {
-            auto it = model::folder_info_iterator_ptr_t(new model::folder_info_iterator_t(peer_folder));
-            auto ss = substate_t{peer_folder, std::move(it), peer_folder->get_index(), 0};
-            substates.push_back(std::move(ss));
+            if (it == substates.end()) {
+                auto iterator = model::folder_info_iterator_ptr_t(new model::folder_info_iterator_t(peer_folder));
+                auto ss = substate_t{peer_folder, std::move(iterator), peer_folder->get_index(), 0};
+                substates.push_back(std::move(ss));
+            }
+        } else {
+            erase = true;
         }
+    } else {
+        erase = true;
+    }
+    if (erase && it != substates.end())  {
+        substates.erase(it);
+        folder_index = 0;
     }
 }
 
 void file_iterator_t::on_upsert(folder_t &folder) noexcept {
-    check(folder.is_shared_with(*peer));
+    check(folder.is_shared_with(*peer), folder);
 }
 
 auto file_iterator_t::next() noexcept -> result_t {

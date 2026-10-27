@@ -40,15 +40,16 @@ void updates_streamer_t::refresh_remote() noexcept {
     auto updates = std::uint_fast32_t{0};
     for (auto &it : folders) {
         auto &folder = *it.item;
+        auto local_folder = static_cast<folder_info_t*>(folder.get_presence(local_device));
+        auto peer_folder = static_cast<folder_info_t*>(local_folder->get_sibling(peer.get()));
+        auto predicate = [&](const update_info_t& item) {return item.local_folder == local_folder; };
+        auto it_update = std::find_if( update_infos.begin(), update_infos.end(), predicate);
+        auto remove_update = true;
         if (folder.get_folder_type() != db::FolderType::receive) {
-            auto local_folder = static_cast<folder_info_t*>(folder.get_presence(local_device));
-            auto peer_folder = static_cast<folder_info_t*>(local_folder->get_sibling(peer.get()));
-            auto predicate = [&](const update_info_t& item) {return item.local_folder == local_folder; };
-            auto it_update = std::find_if( update_infos.begin(), update_infos.end(), predicate);
-            auto remove_update = false;
             if (peer_folder) {
                 auto remote_view = remote_views.get(local_sha256, folder.get_id());
                 if (remote_view) {
+                    remove_update = false;
                     auto index_match = remote_view->index_id == local_folder->get_index();
                     auto min_sequence = index_match ? remote_view->max_sequence : 0;
                     if (it_update != update_infos.end()) {
@@ -61,15 +62,11 @@ void updates_streamer_t::refresh_remote() noexcept {
                         update_infos.push_back({local_folder, {}, min_sequence, false});
                         ++updates;
                     }
-                } else {
-                    remove_update = true;
                 }
-            } else {
-                remove_update = true;
             }
-            if (remove_update && it_update != update_infos.end()) {
-                update_infos.erase(it_update);
-            }
+        }
+        if (remove_update && it_update != update_infos.end()) {
+            update_infos.erase(it_update);
         }
     }
     if (updates) {
