@@ -108,8 +108,8 @@ struct fixture_t {
         folder_id = "1234-5678";
 
         builder.upsert_folder(folder_id, "").apply(*sup);
-        auto &local_folder = *cluster->get_folders().by_id(folder_id);
-        local_files = &local_folder.get_folder_info(*local_device)->get_file_infos();
+        auto &folder = *cluster->get_folders().by_id(folder_id);
+        local_folder = folder.get_folder_info(*local_device);
 
         main(builder);
 
@@ -122,12 +122,28 @@ struct fixture_t {
         return ctx->create_supervisor<sample_supervisor_t>().timeout(timeout).create_registry().finish().get();
     }
 
+    std::size_t count_local_files() noexcept {
+        auto queue = std::list<presence_t*>();
+        queue.push_back(local_folder.get());
+        auto r = std::size_t{0};
+        while(!queue.empty()) {
+            ++r;
+            auto p = queue.front();
+            queue.pop_front();
+            for (auto c: p->get_children()) {
+                queue.push_back(c);
+            }
+        }
+        --r;
+        return r;
+    }
+
     virtual void main(diff_builder_t &builder) noexcept = 0;
 
     sample_supervisor_t *sup;
     cluster_ptr_t cluster;
     std::string_view folder_id;
-    file_infos_map_t *local_files;
+    folder_info_ptr_t local_folder;
 };
 
 void test_large_diffs_chain() {
@@ -163,7 +179,7 @@ void test_large_diffs_chain() {
                 sup->send<model::payload::model_update_t>(sup->get_address(), assember.consume(), nullptr);
                 sup->do_process();
             }
-            CHECK(local_files->size() == N + 1);
+            CHECK(count_local_files() == N + 1);
             CHECK(sup->bounces == N / I);
         }
     };
@@ -220,11 +236,12 @@ void test_updates_intermixture() {
             builder.local_update(folder_id, pr_file).send(*sup);
             proto::set_name(pr_file, "n2");
             builder.local_update(folder_id, pr_file).apply(*sup);
-            CHECK(local_files->size() == N + 3);
+            auto local_files = count_local_files();
+            CHECK(local_files == N + 3);
             CHECK(sup->bounces == N / I);
 
             auto impl = static_cast<sup_t *>(sup);
-            CHECK(impl->update_visits == local_files->size());
+            CHECK(impl->update_visits == local_files);
         }
     };
     F().run();
