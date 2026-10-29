@@ -3,9 +3,7 @@
 
 #include "entity.h"
 #include "presence.h"
-#if 0
-#include "cluster_file_presence.h"
-#endif
+#include "folder_info.h"
 #include <spdlog/spdlog.h>
 #include <algorithm>
 
@@ -95,27 +93,8 @@ void presence_t::sync_with_entity() const noexcept {
 }
 
 auto presence_t::get_children() noexcept -> children_t & {
-#if 0
-    auto &e_children = entity->children;
-    if (children.size() != e_children.size()) {
-        children.clear();
-        children.reserve(e_children.size());
-        for (auto &c : e_children) {
-            auto p = const_cast<presence_t *>(c->get_presence(device));
-            if (p) {
-                if (p->entity->best) {
-                    children.emplace_back(p);
-                }
-            }
-        }
-        std::sort(children.begin(), children.end(), child_comparator_t{});
-    }
-    if (features & F::normalized) {
-        return;
-    }
-#endif
     NORMALIZE_IF_NEEDED();
-    return children_;
+    return children;
 }
 
 void presence_t::normalize() noexcept {
@@ -123,8 +102,8 @@ void presence_t::normalize() noexcept {
         return;
     }
     features |= F::normalized;
-    if (!children_.empty()) {
-        std::sort(children_.begin(), children_.end(), child_comparator_t{});
+    if (!children.empty()) {
+        std::sort(children.begin(), children.end(), child_comparator_t{});
     }
 }
 presence_t *presence_t::get_child(std::string_view name, bool is_dir) noexcept {
@@ -155,15 +134,25 @@ presence_t *presence_t::get_sibling(const device_t* device_) noexcept {
 void presence_t::forget_entity() noexcept { entity = nullptr; }
 
 void presence_t::forget_presence() noexcept {
-    for (auto& c: children_) {
+    for (auto& c: children) {
         c->forget_presence();
     }
     if (parent) {
+        get_folder_info()->forget_file(*entity->get_path());
         parent->remove_child(*this);
     }
     if (entity) {
         entity->remove_presense(*this);
     }
+}
+
+auto presence_t::get_folder_info() noexcept -> folder_info_t* {
+    auto p = this;
+    while (p->parent) {
+        p = p->parent;
+    }
+    assert(p->get_features() & F::folder);
+    return static_cast<folder_info_t*>(p);
 }
 
 bool presence_t::is_unique() const noexcept {
@@ -200,11 +189,11 @@ void presence_t::add_child(presence_t* child, std::string_view name) noexcept {
     child->set_parent(child_entity, this);
     auto reset_normalization = false;
     auto normalized = features & F::normalized;
-    if (children_.size() > 0) {
+    if (children.size() > 0) {
         auto comparator = child_comparator_t{};
-        reset_normalization = !comparator(children_.back(), child);
+        reset_normalization = !comparator(children.back(), child);
     }
-    children_.push_back(std::move(child));
+    children.push_back(std::move(child));
     if (reset_normalization) {
         features = features & ~F::normalized;
     }
@@ -212,9 +201,9 @@ void presence_t::add_child(presence_t* child, std::string_view name) noexcept {
 
 void presence_t::remove_child(const presence_t & child) noexcept {
     // no need to bisect, as children are remove from tail
-    for (auto it = children_.rbegin(); it != children_.rend(); ++it) {
+    for (auto it = children.rbegin(); it != children.rend(); ++it) {
         if (*it == &child) {
-            children_.erase(std::next(it).base());
+            children.erase(std::next(it).base());
             break;
         }
     }

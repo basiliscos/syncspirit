@@ -415,15 +415,15 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
 
         auto path_dir = utils::path_t::make_generic("dir");
         auto path_file = utils::path_t::make_generic("dir/file");
-        auto [p_dir, p_dir_parent] = folder_info->get_by_path(path_dir);
-        auto [p_file, p_file_parent] = folder_info->get_by_path(path_file);
+        auto p_dir = folder_info->get_by_path(path_dir);
+        auto p_file = folder_info->get_by_path(path_file);
         REQUIRE(p_dir);
         REQUIRE(p_file);
         CHECK(*p_dir->get_name() == path_dir);
         CHECK(*p_file->get_name() == path_file);
-        CHECK(p_file_parent == p_dir);
         CHECK(p_file->get_parent() == p_dir);
-        CHECK(p_dir_parent == folder_info);
+        CHECK(p_file->get_parent() == p_dir);
+        CHECK(p_dir->get_parent() == folder_info);
         CHECK(p_dir->get_parent() == folder_info);
     }
 }

@@ -84,6 +84,7 @@ folder_info_t::folder_info_t(const bu::uuid &uuid, const device_ptr_t &device_, 
 folder_t *folder_info_t::get_folder() const noexcept { return static_cast<folder_t *>(entity); }
 
 void folder_info_t::assign_fields(const db::FolderInfo &fi) noexcept {
+    features |= features_t::folder;
     index = db::get_index_id(fi);
     max_sequence = db::get_max_sequence(fi);
     introducer_device_key = db::get_introducer_device_key(fi);
@@ -100,24 +101,24 @@ bool folder_info_t::operator==(const folder_info_t &other) const noexcept {
     return r.first == key + data_length;
 }
 
-void folder_info_t::add(file_info_t* file_info) noexcept {
+void folder_info_t::add_file(file_info_t* file_info) noexcept {
     auto host_entity = entity;
-    auto& path = *file_info->get_name();
-    for (auto name: path) {
+    auto path = file_info->get_name().get();
+    auto ok = file_cache.insert({path, file_info}).second;
+    assert(ok);
+    (void)ok;
+
+    for (auto name: *path) {
         host_entity = host_entity->get_or_create_child(name);
     }
 
     auto host_presence = host_entity->get_parent()->get_presence(file_info->get_device());
     if (!host_presence) {
-        spdlog::critical("missing parent presence for '{}' in folder '{}' for device {}", path,
+        spdlog::critical("missing parent presence for '{}' in folder '{}' for device {}", *path,
                          get_folder()->get_id(), device->device_id().get_short());
         assert(host_presence);
     }
-    host_presence->add_child(file_info, path.get_filename());
-}
-
-void folder_info_t::add_relaxed(file_info_t* file_info) noexcept {
-    add(file_info);
+    host_presence->add_child(file_info, path->get_filename());
     update_max_sequnece(*file_info);
 }
 
@@ -125,18 +126,6 @@ void folder_info_t::update_max_sequnece(const file_info_t& file_info) noexcept {
     if (auto seq = file_info.get_sequence(); seq > max_sequence) {
         max_sequence = seq;
     }
-}
-
-bool folder_info_t::add_strict(file_info_t* file_info, bool already_added) noexcept {
-    auto seq = file_info->get_sequence();
-    if (seq > max_sequence) {
-        max_sequence = seq;
-        if (!already_added) {
-            add(file_info);
-        }
-        return true;
-    }
-    return false;
 }
 
 void folder_info_t::serialize(db::FolderInfo &storage) const noexcept {
@@ -165,35 +154,21 @@ bool folder_info_t::is_introduced_by(const model::device_id_t &device) const noe
 
 utils::bytes_view_t folder_info_t::get_introducer_device_key() const noexcept { return introducer_device_key; }
 
-auto folder_info_t::get_by_path(const utils::path_base_t& path) const noexcept  -> location_t {
-    auto parent = const_cast<presence_t*>(static_cast<const presence_t*>(this));
-    auto it = path.begin();
-    for (std::size_t i = 0; i + 1 < path.get_pieces_size(); ++i) {
-        auto piece = *it;
-        ++it;
-        parent = parent->get_child(piece, true);
-        if (!parent) {
-            break;
-        }
-    }
-
-    auto child = (presence_t*)(nullptr);
-    if (parent) {
-        auto child_name = path.get_filename();
-        auto child_dir = parent->get_child(child_name, true);
-        if (child_dir) {
-            child = child_dir;
-        } else {
-            child = parent->get_child(child_name, false);
-        }
-    }
-    return {static_cast<file_info_t*>(child), parent};
+file_info_t * folder_info_t::get_by_path(const utils::path_base_t& path) const noexcept  {
+    auto it = file_cache.find(&path);
+    return it != file_cache.end() ? it->second : nullptr;
 }
 
 void folder_info_t::clear() noexcept {
-    while(children_.size()) {
-        children_.back()->forget_presence();
+    while(children.size()) {
+        children.back()->forget_presence();
     }
+}
+
+void folder_info_t::forget_file(const utils::path_base_t& path) noexcept {
+    auto it = file_cache.find(&path);
+    assert(it != file_cache.end());
+    file_cache.erase(it);
 }
 
 folder_info_iterator_ptr_t folder_info_t::iterate() noexcept {

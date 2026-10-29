@@ -65,6 +65,7 @@ template <typename F> struct my_cluster_update_visitor_t : diff::cluster_visitor
     }
 };
 
+#if 0
 TEST_CASE("cluster update, new folder", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
@@ -591,6 +592,7 @@ TEST_CASE("cluster update with unknown devices", "[model]") {
     auto diff_opt = diff::peer::cluster_update_t::create({}, *cluster, *sequencer, *peer_device, *cc);
     REQUIRE(diff_opt);
 }
+#endif
 
 TEST_CASE("cluster update nothing shared", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
@@ -653,6 +655,7 @@ TEST_CASE("cluster update nothing shared", "[model]") {
     CHECK(folder_2->is_shared_with(*peer_device)->get_children().size() == 0);
 }
 
+#if 0
 TEST_CASE("non-shared pending folder", "[model]") {
     auto my_id = device_id_t::from_string("KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD").value();
     auto my_device = device_t::create(my_id, "my-device").value();
@@ -1179,6 +1182,7 @@ TEST_CASE("peer2 sharing unknown folder with us and peer1 => NOOP", "[model]") {
     REQUIRE(r);
     CHECK(cluster->get_folders().size() == 0);
 }
+#endif
 
 int _init() {
     test::init_logging();

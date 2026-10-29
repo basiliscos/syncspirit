@@ -357,12 +357,12 @@ void test_index_receiving() {
                 REQUIRE(folder_peer);
                 CHECK(folder_peer->get_max_sequence() == 10ul);
                 REQUIRE(folder_peer->get_children().size() == 1);
-                CHECK(folder_peer->get_by_path(path).first);
+                CHECK(folder_peer->get_by_path(path));
 
                 auto folder_my = folder_1->get_folder_info(*my_device);
                 REQUIRE(folder_my);
                 CHECK(folder_my->get_max_sequence() == 1ul);
-                REQUIRE(folder_my->get_by_path(path).first);
+                REQUIRE(folder_my->get_by_path(path));
 
                 SECTION("then index update is applied") {
                     auto index_update = proto::IndexUpdate{};
@@ -387,11 +387,11 @@ void test_index_receiving() {
 
                     CHECK(folder_peer->get_max_sequence() == sequence);
                     REQUIRE(folder_peer->get_children().size() == 2);
-                    CHECK(folder_peer->get_by_path(path_2).first);
+                    CHECK(folder_peer->get_by_path(path_2));
 
                     CHECK(folder_my->get_max_sequence() == 2ul);
                     REQUIRE(folder_my->get_children().size() == 2);
-                    CHECK(folder_my->get_by_path(path_2).first);
+                    CHECK(folder_my->get_by_path(path_2));
                 }
             }
         }
@@ -533,7 +533,7 @@ void test_downloading() {
                 CHECK(!folder_my->get_folder()->is_synchronizing());
                 REQUIRE(folder_my);
                 CHECK(folder_my->get_max_sequence() == 1ul);
-                auto [f, _] = folder_my->get_by_path(path);
+                auto f = folder_my->get_by_path(path);
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 5);
@@ -563,7 +563,7 @@ void test_downloading() {
                     sup->do_process();
                     CHECK(peer_actor->blocks_requested == 1);
                     CHECK(folder_my->get_max_sequence() == 2ul);
-                    CHECK(folder_my->get_by_path(path).first == f);
+                    CHECK(folder_my->get_by_path(path) == f);
                     CHECK(f->is_locally_available());
                     CHECK(f->get_sequence() == 2ul);
                 }
@@ -635,14 +635,14 @@ void test_downloading() {
                     CHECK(folder_my->get_max_sequence() == 2ul);
                     REQUIRE(folder_my->get_children().size()== 2);
                     {
-                        auto f = folder_my->get_by_path(path_1).first;
+                        auto f = folder_my->get_by_path(path_1);
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
                         CHECK(f->iterate_blocks().get_total() == 1);
                         CHECK(f->is_locally_available());
                     }
                     {
-                        auto f = folder_my->get_by_path(path_2).first;
+                        auto f = folder_my->get_by_path(path_2);
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
                         CHECK(f->iterate_blocks().get_total() == 1);
@@ -667,14 +667,14 @@ void test_downloading() {
                     CHECK(folder_my->get_max_sequence() == 2ul);
                     REQUIRE(folder_my->get_children().size()== 2);
                     {
-                        auto f = folder_my->get_by_path(path_1).first;
+                        auto f = folder_my->get_by_path(path_1);
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
                         CHECK(f->iterate_blocks().get_total() == 1);
                         CHECK(f->is_locally_available());
                     }
                     {
-                        auto f = folder_my->get_by_path(path_2).first;
+                        auto f = folder_my->get_by_path(path_2);
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
                         CHECK(f->iterate_blocks().get_total() == 1);
@@ -702,14 +702,14 @@ void test_downloading() {
                     CHECK(folder_my->get_max_sequence() == 2ul);
                     REQUIRE(folder_my->get_children().size() == 2);
                     {
-                        auto f = folder_my->get_by_path(path_1).first;
+                        auto f = folder_my->get_by_path(path_1);
                         REQUIRE(f);
                         CHECK(f->get_size() == 5);
                         CHECK(f->iterate_blocks().get_total() == 1);
                         CHECK(f->is_locally_available());
                     }
                     {
-                        auto f = folder_my->get_by_path(path_2).first;
+                        auto f = folder_my->get_by_path(path_2);
                         REQUIRE(f);
                         CHECK(f->get_size() == 10);
                         CHECK(f->iterate_blocks().get_total() == 2);
@@ -752,7 +752,7 @@ void test_downloading() {
                     CHECK(folder_my->get_max_sequence() == 1ul);
                     REQUIRE(folder_my->get_children().size() == 1);
                     {
-                        auto f = folder_my->get_by_path(path_1).first;
+                        auto f = folder_my->get_by_path(path_1);
                         REQUIRE(f);
                         CHECK(f->get_size() == 10);
                         CHECK(f->iterate_blocks().get_total() == 2);
@@ -769,7 +769,7 @@ void test_downloading() {
                     CHECK(!folder_my->get_folder()->is_synchronizing());
                     CHECK(peer_actor->blocks_requested == 2);
                     {
-                        auto f = folder_my->get_by_path(path_2).first;
+                        auto f = folder_my->get_by_path(path_2);
                         REQUIRE(f);
                         CHECK(f->get_size() == 20);
                         CHECK(f->iterate_blocks().get_total() == 4);
@@ -828,7 +828,7 @@ void test_downloading() {
 
                 CHECK(folder_my->get_max_sequence() == 1ul);
                 REQUIRE(folder_my->get_children().size() == 1);
-                auto f = folder_my->get_by_path(path).first;
+                auto f = folder_my->get_by_path(path);
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 0);
@@ -874,14 +874,14 @@ void test_downloading() {
                 auto folder_my = folder_1->get_folder_info(*my_device);
                 CHECK(folder_my->get_max_sequence() == 1);
                 REQUIRE(folder_my->get_children().size() == 1);
-                auto f = folder_my->get_by_path(path).first;
+                auto f = folder_my->get_by_path(path);
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 5);
                 CHECK(f->iterate_blocks().get_total() == 1);
                 CHECK(f->is_locally_available());
 
-                auto fp = folder_1_peer->get_by_path(path).first;
+                auto fp = folder_1_peer->get_by_path(path);
                 REQUIRE(fp);
             }
 
@@ -934,7 +934,7 @@ void test_downloading() {
                 sup->do_process();
 
                 REQUIRE(folder_my->get_children().size() == 1);
-                auto f = folder_my->get_by_path(path).first;
+                auto f = folder_my->get_by_path(path);
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name);
                 CHECK(f->get_size() == 5);
@@ -1000,7 +1000,7 @@ void test_downloading() {
                 auto file_my = model::file_info_t::create(uuid, pr_file_my, folder_my).value();
                 file_my->assign_block(bi_1.get(), 0);
                 file_my->mark_local_available(0);
-                REQUIRE(folder_my->add_strict(file_my.get(), false));
+                folder_my->add_file(file_my.get());
 
                 peer_actor->forward(index);
                 peer_actor->push_response(data_2, 0);
@@ -1008,7 +1008,7 @@ void test_downloading() {
                 sup->do_process();
 
                 REQUIRE(folder_my->get_children().size() == 2);
-                auto f = folder_my->get_by_path(path_1).first;
+                auto f = folder_my->get_by_path(path_1);
                 REQUIRE(f);
                 CHECK(f->get_name()->get_full_name() == file_name_1);
                 CHECK(f->get_size() == 10);
@@ -1158,7 +1158,7 @@ void test_downloading_special() {
                 CHECK(folder_my->get_max_sequence() == 1ul);
                 REQUIRE(folder_my->get_children().size() == 1);
 
-                auto f = folder_my->get_by_path(path).first;
+                auto f = folder_my->get_by_path(path);
                 REQUIRE(f);
                 CHECK(f->get_size() == 9 * 5);
                 CHECK(f->iterate_blocks().get_total() == 9);
@@ -1299,12 +1299,12 @@ void test_downloading_errors() {
 
             auto folder_peer = folder_1->get_folder_info(*peer_device);
             REQUIRE(folder_peer->get_children().size() == 1);
-            auto f = folder_peer->get_by_path(path).first;
+            auto f = folder_peer->get_by_path(path);
             REQUIRE(f);
             CHECK(f->is_unreachable() == expected_unreachability);
             CHECK(!f->is_synchronizing());
 
-            auto f_local = folder_my->get_by_path(path).first;
+            auto f_local = folder_my->get_by_path(path);
             CHECK(!f_local);
             CHECK(!folder_my->get_folder()->is_synchronizing());
 
@@ -1393,7 +1393,7 @@ void test_download_from_scratch() {
             CHECK(folder_my->get_max_sequence() == 1ul);
             CHECK(!folder_my->get_folder()->is_synchronizing());
 
-            auto f = folder_my->get_by_path(path).first;
+            auto f = folder_my->get_by_path(path);
             REQUIRE(f);
             CHECK(f->get_size() == 10);
             CHECK(f->iterate_blocks().get_total() == 2);
@@ -1506,7 +1506,7 @@ void test_download_resuming() {
 
             SECTION("mark peer block locally available => just flush unfinished") {
                 auto folder_peer = folder_1->get_folder_info(*peer_device);
-                auto f_peer = folder_peer->get_by_path(path).first;
+                auto f_peer = folder_peer->get_by_path(path);
                 REQUIRE(f_peer);
                 f_peer->mark_local_available(1);
 
@@ -1518,7 +1518,7 @@ void test_download_resuming() {
             CHECK(folder_my->get_max_sequence() == 1ul);
             CHECK(!folder_my->get_folder()->is_synchronizing());
 
-            auto f = folder_my->get_by_path(path).first;
+            auto f = folder_my->get_by_path(path);
             REQUIRE(f);
             CHECK(f->get_size() == 10);
             CHECK(f->iterate_blocks().get_total() == 2);
@@ -1858,7 +1858,7 @@ void test_uploading() {
             auto uuid = sup->sequencer->next_uuid();
             auto file_info = model::file_info_t::create(uuid, file, folder_my).value();
             file_info->assign_block(b.get(), 0);
-            REQUIRE(folder_my->add_strict(file_info.get(), false));
+            folder_my->add_file(file_info.get());
 
             auto req = proto::Request();
             proto::set_id(req, 1);
@@ -2108,7 +2108,7 @@ void test_conflicts() {
             sup->do_process();
 
             auto local_folder = folder_1->get_folder_info(*my_device);
-            auto local_file = local_folder->get_by_path(path).first;
+            auto local_file = local_folder->get_by_path(path);
             auto pr_file = local_file->as_proto(false);
             proto::set_modified_s(pr_file, 1734680000);
 
@@ -2153,7 +2153,7 @@ void test_conflicts() {
                 sup->do_process();
 
                 REQUIRE(local_folder->get_children().size() == 1);
-                auto lf = local_folder->get_by_path(path).first;
+                auto lf = local_folder->get_by_path(path);
                 REQUIRE(local_seq == lf->get_sequence());
                 CHECK(cluster->get_blocks().size() == 2);
 
@@ -2171,13 +2171,13 @@ void test_conflicts() {
                 sup->do_process();
 
                 auto local_folder = folder_1->get_folder_info(*my_device);
-                auto local_conflict = local_folder->get_by_path(conflict_name).first;
+                auto local_conflict = local_folder->get_by_path(conflict_name);
                 REQUIRE(local_conflict);
                 CHECK(local_conflict->get_size() == 5);
                 REQUIRE(local_conflict->iterate_blocks().get_total() == 1);
                 CHECK(local_conflict->iterate_blocks(0).next()->get_hash() == data_2_h);
 
-                auto file = local_folder->get_by_path(path).first;
+                auto file = local_folder->get_by_path(path);
                 REQUIRE(file);
                 CHECK(file->get_size() == 5);
                 REQUIRE(file->iterate_blocks().get_total() == 1);
@@ -2222,13 +2222,13 @@ void test_conflicts() {
                 sup->do_process();
 
                 auto local_folder = folder_1->get_folder_info(*my_device);
-                auto local_conflict = local_folder->get_by_path(conflict_name).first;
+                auto local_conflict = local_folder->get_by_path(conflict_name);
                 REQUIRE(local_conflict);
                 CHECK(local_conflict->get_size() == 5);
                 REQUIRE(local_conflict->iterate_blocks().get_total() == 1);
                 CHECK(local_conflict->iterate_blocks(0).next()->get_hash() == data_2_h);
 
-                auto file = local_folder->get_by_path(path).first;
+                auto file = local_folder->get_by_path(path);
                 REQUIRE(file);
                 CHECK(file->get_size() == 0);
                 REQUIRE(file->iterate_blocks().get_total() == 0);
@@ -2685,7 +2685,7 @@ void test_races() {
 
                 sup->resume_io(2)->do_process();
             }
-            auto [file, _] = folder_my->get_by_path(path);
+            auto file = folder_my->get_by_path(path);
             REQUIRE(file);
             CHECK(file->is_locally_available());
             CHECK(file->get_size() == 10);

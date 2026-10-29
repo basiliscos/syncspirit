@@ -168,7 +168,7 @@ struct C::stack_context_t : model::diff::diff_assember_t {
         if (folder) {
             auto peer_folder = folder->get_folder_info(*actor.peer);
             if (peer_folder) {
-                auto [peer_file, _] = peer_folder->get_by_path(path);
+                auto peer_file = peer_folder->get_by_path(path);
                 if (peer_file && !peer_file->is_unreachable()) {
                     LOG_DEBUG(actor.log, "marking '{}' marking unreachable", *peer_file);
                     peer_file->mark_unreachable(true);
@@ -858,7 +858,7 @@ auto controller_actor_t::operator()(const model::diff::peer::update_folder_t &di
             for (auto &f : diff.files) {
                 auto name = proto::get_name(f);
                 auto path = utils::make_generic_view(name, allocator);
-                auto [file, _] = folder_peer->get_by_path(path);
+                auto file = folder_peer->get_by_path(path);
                 cancel_sync(file);
             }
         }
@@ -884,7 +884,7 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
         if (peer_folder) {
             auto name = proto::get_name(diff.proto_source);
             auto path = utils::make_generic_view(name, allocator);
-            std::tie(peer_file, peer_host) = peer_folder->get_by_path(path);
+            auto peer_file = peer_folder->get_by_path(path);
             if (peer_file) {
                 if (diff.peer_id == peer->device_id().get_sha256()) {
                     local_file = peer_file->get_sibling_file(&self);
@@ -903,7 +903,7 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
                 auto child = host->get_child(name, is_dir);
                 local_file = static_cast<model::file_info_t*>(child);
             } else {
-                local_file = local_folder->get_by_path(path).first;
+                local_file = local_folder->get_by_path(path);
             }
             assert(local_file);
         }
@@ -1001,7 +1001,7 @@ auto controller_actor_t::operator()(const model::diff::modify::mark_reachable_t 
     auto folder = cluster->get_folders().by_id(folder_id);
     auto device = cluster->get_devices().by_sha256(diff.device_id);
     auto folder_info = folder->get_folder_info(*device);
-    auto [file, _] = folder_info->get_by_path(path);
+    auto file = folder_info->get_by_path(path);
     if (ctx->from_self) {
         cancel_sync(file);
     }
@@ -1019,7 +1019,7 @@ auto controller_actor_t::operator()(const model::diff::modify::block_ack_t &diff
         if (folder) {
             auto folder_info = folder->get_folder_info(diff.device_id);
             if (folder_info) {
-                auto [file, _] = folder_info->get_by_path(diff.path);
+                auto file = folder_info->get_by_path(diff.path);
                 if (file) {
                     if (file->is_locally_available()) {
                         auto local_device = cluster->get_device().get();
@@ -1133,7 +1133,7 @@ void controller_actor_t::on_message(proto::Request &req, stack_context_t &ctx) n
                 local_folder = folder->get_folder_info(*cluster->get_device());
                 auto name = proto::get_name(req);
                 auto path = utils::make_generic_view(name, allocator);
-                local_file = local_folder->get_by_path(path).first;
+                local_file = local_folder->get_by_path(path);
                 if (!local_file) {
                     code = proto::ErrorCode::NO_SUCH_FILE;
                 } else {
@@ -1202,7 +1202,7 @@ void controller_actor_t::on_message(proto::Response &message, stack_context_t &c
         peer_folder = folder->get_folder_info(*peer);
     }
     if (peer_folder) {
-        auto [f, _] = peer_folder->get_by_path(path);
+        auto f = peer_folder->get_by_path(path);
         if (f->get_sequence() == peer_context->sequence) {
             file = std::move(f);
         }
@@ -1371,7 +1371,7 @@ void controller_actor_t::on_digest(hasher::message::digest_t &res) noexcept {
         peer_folder = folder->get_folder_info(*peer);
     }
     if (peer_folder) {
-        auto [f, _] = peer_folder->get_by_path(path);
+        auto f = peer_folder->get_by_path(path);
         assert(f);
         if (f->get_sequence() == peer_context->sequence) {
             file = std::move(f);

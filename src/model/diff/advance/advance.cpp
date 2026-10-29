@@ -68,7 +68,7 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
 
     auto path = utils::make_generic_view(local_file_name_, allocator);
     auto local_folder_info = folder->get_folder_info(self);
-    auto [local_file, parent_presence] = local_folder_info->get_by_path(path);
+    auto local_file = local_folder_info->get_by_path(path);
 
     auto orphans = orphaned_blocks_t::set_t();
     proto_local = proto_source;
@@ -163,7 +163,7 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
     auto name = proto::get_name(proto_local);
     auto path = utils::make_generic_view(name, allocator);
 
-    auto [prev_file, parent] = local_folder->get_by_path(path);
+    auto prev_file = local_folder->get_by_path(path);
     auto local_file_opt = file_info_t::create(uuid, proto_local, local_folder);
     if (!local_file_opt) {
         return local_file_opt.assume_error();
@@ -196,14 +196,15 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
     local_file_ptr->mark_local(true);
     local_file_ptr->set_sequence(sequence);
     if (!prev_file) {
-        parent->add_child(local_file_ptr, path.get_filename());
+        local_folder->add_file(local_file_ptr);
     } else {
+        auto parent = local_file->get_parent();
         auto is_dir = local_file->is_dir();
         if (is_dir xor was_dir) {
             parent->reset_normalization();
         }
     }
-    local_folder->add_strict(local_file_ptr, true);
+    local_folder->update_max_sequnece(*local_file_ptr);
 
     LOG_TRACE(log, "advance_t ({}), file: '{}', size: {}, blocks: {}, seq.: {}", stringify(action), *local_file_ptr, size,
               proto::get_blocks_size(proto_local), sequence);

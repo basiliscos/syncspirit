@@ -170,7 +170,7 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
 
             auto path = utils::path_t::make_generic("a.txt");
             REQUIRE(peer_folder_info->get_children().size() == 1);
-            auto [f, _] = peer_folder_info->get_by_path(path);
+            auto f = peer_folder_info->get_by_path(path);
             REQUIRE(f);
 
             SECTION("exactly the same file is added, and it's duplicate is ignored") {
@@ -184,7 +184,7 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
                 REQUIRE(builder.make_index(sha256, "1234-5678").add(pr_file, peer_device).finish().apply());
 
                 REQUIRE(peer_folder_info->get_children().size() == 1);
-                auto [same_f, _] = peer_folder_info->get_by_path(path);
+                auto same_f = peer_folder_info->get_by_path(path);
                 CHECK(same_f == f);
                 CHECK(same_f->get_full_id() == f->get_full_id());
             }
@@ -256,7 +256,7 @@ TEST_CASE("update folder-2 (via Index)", "[model]") {
         REQUIRE(peer_folder->get_children().size() == 1);
 
         auto path = utils::path_t::make_generic("a.txt");
-        auto [file, _] = peer_folder->get_by_path(path);
+        auto file = peer_folder->get_by_path(path);
         REQUIRE(file);
         CHECK(file->get_size() == 0);
     }
@@ -523,15 +523,15 @@ TEST_CASE("update folder-3: out-of-order files", "[model]") {
                     .finish()
                     .apply());
 
-        auto [f1, _] = folder_peer->get_by_path(path_1);
+        auto f1 = folder_peer->get_by_path(path_1);
         REQUIRE(f1);
         CHECK(f1->get_children().size() == 1);
 
-        auto [f2, parent] = folder_peer->get_by_path(path_2);
+        auto f2 = folder_peer->get_by_path(path_2);
         REQUIRE(f2);
         CHECK(f2->get_sequence() == peer_sequence);
         CHECK(f2->get_sequence() == folder_peer->get_max_sequence());
-        CHECK(parent == f1);
+        CHECK(f2->get_parent() == f1);
         CHECK(folder_peer->get_seen_dirs().empty());
     }
 
@@ -551,9 +551,9 @@ TEST_CASE("update folder-3: out-of-order files", "[model]") {
                     .finish()
                     .apply());
 
-        CHECK(folder_peer->get_by_path(path_1).first);
-        CHECK(folder_peer->get_by_path(path_2).first);
-        CHECK(folder_peer->get_by_path(path_3).first);
+        CHECK(folder_peer->get_by_path(path_1));
+        CHECK(folder_peer->get_by_path(path_2));
+        CHECK(folder_peer->get_by_path(path_3));
         CHECK(folder_peer->get_seen_dirs().empty());
     }
 
@@ -575,8 +575,8 @@ TEST_CASE("update folder-3: out-of-order files", "[model]") {
 
         auto path_1 = utils::path_t::make_generic("path");
         auto path_2 = utils::path_t::make_generic("path/content.bin");
-        CHECK(folder_peer->get_by_path(path_1).first);
-        CHECK(folder_peer->get_by_path(path_2).first);
+        CHECK(folder_peer->get_by_path(path_1));
+        CHECK(folder_peer->get_by_path(path_2));
         CHECK(folder_peer->get_seen_dirs().empty());
         CHECK(folder_peer->get_orphaned_files().container.empty());
     }

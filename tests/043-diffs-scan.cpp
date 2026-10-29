@@ -43,8 +43,8 @@ TEST_CASE("scan_start, full", "[model]") {
 
     auto path_1 = utils::path_t::make_generic("a.bin");
     auto path_2 = utils::path_t::make_generic("b.bin");
-    auto f1 = folder_local->get_by_path(path_1).first;
-    auto f2 = folder_local->get_by_path(path_2).first;
+    auto f1 = folder_local->get_by_path(path_1);
+    auto f2 = folder_local->get_by_path(path_2);
 
     REQUIRE(f1->is_local());
     REQUIRE(f2->is_local());
@@ -76,7 +76,7 @@ TEST_CASE("scan_start, partial", "[model]") {
         proto::add_counters(v_1, proto::Counter(my_id.get_uint(), 0));
         REQUIRE(builder.local_update("f1", pr_fi).apply());
         auto path = utils::path_t::make_generic(name);
-        auto [f, _] = folder_local->get_by_path(path);
+        auto f = folder_local->get_by_path(path);
         REQUIRE(f);
         REQUIRE(f->is_local());
     }
@@ -85,9 +85,9 @@ TEST_CASE("scan_start, partial", "[model]") {
     auto path_subdir = utils::path_t::make_generic("dir/sub_dir");
     auto path_dir_x = utils::path_t::make_generic("dir_x");
     REQUIRE(builder.scan_start("f1", path_dir.clone()).apply());
-    CHECK(!folder_local->get_by_path(path_dir).first->is_local());
-    CHECK(!folder_local->get_by_path(path_subdir).first->is_local());
-    CHECK(folder_local->get_by_path(path_dir_x).first->is_local());
+    CHECK(!folder_local->get_by_path(path_dir)->is_local());
+    CHECK(!folder_local->get_by_path(path_subdir)->is_local());
+    CHECK(folder_local->get_by_path(path_dir_x)->is_local());
 }
 
 int _init() {

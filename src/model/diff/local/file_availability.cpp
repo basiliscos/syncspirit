@@ -21,7 +21,7 @@ auto file_availability_t::apply_impl(apply_controller_t &controller, void *custo
     auto folder = cluster.get_folders().by_id(folder_id);
     if (folder) {
         auto folder_info = folder->get_folder_info(*cluster.get_device());
-        auto [f, parent]= folder_info->get_by_path(path);
+        auto f = folder_info->get_by_path(path);
         if (f->get_version().identical_to(version)) {
             auto count = f->iterate_blocks().get_total();
             LOG_TRACE(log, "file_availability_t, mark local file '{}', blocks = {}", path, count);

@@ -52,7 +52,7 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
         REQUIRE(builder.local_update("fid", pr_file).apply());
         auto folder = cluster->get_folders().by_id("fid");
         auto fi = folder->get_folder_info(*my_device);
-        auto [file, _] = fi->get_by_path(utils::path_t::make_generic("a.txt"));
+        auto file = fi->get_by_path(utils::path_t::make_generic("a.txt"));
         REQUIRE(file);
 
         auto orphans = model::orphaned_blocks_t();
@@ -88,7 +88,7 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
         REQUIRE(builder.local_update("fid", pr_file).apply());
         auto folder = cluster->get_folders().by_id("fid");
         auto fi = folder->get_folder_info(*my_device);
-        auto [file, _] = fi->get_by_path(utils::path_t::make_generic("a.txt"));
+        auto file = fi->get_by_path(utils::path_t::make_generic("a.txt"));
         REQUIRE(file);
 
         auto orphans = model::orphaned_blocks_t();
@@ -155,8 +155,8 @@ TEST_CASE("orphaned blocks, all removed for single file", "[model]") {
 
         auto folder = cluster->get_folders().by_id("fid");
         auto fi = folder->get_folder_info(*my_device);
-        auto file_1 = fi->get_by_path(utils::path_t::make_generic("a.txt")).first;
-        auto file_2 = fi->get_by_path(utils::path_t::make_generic("b.txt")).first;
+        auto file_1 = fi->get_by_path(utils::path_t::make_generic("a.txt"));
+        auto file_2 = fi->get_by_path(utils::path_t::make_generic("b.txt"));
         REQUIRE(file_1);
         REQUIRE(file_2);
 

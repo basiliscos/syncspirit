@@ -960,7 +960,7 @@ auto db_actor_t::operator()(const model::diff::advance::advance_t &diff, void *c
         if (folder_info) {
             auto name = proto::get_name(diff.proto_local);
             auto path = utils::make_generic_view(name, allocator);
-            auto [file, _] = folder_info->get_by_path(path);
+            auto file = folder_info->get_by_path(path);
             if (file) {
                 auto &txn = *get_txn().assume_value();
 
@@ -1023,7 +1023,7 @@ auto db_actor_t::operator()(const model::diff::peer::update_folder_t &diff, void
             for (const auto &f : diff.files) {
                 auto name = proto::get_name(f);
                 auto path = utils::make_generic_view(name, allocator);
-                auto [file, _] = folder_info->get_by_path(path);
+                auto file = folder_info->get_by_path(path);
                 LOG_TRACE(log, "saving '{}', seq. = {}", *file, file->get_sequence());
                 unsigned char key[model::file_info_t::data_length + 1];
                 key[0] = db::prefix::file_info;

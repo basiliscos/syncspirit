@@ -22,7 +22,7 @@ auto mark_reachable_t::apply_impl(apply_controller_t &controller, void *custom) 
     auto folder = cluster.get_folders().by_id(folder_id);
     auto device = cluster.get_devices().by_sha256(device_id);
     auto folder_info = folder->get_folder_info(*device);
-    auto [file, _] = folder_info->get_by_path(path);
+    auto file = folder_info->get_by_path(path);
 
     LOG_TRACE(log, "applying reachable ({}) for '{}'", reachable, *file);
     file->mark_unreachable(!reachable);

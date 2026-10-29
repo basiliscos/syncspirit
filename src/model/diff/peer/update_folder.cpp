@@ -83,7 +83,7 @@ auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
                 file->assign_block(block.get(), (size_t)i);
             }
         }
-        auto [prev_file, parent] = folder_info->get_by_path(*file->get_name());
+        auto prev_file = folder_info->get_by_path(*file->get_name());
         if (prev_file) {
             auto prev_seq = prev_file->get_sequence();
             auto new_seq = file->get_sequence();
@@ -94,11 +94,8 @@ auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
             } else if (prev_seq == new_seq) {
                 LOG_TRACE(log, "update_folder_t, apply(); skipping update for '{}', seq. {}", new_seq, *file);
             }
-        }
-
-        assert(parent);
-        if (!prev_file) {
-            parent->add_child(file.get(), file->get_name()->get_filename());
+        } else {
+            folder_info->add_file(file.get());
         }
         folder_info->update_max_sequnece(*file);
         if (folder_info == cache_folder && file->is_dir()) {
@@ -147,7 +144,7 @@ static auto construct(sequencer_t &sequencer, folder_info_t *folder_info, syncsp
         }
         auto file_uuid = bu::uuid{};
         auto path = utils::make_generic_view(proto::get_name(f), allocator);
-        auto [prev_file, _] = folder_info->get_by_path(path);
+        auto prev_file = folder_info->get_by_path(path);
         if (prev_file) {
             assign(file_uuid, prev_file->get_uuid());
             orphaned_candidates.record(*prev_file);
@@ -244,7 +241,7 @@ static auto instantiate(cluster_t &cluster, sequencer_t &sequencer, const device
             LOG_WARN(log, "file {} should not have blocks, but it has {}", name, blocks_count);
         }
         auto sequence = proto::get_sequence(f);
-        auto [prev_file, parent_dir] = fi->get_by_path(path);
+        auto prev_file = fi->get_by_path(path);
         if (sequence <= prev_sequence) {
             LOG_DEBUG(log, "file '{}' has sequence {}, it is already known {}, try to ignore", name, sequence,
                       prev_sequence);
@@ -292,6 +289,7 @@ static auto instantiate(cluster_t &cluster, sequencer_t &sequencer, const device
         }
 
         auto enqueue_file = false;
+        auto parent_dir = prev_file ? prev_file->get_parent() : fi->get_by_path(path.get_parent());
         if (parent_dir || path.get_components() == 0) {
             enqueue_file = true;
         } else {

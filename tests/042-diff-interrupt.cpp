@@ -72,9 +72,9 @@ TEST_CASE("diff interrupt", "[model]") {
         auto controller = make_apply_controller(cluster);
         REQUIRE(ctx.next->apply(*controller, {}));
         REQUIRE(folder_local->get_children().size() == 3);
-        REQUIRE(folder_local->get_by_path(path_a).first);
-        REQUIRE(folder_local->get_by_path(path_b).first);
-        REQUIRE(folder_local->get_by_path(path_c).first);
+        REQUIRE(folder_local->get_by_path(path_a));
+        REQUIRE(folder_local->get_by_path(path_b));
+        REQUIRE(folder_local->get_by_path(path_c));
     }
 
     SECTION("custom applicator") {
@@ -83,17 +83,17 @@ TEST_CASE("diff interrupt", "[model]") {
 
         REQUIRE(ctx.next->apply(controller, &ctx));
         REQUIRE(folder_local->get_children().size() == 1);
-        REQUIRE(folder_local->get_by_path(path_a).first);
+        REQUIRE(folder_local->get_by_path(path_a));
         REQUIRE(ctx.next);
 
         REQUIRE(ctx.next->apply(controller, &ctx));
         REQUIRE(folder_local->get_children().size() == 2);
-        REQUIRE(folder_local->get_by_path(path_b).first);
+        REQUIRE(folder_local->get_by_path(path_b));
         REQUIRE(ctx.next);
 
         REQUIRE(ctx.next->apply(controller, &ctx));
         REQUIRE(folder_local->get_children().size() == 3);
-        REQUIRE(folder_local->get_by_path(path_c).first);
+        REQUIRE(folder_local->get_by_path(path_c));
         REQUIRE(!ctx.next);
     }
 }

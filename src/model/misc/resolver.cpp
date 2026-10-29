@@ -91,7 +91,7 @@ static advance_action_t _resolve(const file_info_t &remote, const file_info_t *l
             continue;
         }
         auto fi = static_cast<model::folder_info_t *>(p.get());
-        auto [other_party_file, _] = fi->get_by_path(*remote.get_name());
+        auto other_party_file = fi->get_by_path(*remote.get_name());
         if (other_party_file && other_party_file != &remote) {
             auto o_v = other_party_file->get_version();
             if (!r_v.contains(o_v)) {
@@ -137,7 +137,7 @@ advance_action_t resolve(const file_info_t &remote, const file_info_t *local,
             action = advance_action_t::ignore;
         } else {
             auto resolved_path = local->make_conflicting_name(allocator);
-            auto [resolved_file, _] = local_folder.get_by_path(resolved_path);
+            auto resolved_file = local_folder.get_by_path(resolved_path);
             if (resolved_file) {
                 action = advance_action_t::ignore;
             }

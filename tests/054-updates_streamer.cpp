@@ -63,7 +63,7 @@ TEST_CASE("updates_streamer", "[model]") {
         proto::add_counters(v, proto::Counter(my_device->device_id().get_uint(), 0));
 
         auto f = file_info_t::create(sequencer->next_uuid(), pr_file, my_folder).value();
-        my_folder->add_strict(f.get(), false);
+        my_folder->add_file(f.get());
         return f;
     };
 
@@ -153,7 +153,7 @@ TEST_CASE("updates_streamer", "[model]") {
         auto streamer = model::updates_streamer_t(*cluster, *peer_device);
 
         f1->set_sequence(++seq);
-        my_folder->add_strict(f1.get(), true);
+        my_folder->update_max_sequnece(*f1);
 
         streamer.on_update(*f1, *my_folder);
 
@@ -168,8 +168,8 @@ TEST_CASE("updates_streamer", "[model]") {
         auto f1 = add_file("a.txt");
         auto f2 = add_file("b.txt");
 
-        my_folder->add_strict(f1.get(), true);
-        my_folder->add_strict(f2.get(), true);
+        my_folder->update_max_sequnece(*f1);
+        my_folder->update_max_sequnece(*f2);
         auto streamer = model::updates_streamer_t(*cluster, *peer_device);
         CHECK(streamer.next() == update_t(f1, my_folder, true));
 

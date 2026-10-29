@@ -147,7 +147,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
                     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
                     my_file->mark_local(true);
-                    my_folder->add_relaxed(my_file.get());
+                    my_folder->add_file(my_file.get());
 
                     auto [f, fi, lf, action] = file_iterator->next();
                     REQUIRE(f);
@@ -162,7 +162,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     proto::set_value(c_1, 3);
 
                     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
-                    my_folder->add_relaxed(my_file.get());
+                    my_folder->add_file(my_file.get());
 
                     CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
                 }
@@ -173,7 +173,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
                     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
                     my_file->mark_local(true);
-                    my_folder->add_relaxed(my_file.get());
+                    my_folder->add_file(my_file.get());
 
                     CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
                 }
@@ -183,7 +183,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
                     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
                     my_file->mark_local(true);
-                    my_folder->add_relaxed(my_file.get());
+                    my_folder->add_file(my_file.get());
 
                     CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
                 }
@@ -226,7 +226,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
             }
             SECTION("1 file is missing on my side") {
-                auto [peer_file, _] = peer_folder->get_by_path(path_1);
+                auto peer_file = peer_folder->get_by_path(path_1);
                 REQUIRE(peer_file);
                 REQUIRE(peer_file);
                 REQUIRE(builder.remote_copy(*peer_file, *peer_folder).apply());
@@ -244,8 +244,8 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
             }
             SECTION("0 files are missing on my side") {
-                auto peer_file_1 = peer_folder->get_by_path(path_1).first;
-                auto peer_file_2 = peer_folder->get_by_path(path_2).first;
+                auto peer_file_1 = peer_folder->get_by_path(path_1);
+                auto peer_file_2 = peer_folder->get_by_path(path_2);
                 builder.remote_copy(*peer_file_1, *peer_folder).remote_copy(*peer_file_2, *peer_folder);
                 REQUIRE(builder.apply());
                 CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
@@ -349,14 +349,14 @@ TEST_CASE("file iterator, single folder", "[model]") {
             proto::add_counters(v, proto::Counter(1, 1));
 
             auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
-            REQUIRE(my_folder->add_strict(my_file.get(), false));
+            my_folder->add_file(my_file.get());
 
             proto::add_counters(v, proto::Counter(2, 2));
             REQUIRE(
                 builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
 
             SECTION("has not bee scanned") {
-                auto [peer_file, _] = peer_folder->get_by_path(path);
+                auto peer_file = peer_folder->get_by_path(path);
                 file_iterator->recheck(*peer_folder, *peer_file);
                 CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
             }
@@ -389,7 +389,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
             proto::add_counters(v, proto::Counter(2, 2));
             auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
-            REQUIRE(my_folder->add_strict(my_file.get(), false));
+            my_folder->add_file(my_file.get());
 
             REQUIRE(builder.apply());
             CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
@@ -406,7 +406,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
             REQUIRE(
                 builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi, peer_device).finish().apply());
-            auto [f, _] = peer_folder->get_by_path(path);
+            auto f = peer_folder->get_by_path(path);
             REQUIRE(builder.remote_copy(*f, *peer_folder).mark_reacheable(f, *peer_folder, false).apply());
 
             CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});

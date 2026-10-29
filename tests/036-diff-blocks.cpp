@@ -48,7 +48,7 @@ TEST_CASE("various block diffs", "[model]") {
     REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
 
     auto path = utils::path_t::make_generic("a.txt");
-    auto [file, _] = folder_info->get_by_path(path);
+    auto file = folder_info->get_by_path(path);
     auto bi1 = cluster->get_blocks().by_hash(b1_hash);
     auto bi2 = cluster->get_blocks().by_hash(b2_hash);
     file->remove_blocks();

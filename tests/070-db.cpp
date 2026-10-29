@@ -567,7 +567,7 @@ void test_cluster_update_and_remove() {
 
             REQUIRE(peer_folder_info);
             CHECK(peer_folder_info->get_max_sequence() == 6ul);
-            auto [peer_file, _] = peer_folder_info->get_by_path(path);
+            auto peer_file = peer_folder_info->get_by_path(path);
             REQUIRE(peer_file);
 
             auto &unknown_folders = cluster->get_pending_folders();
@@ -587,7 +587,7 @@ void test_cluster_update_and_remove() {
                 auto peer_clone = cluster_clone->get_devices().by_sha256(peer_device->device_id().get_sha256());
                 auto peer_folder_info = folder->get_folder_info(*peer_clone);
                 REQUIRE(peer_folder_info);
-                auto [peer_file, _] = peer_folder_info->get_by_path(path);
+                auto peer_file = peer_folder_info->get_by_path(path);
                 REQUIRE(peer_file);
                 REQUIRE(cluster_clone->get_pending_folders().size() == 1);
             }
@@ -670,7 +670,7 @@ void test_unshare_and_remove_folder() {
 
             REQUIRE(peer_folder_info);
             CHECK(peer_folder_info->get_max_sequence() == 6ul);
-            auto [peer_file, _] = peer_folder_info->get_by_path(path);
+            auto peer_file = peer_folder_info->get_by_path(path);
             REQUIRE(peer_file);
 
             SECTION("unshare") {
@@ -749,9 +749,9 @@ void test_remote_copy() {
             SECTION("file without blocks") {
                 builder.make_index(sha256, folder_id).add(file, peer_device).finish().apply(*sup);
 
-                auto [file_peer, _] = folder_peer->get_by_path(path);
-                REQUIRE(file_peer);
-                builder.remote_copy(*file_peer, *folder_peer).apply(*sup);
+                auto peer_file = folder_peer->get_by_path(path);
+                REQUIRE(peer_file);
+                builder.remote_copy(*peer_file, *folder_peer).apply(*sup);
 
                 load_diff = {};
                 sup->send<net::payload::load_cluster_trigger_t>(db_addr);
@@ -765,7 +765,7 @@ void test_remote_copy() {
                     auto folder = cluster_clone->get_folders().by_id(folder_id);
                     REQUIRE(folder->get_presences().size() == 2);
                     auto folder_info_clone = folder->get_folder_info(*cluster_clone->get_device());
-                    auto [file_clone, _] = folder_info_clone->get_by_path(path);
+                    auto file_clone = folder_info_clone->get_by_path(path);
                     REQUIRE(file_clone);
                     REQUIRE(file_clone->get_name()->get_full_name() == proto::get_name(file));
                     REQUIRE(file_clone->iterate_blocks().get_total() == 0);
@@ -788,10 +788,10 @@ void test_remote_copy() {
                 auto folder = cluster->get_folders().by_id(folder_id);
                 auto folder_my = folder->get_folder_info(*my_device);
                 auto folder_peer = folder->get_folder_info(*peer_device);
-                auto [file_peer, _] = folder_peer->get_by_path(path);
-                REQUIRE(file_peer);
+                auto peer_file = folder_peer->get_by_path(path);
+                REQUIRE(peer_file);
 
-                builder.remote_copy(*file_peer, *folder_peer).apply(*sup);
+                builder.remote_copy(*peer_file, *folder_peer).apply(*sup);
                 REQUIRE(folder_my->get_max_sequence() == 1);
 
                 {
@@ -807,7 +807,7 @@ void test_remote_copy() {
                     auto folder = cluster_clone->get_folders().by_id(folder_id);
                     REQUIRE(folder->get_presences().size() == 2);
                     auto folder_info_clone = folder->get_folder_info(*cluster_clone->get_device());
-                    auto [file_clone, _] = folder_info_clone->get_by_path(path);
+                    auto file_clone = folder_info_clone->get_by_path(path);
                     REQUIRE(file_clone);
                     REQUIRE(file_clone->get_name()->get_full_name() == proto::get_name(file));
                     REQUIRE(file_clone->iterate_blocks().get_total() == 1);
@@ -815,11 +815,11 @@ void test_remote_copy() {
                     REQUIRE(folder_info_clone->get_max_sequence() == 1);
                 }
 
-                file_peer = folder_peer->get_by_path(path).first;
-                file_peer->mark_local_available(0);
-                REQUIRE(file_peer->is_locally_available());
+                peer_file = folder_peer->get_by_path(path);
+                peer_file->mark_local_available(0);
+                REQUIRE(peer_file->is_locally_available());
 
-                builder.remote_copy(*file_peer, *folder_peer).apply(*sup);
+                builder.remote_copy(*peer_file, *folder_peer).apply(*sup);
 
                 {
                     load_diff = {};
@@ -834,7 +834,7 @@ void test_remote_copy() {
                     auto folder = cluster_clone->get_folders().by_id(folder_id);
                     REQUIRE(folder->get_presences().size() == 2);
                     auto folder_info_clone = folder->get_folder_info(*cluster_clone->get_device());
-                    auto [file_clone, _] = folder_info_clone->get_by_path(path);
+                    auto file_clone = folder_info_clone->get_by_path(path);
                     REQUIRE(file_clone);
                     REQUIRE(file_clone->get_name()->get_full_name() == proto::get_name(file));
                     REQUIRE(file_clone->iterate_blocks().get_total() == 1);
@@ -877,7 +877,7 @@ void test_local_update() {
 
                 auto folder = cluster_clone->get_folders().by_id(folder_id);
                 auto folder_my = folder->get_folder_info(*my_device);
-                auto [file, _] = folder_my->get_by_path(path);
+                auto file = folder_my->get_by_path(path);
                 REQUIRE(file);
                 CHECK(cluster_clone->get_blocks().size() == 1);
                 CHECK(file->iterate_blocks().get_total() == 1);
@@ -899,7 +899,7 @@ void test_local_update() {
 
                 auto folder = cluster_clone->get_folders().by_id(folder_id);
                 auto folder_my = folder->get_folder_info(*my_device);
-                auto [file, _] = folder_my->get_by_path(path);
+                auto file = folder_my->get_by_path(path);
                 REQUIRE(file);
                 CHECK(file->is_deleted());
                 CHECK(cluster_clone->get_blocks().size() == 0);
@@ -988,7 +988,7 @@ void test_remove_peer() {
 
             REQUIRE(peer_folder_info);
             CHECK(peer_folder_info->get_max_sequence() == 6ul);
-            auto [peer_file, _] = peer_folder_info->get_by_path(path);
+            auto peer_file = peer_folder_info->get_by_path(path);
             REQUIRE(peer_file);
 
             builder.remove_peer(*peer_device).apply(*sup);
@@ -1100,7 +1100,7 @@ void test_peer_3_folders_6_files() {
                     auto folder = cluster->get_folders().by_id(folder_id);
                     auto folder_info = folder->get_folder_info(*peer_device);
                     auto path = utils::path_t::make_generic(name);
-                    auto file = folder_info->get_by_path(path).first;
+                    auto file = folder_info->get_by_path(path);
                     return {file, folder_info};
                 };
 
@@ -1141,7 +1141,7 @@ void test_peer_3_folders_6_files() {
                     auto folder = cluster_clone->get_folders().by_id(folder_id);
                     auto folder_info = folder->get_folder_info(*self_clone);
                     auto path = utils::path_t::make_generic(name);
-                    auto file = folder_info->get_by_path(path).first;
+                    auto file = folder_info->get_by_path(path);
                     return file;
                 };
 
@@ -1300,7 +1300,7 @@ void test_corrupted_file() {
             auto folder = cluster->get_folders().by_id(folder_id);
             auto fi = folder->get_folder_info(*my_device);
 
-            auto [file, _] = fi->get_by_path(path);
+            auto file = fi->get_by_path(path);
             REQUIRE(file);
 
             auto &db_env = db_actor->access<env>();
@@ -1404,7 +1404,7 @@ void test_flush_on_shutdown() {
                 auto folder = cluster_clone->get_folders().by_id(folder_id);
                 auto folder_my = folder->get_folder_info(*my_device);
                 auto path = utils::path_t::make_generic("a.txt");
-                auto [file, _] = folder_my->get_by_path(path);
+                auto file = folder_my->get_by_path(path);
                 REQUIRE(file);
                 CHECK(file->iterate_blocks().get_total() == 1);
                 CHECK(cluster_clone->get_blocks().size() == 1);

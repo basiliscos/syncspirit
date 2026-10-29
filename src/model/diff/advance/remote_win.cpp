@@ -19,7 +19,7 @@ remote_win_t::remote_win_t(const cluster_t &cluster, sequencer_t &sequencer, pro
     auto folder = cluster.get_folders().by_id(folder_id);
     auto path = utils::make_generic_view(proto::get_name(proto_file_), allocator);
 
-    auto [local_file, _] = folder->get_folder_info(self)->get_by_path(path);
+    auto local_file = folder->get_folder_info(self)->get_by_path(path);
     auto local_source = local_file->as_proto(true);
     auto name = local_file->make_conflicting_name(allocator);
     initialize(cluster, sequencer, std::move(local_source), name.get_full_name());

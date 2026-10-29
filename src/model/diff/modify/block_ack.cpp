@@ -32,7 +32,7 @@ auto block_ack_t::apply_impl(apply_controller_t &controller, void *custom) const
     if (folder) {
         auto folder_info = folder->get_folder_info(device_id);
         if (folder_info) {
-            auto [file, _] = folder_info->get_by_path(path);
+            auto file = folder_info->get_by_path(path);
             if (file) {
                 if (!file->is_locally_available(block_index)) {
                     LOG_TRACE(log, "block_ack_t, '{}' block #{} (hash: {})", path, block_index, block_hash);

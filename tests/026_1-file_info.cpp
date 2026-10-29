@@ -103,20 +103,20 @@ TEST_CASE("file_info_t::local_file", "[model]") {
 
     SECTION("no local file") {
         auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
-        CHECK(!folder_my->get_by_path(path).first);
+        CHECK(!folder_my->get_by_path(path));
         CHECK(file_peer->is_locally_available());
     }
 
     SECTION("there is identical local file") {
         proto::set_sequence(pr_file, folder_my->get_max_sequence() + 1);
         auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
-        REQUIRE(folder_my->add_strict(file_my.get(), false));
+        folder_my->add_file(file_my.get());
 
         proto::set_sequence(pr_file, folder_peer->get_max_sequence() + 1);
         auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
-        REQUIRE(folder_peer->add_strict(file_peer.get(), false));
+        folder_peer->add_file(file_peer.get());
 
-        auto lf = folder_my->get_by_path(*file_peer->get_name()).first;
+        auto lf = folder_my->get_by_path(*file_peer->get_name());
         REQUIRE(lf);
         REQUIRE(lf == file_my);
     }
@@ -156,7 +156,7 @@ TEST_CASE("file_info_t::check_consistency", "[model]") {
 
     REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
     auto path = utils::path_t::make_generic(proto::get_name(pr_file));
-    auto [file_my, _] = folder_my->get_by_path(path);
+    auto file_my = folder_my->get_by_path(path);
     CHECK(file_my->get_size() == 5);
 }
 

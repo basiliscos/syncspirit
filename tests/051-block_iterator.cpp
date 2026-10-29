@@ -48,7 +48,7 @@ TEST_CASE("block iterator", "[model]") {
     SECTION("no blocks") {
         REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
-        auto [my_file, _] = my_folder->get_by_path(path);
+        auto my_file = my_folder->get_by_path(path);
         REQUIRE(!next(my_file, *my_folder, true));
     }
 
@@ -73,14 +73,14 @@ TEST_CASE("block iterator", "[model]") {
 
             REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
-            auto [my_file, _] = my_folder->get_by_path(path);
+            auto my_file = my_folder->get_by_path(path);
             CHECK(!next(my_file, *my_folder, true));
         }
 
         SECTION("normal iteration") {
             REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
-            auto [my_file, _] = my_folder->get_by_path(path);
+            auto my_file = my_folder->get_by_path(path);
             auto bi1 = cluster->get_blocks().by_hash(b1_hash);
             auto bi2 = cluster->get_blocks().by_hash(b2_hash);
             my_file->remove_blocks();
@@ -105,7 +105,7 @@ TEST_CASE("block iterator", "[model]") {
         SECTION("no iteration upon unavailable file") {
             REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
-            auto [my_file, _] = my_folder->get_by_path(path);
+            auto my_file = my_folder->get_by_path(path);
             auto bi1 = cluster->get_blocks().by_hash(b1_hash);
             auto bi2 = cluster->get_blocks().by_hash(b2_hash);
             my_file->remove_blocks();
@@ -130,12 +130,12 @@ TEST_CASE("block iterator", "[model]") {
 
         REQUIRE(builder.local_update(folder->get_id(), p_file_2).apply());
 
-        auto [my_file_2, _] = my_folder->get_by_path(path_2);
+        auto my_file_2 = my_folder->get_by_path(path_2);
         REQUIRE(my_file_2->is_locally_available());
 
         REQUIRE(builder.local_update(folder->get_id(), p_file).apply());
 
-        auto my_file = my_folder->get_by_path(path).first;
+        auto my_file = my_folder->get_by_path(path);
         auto bi1 = cluster->get_blocks().by_hash(b1_hash);
         my_file->remove_blocks();
         my_file->assign_block(bi1.get(), 0);

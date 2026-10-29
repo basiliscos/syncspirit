@@ -11,6 +11,7 @@
 #include "syncspirit-export.h"
 #include "utils/bytes.h"
 #include "misc/orphaned_files.h"
+#include <unordered_map>
 #include <boost/outcome.hpp>
 
 namespace syncspirit::model {
@@ -47,7 +48,6 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
         unsigned char device_key_raw[device_id_t::data_length];
         unsigned char folder_key_raw[folder_data_length];
     };
-    using location_t = std::pair<file_info_t *, presence_t *>;
     using seen_dirs_t = std::unordered_set<utils::path_ptr_t, utils::path_hash_t, utils::path_eq_t>;
 
     static decomposed_key_t decompose_key(utils::bytes_view_t key);
@@ -62,8 +62,7 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     bool operator==(const folder_info_t &other) const noexcept;
     bool operator!=(const folder_info_t &other) const noexcept { return !(*this == other); }
 
-    void add_relaxed(file_info_t* file_info) noexcept;
-    bool add_strict(file_info_t* file_info, bool already_added) noexcept;
+    void add_file(file_info_t* file_info) noexcept;
     void update_max_sequnece(const file_info_t& file_info) noexcept;
 
     void serialize(db::FolderInfo &storage) const noexcept;
@@ -76,8 +75,9 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     folder_t *get_folder() const noexcept;
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
 
-    location_t get_by_path(const utils::path_base_t& path) const noexcept;
+    file_info_t* get_by_path(const utils::path_base_t& path) const noexcept;
     void clear() noexcept;
+    void forget_file(const utils::path_base_t& path) noexcept;
 
     bool is_introduced_by(const model::device_id_t &device) const noexcept;
     utils::bytes_view_t get_introducer_device_key() const noexcept;
@@ -88,10 +88,21 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     folder_info_iterator_ptr_t iterate() noexcept;
 
   private:
+    struct path_eq_t {
+        bool operator()(const utils::path_base_t* lhs, const utils::path_base_t* rhs) const {
+            if (lhs == rhs) {
+                return true;
+            } else if (lhs && rhs) {
+                return *lhs == *rhs;
+            }
+            return false;
+        }
+    };
+    using file_cache_t = std::unordered_map<const utils::path_base_t*, file_info_t*, utils::path_hash_t, path_eq_t>;
+
     folder_info_t(utils::bytes_view_t key, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
     folder_info_t(const bu::uuid &uuid, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
     void assign_fields(const db::FolderInfo &data) noexcept;
-    void add(file_info_t* file_info) noexcept;
 
     static const constexpr auto data_length = uuid_length * 2 + device_id_t::digest_length + 1;
 
@@ -101,7 +112,8 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     std::int64_t max_sequence;
     utils::bytes_t introducer_device_key;
     orphaned_files_t orphaned_files;
-    seen_dirs_t seen_dirs;;
+    seen_dirs_t seen_dirs;
+    file_cache_t file_cache;
 };
 
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;

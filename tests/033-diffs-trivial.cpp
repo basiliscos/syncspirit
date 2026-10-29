@@ -63,7 +63,7 @@ TEST_CASE("with file", "[model]") {
 
     auto path = utils::path_t::make_generic("a.txt");
     REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
-    auto [file, _] = folder_info->get_by_path(path);
+    auto file = folder_info->get_by_path(path);
     REQUIRE(file);
 
     auto v = file->get_version();

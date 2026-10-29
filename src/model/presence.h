@@ -16,8 +16,9 @@ using entity_ptr_t = model::intrusive_ptr_t<entity_t>;
 struct presence_t;
 using presence_ptr_t = model::intrusive_ptr_t<presence_t>;
 
-struct file_entity_t;
 struct cluster_file_presence_t;
+struct file_entity_t;
+struct folder_info_t;
 
 struct folder_info_iterator_t;
 
@@ -59,6 +60,7 @@ struct SYNCSPIRIT_API presence_t : model::augmentable_t {
     virtual const presence_stats_t& get_stats(bool sync = true) const noexcept ;
     const presence_stats_t& get_own_stats() const noexcept;
     inline const model::device_t* get_device() const noexcept { return device; }
+    folder_info_t* get_folder_info() noexcept;
 
     children_t& get_children() noexcept;
     presence_t *get_child(std::string_view name, bool is_dir) noexcept ;
@@ -70,7 +72,6 @@ struct SYNCSPIRIT_API presence_t : model::augmentable_t {
     }
 
     void remove_child(const presence_t &) noexcept;
-    void add_child(presence_t*, std::string_view name) noexcept;
     void forget_presence() noexcept;
 
     struct SYNCSPIRIT_API presence_like_t {
@@ -90,8 +91,10 @@ struct SYNCSPIRIT_API presence_t : model::augmentable_t {
     friend struct entity_t;
     friend struct cluster_file_presence_t;
     friend struct file_entity_t;
+    friend struct folder_info_t;
     friend struct folder_info_iterator_t;
 
+    void add_child(presence_t*, std::string_view name) noexcept;
     void forget_entity() noexcept;
     void normalize() noexcept;
 
@@ -102,8 +105,8 @@ struct SYNCSPIRIT_API presence_t : model::augmentable_t {
     entity_t *entity;
     presence_t *parent;
     device_t* device;
-    children_t children_;
     mutable std::uint32_t features = 0;
+    children_t children;
     mutable std::uint32_t entity_generation = 0;
     mutable presence_stats_t statistics;
     mutable presence_stats_t own_statistics;

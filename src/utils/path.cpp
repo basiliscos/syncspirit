@@ -243,6 +243,10 @@ size_t path_hash_t::operator()(const path_base_t &item) const noexcept {
     return std::hash<std::string_view>()(item.get_full_name());
 }
 
+size_t path_hash_t::operator()(const path_base_t* item) const noexcept {
+    return std::hash<std::string_view>()(item->get_full_name());
+}
+
 size_t path_hash_t::operator()(const path_ptr_t &item) const noexcept {
     auto ptr = item.get();
     if (!ptr) {

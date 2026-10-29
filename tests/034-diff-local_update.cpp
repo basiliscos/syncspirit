@@ -36,7 +36,7 @@ TEST_CASE("new file diff", "[model]") {
 
         auto folder_info = folder->get_folder_info(*my_device);
         auto path = utils::path_t::make_generic(proto::get_name(pr_file));
-        auto [file, _] = folder_info->get_by_path(path);
+        auto file = folder_info->get_by_path(path);
         REQUIRE(file);
         REQUIRE(file->get_name()->get_full_name() == "a.txt");
         REQUIRE(file->get_link_target() == "/some/where");
@@ -68,7 +68,7 @@ TEST_CASE("new file diff", "[model]") {
             REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
             REQUIRE(folder->get_children().size() == 1);
 
-            auto [new_file, _] = folder_info->get_by_path(path);
+            auto new_file = folder_info->get_by_path(path);
             REQUIRE(new_file);
             CHECK(new_file == file);
             CHECK(new_file->get_full_id() == file->get_full_id());
@@ -92,7 +92,7 @@ TEST_CASE("new file diff", "[model]") {
 
         auto folder_info = folder->get_folder_info(*my_device);
         auto path = utils::path_t::make_generic(proto::get_name(pr_file));
-        auto [file, _] = folder_info->get_by_path(path);
+        auto file = folder_info->get_by_path(path);
         REQUIRE(file);
         REQUIRE(file->get_size() == 5);
         REQUIRE(file->get_name()->get_full_name() == "a.txt");
@@ -119,13 +119,13 @@ TEST_CASE("new file diff", "[model]") {
 
         auto folder_info = folder->get_folder_info(*my_device);
         auto path = utils::path_t::make_generic(proto::get_name(pr_file));
-        auto [file, _] = folder_info->get_by_path(path);
+        auto file = folder_info->get_by_path(path);
         REQUIRE(file->get_sequence() == 1);
         CHECK(file->is_locally_available());
 
         proto::set_sequence(pr_file, 2ul);
         REQUIRE(builder.local_update(folder->get_id(), pr_file).apply());
-        file = folder_info->get_by_path(path).first;
+        file = folder_info->get_by_path(path);
         REQUIRE(file->get_sequence() == 2);
         CHECK(file->is_locally_available());
     }
@@ -148,7 +148,7 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(blocks.size() == 1);
 
         auto path = utils::path_t::make_generic(proto::get_name(pr_file));
-        auto [file, _] = folder_info->get_by_path(path);
+        auto file = folder_info->get_by_path(path);
         auto sequence = file->get_sequence();
         auto version = file->get_version();
 
@@ -159,7 +159,7 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(folder_info->get_children().size() == 1);
         CHECK(blocks.size() == 0);
 
-        file= folder_info->get_by_path(path).first;
+        file= folder_info->get_by_path(path);
         CHECK(file->is_deleted());
         REQUIRE(file->iterate_blocks().get_total() == 0);
         CHECK(file->get_sequence() > sequence);
