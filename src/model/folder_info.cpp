@@ -34,6 +34,29 @@ auto folder_info_t::decompose_key(utils::bytes_view_t key) -> decomposed_key_t {
     return decomposed_key_t(device_key, folder_id, folder_info_id);
 }
 
+bool folder_info_t::path_eq_t::operator()(const utils::path_base_t* lhs, std::string_view rhs) const {
+    if (lhs) {
+        return lhs->get_full_name() == rhs;
+    }
+    return false;
+}
+
+bool folder_info_t::path_eq_t::operator()(std::string_view lhs, const utils::path_base_t* rhs) const {
+    if (rhs) {
+        return lhs == rhs->get_full_name();
+    }
+    return false;
+}
+
+bool folder_info_t::path_eq_t::operator()(const utils::path_base_t* lhs, const utils::path_base_t* rhs) const {
+    if (lhs == rhs) {
+        return true;
+    } else if (lhs && rhs) {
+        return *lhs == *rhs;
+    }
+    return false;
+}
+
 outcome::result<folder_info_ptr_t> folder_info_t::create(utils::bytes_view_t key, const db::FolderInfo &data,
                                                          const device_ptr_t &device_,
                                                          const folder_ptr_t &folder_) noexcept {
@@ -102,23 +125,24 @@ bool folder_info_t::operator==(const folder_info_t &other) const noexcept {
 }
 
 void folder_info_t::add_file(file_info_t* file_info) noexcept {
-    auto host_entity = entity;
     auto path = file_info->get_name().get();
     auto ok = file_cache.insert({path, file_info}).second;
     assert(ok);
     (void)ok;
-
-    for (auto name: *path) {
-        host_entity = host_entity->get_or_create_child(name);
-    }
-
-    auto host_presence = host_entity->get_parent()->get_presence(file_info->get_device());
-    if (!host_presence) {
+    auto parent_name = path->get_parent_name();
+    auto parent = parent_name.empty() ? this: [&]() -> presence_t* {
+        auto it = file_cache.find(parent_name);
+        return it == file_cache.end() ? nullptr : it->second;
+    }();
+    if (!parent) {
         spdlog::critical("missing parent presence for '{}' in folder '{}' for device {}", *path,
                          get_folder()->get_id(), device->device_id().get_short());
-        assert(host_presence);
+        assert(parent);
     }
-    host_presence->add_child(file_info, path->get_filename());
+    auto filename = path->get_filename();
+    auto entity = parent->get_entity()->get_or_create_child(filename);
+    parent->add_child(file_info, filename);
+
     update_max_sequnece(*file_info);
 }
 

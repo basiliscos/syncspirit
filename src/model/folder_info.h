@@ -89,22 +89,18 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
 
   private:
     struct path_eq_t {
-        bool operator()(const utils::path_base_t* lhs, const utils::path_base_t* rhs) const {
-            if (lhs == rhs) {
-                return true;
-            } else if (lhs && rhs) {
-                return *lhs == *rhs;
-            }
-            return false;
-        }
+        using is_transparent = void;
+        bool operator()(const utils::path_base_t* lhs, std::string_view rhs) const;
+        bool operator()(std::string_view lhs, const utils::path_base_t* rhs) const;
+        bool operator()(const utils::path_base_t* lhs, const utils::path_base_t* rhs) const;
     };
     using file_cache_t = std::unordered_map<const utils::path_base_t*, file_info_t*, utils::path_hash_t, path_eq_t>;
+
+    static const constexpr auto data_length = uuid_length * 2 + device_id_t::digest_length + 1;
 
     folder_info_t(utils::bytes_view_t key, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
     folder_info_t(const bu::uuid &uuid, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
     void assign_fields(const db::FolderInfo &data) noexcept;
-
-    static const constexpr auto data_length = uuid_length * 2 + device_id_t::digest_length + 1;
 
     unsigned char key[data_length];
 
