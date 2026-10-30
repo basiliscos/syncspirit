@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #include "version.h"
 #include "device.h"
@@ -18,7 +18,7 @@ version_t::version_t(const proto::Vector &v) noexcept {
     counters.resize(counters_sz);
     auto best = proto::get_counters(v, 0);
     auto best_index = 0;
-    for (int i = 0; i < counters_sz; ++i) {
+    for (std::size_t i = 0; i < counters_sz; ++i) {
         auto &c = proto::get_counters(v, i);
         counters[i] = c;
         if (proto::get_value(c) > proto::get_value(best)) {

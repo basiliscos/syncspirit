@@ -26,11 +26,10 @@ update_folder_t::update_folder_t(std::string_view folder_id_, utils::bytes_view_
                                  uuids_t uuids, blocks_t blocks, orphaned_blocks_t::set_t removed_blocks,
                                  const folder_info_t *cache_folder_) noexcept
     : folder_id{std::string(folder_id_)}, peer_id{peer_id_.begin(), peer_id_.end()}, files(std::move(files_)),
-      uuids{std::move(uuids)}, cache_folder{cache_folder_} {
+      cache_folder{cache_folder_}, uuids{std::move(uuids)} {
     LOG_DEBUG(log, "update_folder_t, folder = {}, files: {}, blocks = {}", folder_id, files.size(), blocks.size());
     auto assember = model::diff::diff_assember_t(constants::diffs_batch);
 
-    auto current = (cluster_diff_t *)(nullptr);
     if (!blocks.empty()) {
         assember.push_back(new modify::add_blocks_t(std::move(blocks)));
     }
@@ -74,7 +73,7 @@ auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
         auto file_sz = proto::get_size(f);
         if (file->is_file() && !file->is_deleted() && file_sz) {
             auto blocks_count = proto::get_blocks_size(f);
-            for (int i = 0; i < blocks_count; ++i) {
+            for (std::size_t i = 0; i < blocks_count; ++i) {
                 auto &b = proto::get_blocks(f, i);
                 auto hash = proto::get_hash(b);
                 auto strict_hash = block_info_t::make_strict_hash(hash);
@@ -210,8 +209,8 @@ static auto instantiate(cluster_t &cluster, sequencer_t &sequencer, const device
     auto &path_cache = cluster.get_path_cache();
 
     // pass 1: skip "outdated" files and pick only recent ones
-    for (int i = files_count - 1; i >= 0; --i) {
-        auto &f = proto::get_files(message, i);
+    for (int i = static_cast<int>(files_count) - 1; i >= 0; --i) {
+        auto &f = proto::get_files(message, static_cast<std::size_t>(i));
         auto name = proto::get_name(f);
         if (seen_file_names.count(name)) {
             skipped_file_indices.insert(i);
@@ -221,8 +220,8 @@ static auto instantiate(cluster_t &cluster, sequencer_t &sequencer, const device
     }
 
     // pass 2: do actual processing
-    for (int i = 0; i < files_count; ++i) {
-        auto &f = proto::get_files(message, i);
+    for (int i = 0; i < static_cast<int>(files_count); ++i) {
+        auto &f = proto::get_files(message, static_cast<std::size_t>(i));
         auto name = proto::get_name(f);
         auto path = utils::make_generic_view(name, allocator);
 

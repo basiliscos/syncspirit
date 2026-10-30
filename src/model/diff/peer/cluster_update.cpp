@@ -257,7 +257,7 @@ cluster_update_t::cluster_update_t(const utils::path_t &default_path, const clus
         auto folder = folders.by_id(folder_id);
         LOG_DEBUG(log, "cluster_update_t, folder label = '{}', id = '{}'", folder_label, folder_id);
         auto devices_count = proto::get_devices_size(f);
-        for (int j = 0; j < devices_count; ++j) {
+        for (std::size_t j = 0; j < devices_count; ++j) {
             auto &d = proto::get_devices(f, j);
             auto device_sha = proto::get_id(d);
             auto device_opt = model::device_id_t::from_sha256(device_sha);
@@ -359,10 +359,9 @@ cluster_update_t::cluster_update_t(const utils::path_t &default_path, const clus
     for (size_t i = 0; i < folders_count; ++i) {
         auto &f = proto::get_folders(message, i);
         auto folder_id = proto::get_id(f);
-        auto folder_label = proto::get_label(f);
         auto folder = folders.by_id(folder_id);
         auto devices_count = proto::get_devices_size(f);
-        for (int j = 0; j < devices_count; ++j) {
+        for (std::size_t j = 0; j < devices_count; ++j) {
             auto &d = proto::get_devices(f, j);
             auto device_sha = proto::get_id(d);
             if ((device_sha == sha256) || device_sha == cluster.get_device()->device_id().get_sha256()) {

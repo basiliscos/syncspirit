@@ -83,7 +83,6 @@ static advance_action_t _resolve(const file_info_t &remote, const file_info_t *l
     }
 
     auto folder = local_folder.get_folder();
-    auto &self = *folder->get_cluster()->get_device();
     auto &r_v = remote.get_version();
 
     for (auto &p : folder->get_presences()) {

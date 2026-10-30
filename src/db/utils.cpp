@@ -48,7 +48,6 @@ outcome::result<uint32_t> get_version(transaction_t &txn) noexcept {
 }
 
 outcome::result<void> save_version(std::uint32_t v, transaction_t &txn) noexcept {
-    using prefixes_t = std::vector<discr_t>;
     auto key = prefixer_t<prefix::misc>::make(misc::db_version);
     MDBX_val value;
     auto db_ver = be::native_to_big(v);
@@ -129,7 +128,7 @@ static outcome::result<void> migrate_1(model::device_ptr_t &device, transaction_
     return outcome::success();
 }
 
-static outcome::result<void> migrate_2(model::device_ptr_t &device, transaction_t &txn) noexcept {
+static outcome::result<void> migrate_2(model::device_ptr_t &, transaction_t &txn) noexcept {
     // clang-format off
     using BlockInfoEx = pp::message<
        pp::uint32_field <"weak_hash", 1>,
@@ -164,7 +163,7 @@ static outcome::result<void> migrate_2(model::device_ptr_t &device, transaction_
     return outcome::success();
 }
 
-static outcome::result<void> migrate_3(model::device_ptr_t &device, transaction_t &txn) noexcept {
+static outcome::result<void> migrate_3(model::device_ptr_t &, transaction_t &txn) noexcept {
     static constexpr auto KEY_SZ = std::size_t{model::uuid_length} + 1;
     auto bis_opt = db::load(db::prefix::folder, txn);
     if (!bis_opt) {

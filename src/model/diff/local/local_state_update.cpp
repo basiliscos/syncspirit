@@ -15,8 +15,7 @@ local_state_update_t::local_state_update_t(const cluster_t &cluster, model::conn
     LOG_DEBUG(log, "local_state_update_t, {} -> {}", (int)prev, (int)state);
 }
 
-auto local_state_update_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept
-    -> outcome::result<void> {
+auto local_state_update_t::apply_impl(apply_controller_t &controller, void *) const noexcept -> outcome::result<void> {
     auto local_device = controller.get_cluster().get_device().get();
     local_device->update_state(state);
     return outcome::success();

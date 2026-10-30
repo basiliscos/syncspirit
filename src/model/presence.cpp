@@ -191,7 +191,6 @@ void presence_t::add_child(presence_t *child, std::string_view name) noexcept {
     auto child_entity = entity->get_or_create_child(name);
     child->set_parent(child_entity, this);
     auto reset_normalization = false;
-    auto normalized = features & F::normalized;
     if (children.size() > 0) {
         auto comparator = child_comparator_t{};
         reset_normalization = !comparator(children.back(), child);

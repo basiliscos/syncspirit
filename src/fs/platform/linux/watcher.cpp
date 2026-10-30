@@ -115,8 +115,6 @@ void watcher_t::inotify_callback() noexcept {
             auto sub_path_sz = parent_guard->path.size() - folder_path.size();
             tail -= sub_path_sz;
             auto rel_path = std::string_view(tail, sub_path_sz + filename.size());
-            auto full_sz = (name_buff + sizeof(name_buff) - 2) - name_ptr;
-            auto full_path = std::string_view(name_ptr, full_sz);
             auto is_dir = event->mask & IN_ISDIR;
             auto requires_refinement = false;
             if (is_dir) {

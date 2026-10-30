@@ -140,7 +140,7 @@ void folder_info_t::add_file(file_info_t *file_info) noexcept {
         assert(parent);
     }
     auto filename = path->get_filename();
-    auto entity = parent->get_entity()->get_or_create_child(filename);
+    parent->get_entity()->get_or_create_child(filename);
     parent->add_child(file_info, filename);
 
     update_max_sequnece(*file_info);

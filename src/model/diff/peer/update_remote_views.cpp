@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "update_remote_views.h"
 #include "model/cluster.h"
@@ -21,8 +21,6 @@ auto update_remote_views_t::apply_impl(apply_controller_t &controller, void *cus
     auto &cluster = controller.get_cluster();
     auto peer = cluster.get_devices().by_sha256(peer_id);
     auto &views = peer->get_remote_view_map();
-    auto &folders = cluster.get_folders();
-    auto &devices = cluster.get_devices();
     for (auto &item : container) {
         auto &d = item.device_id;
         views.push(d.get_sha256(), item.folder_id, item.index_id, item.max_sequence);

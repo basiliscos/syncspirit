@@ -71,7 +71,7 @@ void entity_t::add_child(entity_t &child) noexcept {
     child.set_parent(this);
 }
 
-void entity_t::commit(const utils::path_t &path, const model::device_t *device) noexcept {
+void entity_t::commit(const utils::path_t &, const model::device_t *) noexcept {
     // TODO
 }
 
@@ -127,7 +127,7 @@ bool nc_t::operator()(const std::string_view lhs, const entity_ptr_t &rhs) const
 }
 using bl_t = entity_t::bulk_loader_t;
 
-bl_t &bl_t::add(presence_t *presence) noexcept { return *this; }
+bl_t &bl_t::add(presence_t *) noexcept { return *this; }
 
 bl_t::~bulk_loader_t() {
     //

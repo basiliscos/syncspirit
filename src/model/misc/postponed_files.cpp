@@ -39,7 +39,7 @@ bool postponed_files_t::eq_t::operator()(const block_2_file_ptr_t &a, const bloc
 auto postponed_files_t::get_ready() noexcept -> model::file_info_ptr_t {
     if (!ready.empty()) {
         auto it = ready.begin();
-        auto f = std::move(*it);
+        auto f = *it;
         ready.erase(it);
         return f;
     }

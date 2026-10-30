@@ -103,8 +103,8 @@ struct SYNCSPIRIT_API presence_t : model::augmentable_t {
     void sync_with_entity() const noexcept;
 
     entity_t *entity;
-    presence_t *parent;
     device_t* device;
+    presence_t *parent;
     mutable std::uint32_t features = 0;
     children_t children;
     mutable std::uint32_t entity_generation = 0;

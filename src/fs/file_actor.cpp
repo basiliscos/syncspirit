@@ -156,14 +156,14 @@ void file_actor_t::on_retension_finish(r::request_id_t, bool cancelled) noexcept
 void file_actor_t::on_exec(message::foreign_executor_t &request) noexcept {
     struct execution_ctx_impl_t final : execution_context_t {
         execution_ctx_impl_t(file_actor_t &actor_)
-            : actor{&actor_}, fs_proxy_holder(*actor_.updates_mediator, clock_t::local_time() + actor_.retension) {
+            : actor{&actor_}, fs_proxy_holder(*actor->updates_mediator, clock_t::local_time() + actor->retension) {
             plugin = actor->hasher;
             fs_proxy = &fs_proxy_holder;
             scan_dir_callback = actor->scan_dir_callback;
         }
 
-        fs_proxy_t fs_proxy_holder;
         file_actor_t *actor;
+        fs_proxy_t fs_proxy_holder;
     };
 
     LOG_DEBUG(log, "on_exec");
@@ -355,7 +355,6 @@ void file_actor_t::process(payload::finish_file_t &cmd, process_context_t &conte
     if (!cmd.conflict_path.empty()) {
         auto new_name = cmd.conflict_path.get_view(context.allocator);
         LOG_DEBUG(log, "renaming {} -> {}", path, new_name);
-        auto ec = std::error_code();
         if (auto ec = context.rename(cmd.path, new_name); ec) {
             LOG_ERROR(log, "cannot rename file '{}': {}", path, ec);
             cmd.result = ec;

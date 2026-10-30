@@ -240,7 +240,7 @@ block_info_ptr_t block_infos_map_t::by_hash(utils::bytes_view_t hash) const noex
     return it != proj.end() ? *it : block_info_ptr_t();
 }
 
-bool block_infos_map_t::put(const model::block_info_ptr_t &item, bool replace) noexcept {
+bool block_infos_map_t::put(const model::block_info_ptr_t &item, bool) noexcept {
     auto &proj = get<0>();
     return proj.emplace(item).second;
 }

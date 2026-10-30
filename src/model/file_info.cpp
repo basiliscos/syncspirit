@@ -619,7 +619,6 @@ void file_info_t::update(const file_info_t &other) noexcept {
                 auto ptr = reinterpret_cast<std::uintptr_t>(b_raw);
                 auto block = reinterpret_cast<block_info_t *>(ptr & PTR_MASK);
                 assign_block(block, i);
-                auto already_local = ptr & LOCAL_MASK;
                 if (local_block_hashes.contains(block->get_hash())) {
                     mark_local_available(i);
                 }

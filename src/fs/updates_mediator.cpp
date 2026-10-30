@@ -27,8 +27,8 @@ void updates_mediator_t::mask(const utils::path_base_t &path, const utils::path_
         return;
     }
 
-    auto target = (updates_t *){};
-    auto counter = update_type_internal_t{1};
+    auto target = (updates_t *)(nullptr);
+    auto counter = update_type_internal_t(1);
     auto path_str = path.get_full_name();
     if (next.deadline == deadline) {
         target = &next;
@@ -88,7 +88,7 @@ bool updates_mediator_t::clean_expired() noexcept {
         auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
         auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
         auto items = items_t(allocator);
-        auto i = 0;
+        auto i = size_t{0};
         for (auto it = expired.begin(); it != expired.end() && i < MAX_LOG_ITEMS; ++it, ++i) {
             items.emplace_back(it->path);
         }
