@@ -596,7 +596,8 @@ struct fixture_real_t : fixture_t {
 
     void recurse_scan(const utils::poly_path_view_t &path) {
 #ifdef SYNCSPIRIT_WATCHER_UNIX
-        auto queue = std::list<utils::poly_path_view_t>{path};
+        auto queue = std::list<utils::poly_path_view_t>();
+        queue.push_back(path.clone());
         auto dummy_slave = fs_slave_t();
         auto ctx = execution_context_t();
         auto watcher = static_cast<fs::platform::unix::watcher_t *>(target.get());

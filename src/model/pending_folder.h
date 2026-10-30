@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -38,7 +38,7 @@ struct SYNCSPIRIT_API pending_folder_t final : augmentable_t, folder_data_t {
   private:
     pending_folder_t(utils::bytes_view_t key, const device_id_t &device_) noexcept;
     pending_folder_t(const bu::uuid &uuid, const device_id_t &device_) noexcept;
-    void assign_fields(const db::PendingFolder &data) noexcept;
+    void assign_data(const db::PendingFolder &data) noexcept;
 
     device_id_t device;
     std::uint64_t index;

@@ -191,7 +191,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
         }
         SECTION("2+ files") {
             auto path_1 = utils::path_t::make_generic("a.txt");
-            auto path_2= utils::path_t::make_generic("b.txt");
+            auto path_2 = utils::path_t::make_generic("b.txt");
             auto pr_fi_1 = proto::FileInfo();
             proto::set_name(pr_fi_1, "a.txt");
             proto::set_sequence(pr_fi_1, 10ul);
@@ -372,7 +372,6 @@ TEST_CASE("file iterator, single folder", "[model]") {
                 CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
                 REQUIRE(builder.apply());
             }
-
         }
         SECTION("have local, local is newer") {
             auto pr_fi = proto::FileInfo();
@@ -700,7 +699,11 @@ TEST_CASE("upsert folder-info", "[model]") {
     auto pr_fi_2 = proto::FileInfo();
     proto::set_name(pr_fi_2, "b.txt");
     proto::set_sequence(pr_fi_2, 11);
-    REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id()).add(pr_fi_1, peer_device).add(pr_fi_2, peer_device).finish().apply());
+    REQUIRE(builder.make_index(peer_id.get_sha256(), folder->get_id())
+                .add(pr_fi_1, peer_device)
+                .add(pr_fi_2, peer_device)
+                .finish()
+                .apply());
 
     auto next = [&]() -> std::string_view {
         auto f = file_iterator->next().peer_file;

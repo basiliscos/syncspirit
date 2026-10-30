@@ -133,7 +133,7 @@ auto iterative_controller_base_t::apply(const model::diff::load::interrupt_t &di
     return outcome::success();
 }
 
-auto iterative_controller_base_t::apply(const model::diff::load::commit_t &diff, void *custom) noexcept
+auto iterative_controller_base_t::apply(const model::diff::load::commit_t &diff, void *) noexcept
     -> outcome::result<void> {
     owner->get_supervisor().put(diff.commit_message);
     if (owner->access<to::state>() > r::state_t::OPERATIONAL) {

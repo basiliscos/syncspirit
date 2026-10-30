@@ -62,8 +62,8 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     bool operator==(const folder_info_t &other) const noexcept;
     bool operator!=(const folder_info_t &other) const noexcept { return !(*this == other); }
 
-    void add_file(file_info_t* file_info) noexcept;
-    void update_max_sequnece(const file_info_t& file_info) noexcept;
+    void add_file(file_info_t *file_info) noexcept;
+    void update_max_sequnece(const file_info_t &file_info) noexcept;
 
     void serialize(db::FolderInfo &storage) const noexcept;
     utils::bytes_t serialize() const noexcept;
@@ -75,26 +75,26 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     folder_t *get_folder() const noexcept;
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
 
-    file_info_t* get_by_path(const utils::path_base_t& path) const noexcept;
+    file_info_t *get_by_path(const utils::path_base_t &path) const noexcept;
     void clear() noexcept;
-    void forget_file(const utils::path_base_t& path) noexcept;
+    void forget_file(const utils::path_base_t &path) noexcept;
 
     bool is_introduced_by(const model::device_id_t &device) const noexcept;
     utils::bytes_view_t get_introducer_device_key() const noexcept;
 
-    orphaned_files_t& get_orphaned_files() noexcept { return orphaned_files; }
-    seen_dirs_t& get_seen_dirs() noexcept { return seen_dirs; }
+    orphaned_files_t &get_orphaned_files() noexcept { return orphaned_files; }
+    seen_dirs_t &get_seen_dirs() noexcept { return seen_dirs; }
 
     folder_info_iterator_ptr_t iterate() noexcept;
 
   private:
     struct path_eq_t {
         using is_transparent = void;
-        bool operator()(const utils::path_base_t* lhs, std::string_view rhs) const;
-        bool operator()(std::string_view lhs, const utils::path_base_t* rhs) const;
-        bool operator()(const utils::path_base_t* lhs, const utils::path_base_t* rhs) const;
+        bool operator()(const utils::path_base_t *lhs, std::string_view rhs) const;
+        bool operator()(std::string_view lhs, const utils::path_base_t *rhs) const;
+        bool operator()(const utils::path_base_t *lhs, const utils::path_base_t *rhs) const;
     };
-    using file_cache_t = std::unordered_map<const utils::path_base_t*, file_info_t*, utils::path_hash_t, path_eq_t>;
+    using file_cache_t = std::unordered_map<const utils::path_base_t *, file_info_t *, utils::path_hash_t, path_eq_t>;
 
     static const constexpr auto data_length = uuid_length * 2 + device_id_t::digest_length + 1;
 

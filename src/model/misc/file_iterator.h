@@ -33,7 +33,7 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
 
     void on_upsert(folder_t &folder) noexcept;
     void on_upsert(folder_info_ptr_t peer_folder) noexcept;
-    void on_remove(const folder_info_t* peer_folder) noexcept;
+    void on_remove(const folder_info_t *peer_folder) noexcept;
     void recheck(const folder_info_t &fi, file_info_t &file) noexcept;
 
   private:
@@ -44,7 +44,7 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
         std::int64_t seen_sequence;
     };
     using substates_t = std::vector<substate_t>;
-    void check(folder_info_t* fi, model::folder_t& folder) noexcept;
+    void check(folder_info_t *fi, model::folder_t &folder) noexcept;
     std::size_t folder_index;
     cluster_t &cluster;
     device_t *peer;

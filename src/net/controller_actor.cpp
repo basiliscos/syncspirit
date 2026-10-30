@@ -148,7 +148,7 @@ struct C::stack_context_t : model::diff::diff_assember_t {
     void ack_block(block_ack_context_t *io_ctx, bool unlock_block) noexcept {
         using namespace model::diff;
         auto folder_id = io_ctx->folder->get_id();
-        auto& path = io_ctx->target_file->get_name();
+        auto &path = io_ctx->target_file->get_name();
         auto device_id = utils::bytes_t(io_ctx->target_folder->get_device()->device_id().get_sha256());
         auto hash = utils::bytes_t(io_ctx->block->get_hash());
         auto diff = new modify::block_ack_t(path->clone(), std::string(folder_id), std::move(device_id),
@@ -163,7 +163,7 @@ struct C::stack_context_t : model::diff::diff_assember_t {
         return locked_blocks.count(&block) || block.is_locked();
     }
 
-    void mark_unreachable(const utils::path_base_t& path, std::string_view folder_id) noexcept {
+    void mark_unreachable(const utils::path_base_t &path, std::string_view folder_id) noexcept {
         auto folder = actor.cluster->get_folders().by_id(folder_id);
         if (folder) {
             auto peer_folder = folder->get_folder_info(*actor.peer);
@@ -878,7 +878,8 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
         auto local_folder = folder->get_folder_info(self);
         auto peer_folder = folder->get_folder_info(diff.peer_id);
         auto local_file = model::file_info_ptr_t();
-        auto fetch_local_file = diff.peer_id == self.device_id().get_sha256() || diff.action == model::advance_action_t::resolve_remote_win;
+        auto fetch_local_file =
+            diff.peer_id == self.device_id().get_sha256() || diff.action == model::advance_action_t::resolve_remote_win;
         auto peer_host = (model::presence_t *){nullptr};
         auto peer_file = (model::file_info_t *){nullptr};
         if (peer_folder) {
@@ -901,7 +902,7 @@ auto controller_actor_t::operator()(const model::diff::advance::advance_t &diff,
                 auto is_dir = proto::get_type(diff.proto_local) == proto::FileInfoType::DIRECTORY;
                 auto host = peer_host->get_device() != &self ? peer_host->get_sibling(&self) : peer_host;
                 auto child = host->get_child(name, is_dir);
-                local_file = static_cast<model::file_info_t*>(child);
+                local_file = static_cast<model::file_info_t *>(child);
             } else {
                 local_file = local_folder->get_by_path(path);
             }
@@ -1288,7 +1289,7 @@ void controller_actor_t::postprocess_io(fs::payload::remote_copy_t &res, stack_c
         auto diff = advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer, allocator);
         ctx.push_back(diff.get());
     } else {
-        auto& path = io_ctx->peer_file->get_name();
+        auto &path = io_ctx->peer_file->get_name();
         auto folder_id = io_ctx->peer_folder->get_folder()->get_id();
         ctx.mark_unreachable(*path, folder_id);
     }
@@ -1299,7 +1300,7 @@ void controller_actor_t::postprocess_io(fs::payload::append_block_t &res, stack_
     if (res.result) {
         ctx.ack_block(io_ctx, true);
     } else {
-        auto& path = io_ctx->target_file->get_name();
+        auto &path = io_ctx->target_file->get_name();
         auto folder_id = io_ctx->folder->get_id();
         ctx.mark_unreachable(*path, folder_id);
     }
@@ -1310,7 +1311,7 @@ void controller_actor_t::postprocess_io(fs::payload::clone_block_t &res, stack_c
     if (res.result) {
         ctx.ack_block(io_ctx, false);
     } else {
-        auto& path = io_ctx->target_file->get_name();
+        auto &path = io_ctx->target_file->get_name();
         auto folder_id = io_ctx->folder->get_id();
         ctx.mark_unreachable(*path, folder_id);
     }
@@ -1326,7 +1327,7 @@ void controller_actor_t::postprocess_io(fs::payload::finish_file_t &res, stack_c
             advance::advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer, allocator);
         ctx.push_back(diff.get());
     } else {
-        auto& path = io_ctx->peer_file->get_name();
+        auto &path = io_ctx->peer_file->get_name();
         auto folder_id = io_ctx->peer_folder->get_folder()->get_id();
         ctx.mark_unreachable(*path, folder_id);
     }
@@ -1342,7 +1343,7 @@ void controller_actor_t::postprocess_io(fs::payload::update_meta_t &res, stack_c
             advance::advance_t::create(io_ctx->action, *io_ctx->peer_file, *io_ctx->peer_folder, *sequencer, allocator);
         ctx.push_back(diff.get());
     } else {
-        auto& path = io_ctx->peer_file->get_name();
+        auto &path = io_ctx->peer_file->get_name();
         auto folder_id = io_ctx->peer_folder->get_folder()->get_id();
         ctx.mark_unreachable(*path, folder_id);
     }

@@ -22,7 +22,6 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     auto &device = *cluster.get_devices().by_sha256(peer_id);
     auto folder = cluster.get_folders().by_id(folder_id);
     auto &self = *cluster.get_device();
-    auto self_id = self.device_id().get_sha256();
 
     auto proto_name = proto::get_name(proto_file_);
     assert(proto_name.size());
@@ -66,7 +65,7 @@ auto local_update_t::get_original(const model::folder_t &folder, const model::de
     auto local_size = proto::get_size(local_file);
     auto local_type = model::file_info_t::as_flags(proto::get_type(local_file));
 
-    for (auto& p : folder.get_presences()) {
+    for (auto &p : folder.get_presences()) {
         auto fi = static_cast<model::folder_info_t *>(p.get());
         auto peer_file = model::file_info_ptr_t();
         if (fi->get_device() != &self) {

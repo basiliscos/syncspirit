@@ -333,7 +333,7 @@ diff_builder_t &diff_builder_t::remove_unknown_device(const model::pending_devic
 
 diff_builder_t &diff_builder_t::scan_start(std::string_view id, utils::path_t sub_dir,
                                            const r::pt::ptime &at) noexcept {
-    auto final_at = at.is_not_a_date_time() ? r::pt::microsec_clock::local_time() : at;    
+    auto final_at = at.is_not_a_date_time() ? r::pt::microsec_clock::local_time() : at;
     return assign(new model::diff::local::scan_start_t(id, std::move(sub_dir), final_at));
 }
 

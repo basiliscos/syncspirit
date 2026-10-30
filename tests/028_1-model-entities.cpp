@@ -40,7 +40,8 @@ TEST_CASE("entities & presences", "[model]") {
         folder_info = folder_info_t::create(sequencer->next_uuid(), db_fi, my_device, folder).value();
     }
 
-    auto mk_file= [&](std::string_view name, proto::FileInfoType type = proto::FileInfoType::FILE) -> model::file_info_ptr_t {
+    auto mk_file = [&](std::string_view name,
+                       proto::FileInfoType type = proto::FileInfoType::FILE) -> model::file_info_ptr_t {
         proto::FileInfo pr;
         proto::set_name(pr, name);
         proto::set_sequence(pr, ++sequence);
@@ -75,7 +76,7 @@ TEST_CASE("entities & presences", "[model]") {
                 folder_info->add_file(f_3.get());
             }
 
-            auto& children = folder_info->get_children();
+            auto &children = folder_info->get_children();
             REQUIRE(children.size() == 3);
             CHECK(children[0] == f_1.get());
             CHECK(children[1] == f_2.get());
@@ -96,7 +97,7 @@ TEST_CASE("entities & presences", "[model]") {
                 folder_info->add_file(f_3.get());
             }
 
-            auto& children = folder_info->get_children();
+            auto &children = folder_info->get_children();
             REQUIRE(children.size() == 3);
             CHECK(children[0] == f_2.get());
             CHECK(children[1] == f_1.get());
@@ -112,7 +113,7 @@ TEST_CASE("entities & presences", "[model]") {
             it->set_min_sequence(min_sequence);
             for (auto n = it->next(); n; n = it->next()) {
                 auto str = std::string(n->get_entity()->get_path()->get_full_name());
-               r.push_back(str);
+                r.push_back(str);
             }
             return r;
         };
@@ -235,12 +236,10 @@ TEST_CASE("entities & presences", "[model]") {
                 CHECK(it->next() == nullptr);
             }
         }
-
     }
 
     folder_info->clear();
     CHECK(folder_info->get_children().size() == 0);
-
 }
 
 int _init() {

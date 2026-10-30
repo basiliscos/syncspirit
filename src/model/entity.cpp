@@ -34,9 +34,7 @@ void entity_t::clear_children() noexcept {
     children.clear();
 }
 
-void entity_t::forget_parent() noexcept {
-    parent = nullptr;
-}
+void entity_t::forget_parent() noexcept { parent = nullptr; }
 void entity_t::set_parent(entity_t *value) noexcept {
     parent = value;
     for (auto presence : presences) {
@@ -85,7 +83,7 @@ auto entity_t::get_path() const noexcept -> const utils::path_ptr_t & { return p
 
 auto entity_t::get_children() noexcept -> children_t & { return children; }
 
-entity_t* entity_t::get_or_create_child(std::string_view name) noexcept {
+entity_t *entity_t::get_or_create_child(std::string_view name) noexcept {
     auto it = children.find(name);
     if (it == children.end()) {
         auto new_child = create_child(name);
@@ -94,22 +92,22 @@ entity_t* entity_t::get_or_create_child(std::string_view name) noexcept {
     return it->get();
 }
 
-cluster_t& entity_t::get_cluster() noexcept {
+cluster_t &entity_t::get_cluster() noexcept {
     auto e = this;
     while (e->parent) {
         e = e->parent;
     }
-    auto f = static_cast<folder_t*>(e);
+    auto f = static_cast<folder_t *>(e);
     return *f->get_cluster();
 }
 
 entity_ptr_t entity_t::create_child(std::string_view name) noexcept {
-   auto buffer = std::array<std::byte, 1024 * 32>();
+    auto buffer = std::array<std::byte, 1024 * 32>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto view = path->get_view(allocator);
     auto path = view / utils::make_generic_view(name, allocator);
-    auto& path_cache = get_cluster().get_path_cache();
+    auto &path_cache = get_cluster().get_path_cache();
     auto path_ptr = path_cache.get_path(path.get_full_name());
     return new entity::file_t(std::move(path_ptr), this);
 }

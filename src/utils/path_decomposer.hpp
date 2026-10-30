@@ -116,8 +116,7 @@ template <> struct support_t<wchar_t> {
     using traits_in_t = boost::nowide::utf::utf_traits<wchar_t>;
     using traits_out_t = boost::nowide::utf::utf_traits<char>;
 
-    static void copy(str_t src, std::uint8_t *dst_, const pieces_t &pieces,
-                     const positions_t &separator_positions) noexcept {
+    static void copy(str_t src, std::uint8_t *dst_, const pieces_t &, const positions_t &separator_positions) noexcept {
         static constexpr auto UNDEF = std::numeric_limits<std::size_t>::max();
         auto in = src.data();
         auto in_end = src.data() + src.size();
@@ -202,8 +201,6 @@ struct path_decomposer_t {
         using namespace boost::nowide;
         using namespace boost::nowide::utf;
 
-        using traits_in_t = utf_traits<char>;
-        using traits_out_t = utf_traits<wchar_t>;
         using support_t = details::support_t<CharT>;
 
         if (!in.empty()) {
@@ -214,8 +211,7 @@ struct path_decomposer_t {
             auto allocator = AllocatorU32(allocator_);
 
             auto sz = sizeof(std::uint32_t) + pieces.size() + str_sz + 1;
-            auto data_ptr = (uint8_t *){};
-            data_ptr = reinterpret_cast<uint8_t *>(TraitsU32::allocate(allocator, sz));
+            auto data_ptr = reinterpret_cast<uint8_t *>(TraitsU32::allocate(allocator, sz));
             auto raw_u32 = reinterpret_cast<std::uint32_t *>(data_ptr);
             *raw_u32++ = str_sz;
             auto raw_u8_ptr = reinterpret_cast<std::uint8_t *>(raw_u32);

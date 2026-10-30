@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -26,10 +26,10 @@ using extendended_context_prt_t = boost::intrusive_ptr<extendended_context_t>;
 struct digest_t {
     utils::bytes_t data;
     std::int32_t block_index;
-    extendended_context_prt_t context;
     r::address_ptr_t back_addr;
     r::address_ptr_t hasher_addr;
     outcome::result<utils::bytes_t> result;
+    extendended_context_prt_t context;
 
     digest_t(utils::bytes_view_t data_, std::int32_t block_index_, extendended_context_prt_t context_ = {}) noexcept
         : data{std::move(data_)}, block_index{block_index_},

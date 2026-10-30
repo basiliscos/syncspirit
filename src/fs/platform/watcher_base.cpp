@@ -68,7 +68,7 @@ auto BU::make(const watched_folders_t &watched_folders, watcher_base_t &actor) n
         updates.resize(0);
         deadline = {};
         if (!r.empty()) {
-            return std::move(r);
+            return r;
         }
     }
     return {};

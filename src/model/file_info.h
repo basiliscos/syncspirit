@@ -37,7 +37,7 @@ using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 
 struct path_guard_t;
 
-struct SYNCSPIRIT_API file_info_t: presence_t {
+struct SYNCSPIRIT_API file_info_t : presence_t {
 
     static constexpr std::uintptr_t LOCAL_MASK = 1 << 0;
     static constexpr std::uintptr_t PTR_MASK = ~LOCAL_MASK;
@@ -123,7 +123,7 @@ struct SYNCSPIRIT_API file_info_t: presence_t {
     const utils::path_ptr_t &get_name() const noexcept;
     inline version_t &get_version() noexcept { return version; }
     inline const version_t &get_version() const noexcept { return version; }
-    file_info_t* get_sibling_file(const device_t*) noexcept;
+    file_info_t *get_sibling_file(const device_t *) noexcept;
 
     inline std::int64_t get_sequence() const noexcept { return sequence; }
     void set_sequence(std::int64_t value) noexcept;

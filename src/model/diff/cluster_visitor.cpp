@@ -136,7 +136,7 @@ auto cluster_visitor_t::operator()(const load::remove_corrupted_files_t &diff, v
     return diff.visit_next(*this, custom);
 }
 
-auto cluster_visitor_t::operator()(const load::interrupt_t &diff, void *custom) noexcept -> outcome::result<void> {
+auto cluster_visitor_t::operator()(const load::interrupt_t &, void *) noexcept -> outcome::result<void> {
     return outcome::success();
 }
 

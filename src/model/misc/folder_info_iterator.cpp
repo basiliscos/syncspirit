@@ -8,10 +8,10 @@
 
 using namespace syncspirit::model;
 
-static presence_t* next_sibling(presence_t* current) noexcept {
+static presence_t *next_sibling(presence_t *current) noexcept {
     auto parent = current->get_parent();
     if (parent) {
-        auto& children = parent->get_children();
+        auto &children = parent->get_children();
         auto b = children.begin();
         auto e = children.end();
         auto it = std::lower_bound(b, e, current, presence_t::child_comparator_t{});
@@ -24,14 +24,9 @@ static presence_t* next_sibling(presence_t* current) noexcept {
     return nullptr;
 }
 
-folder_info_iterator_t::folder_info_iterator_t(folder_info_ptr_t fi_) noexcept:
-    fi{std::move(fi_)} {
-    reset();
-}
+folder_info_iterator_t::folder_info_iterator_t(folder_info_ptr_t fi_) noexcept : fi{std::move(fi_)} { reset(); }
 
-folder_info_t* folder_info_iterator_t::get_folder_info() noexcept {
-    return fi.get();
-}
+folder_info_t *folder_info_iterator_t::get_folder_info() noexcept { return fi.get(); }
 
 bool folder_info_iterator_t::is_finished() const noexcept {
     return current == nullptr && seen_sequence >= fi->get_max_sequence();
@@ -44,11 +39,9 @@ void folder_info_iterator_t::reset() noexcept {
     max_sequence = fi->get_max_sequence();
 }
 
-void folder_info_iterator_t::set_min_sequence(std::int64_t value) noexcept {
-    min_sequence = value;
-}
+void folder_info_iterator_t::set_min_sequence(std::int64_t value) noexcept { min_sequence = value; }
 
-file_info_t* folder_info_iterator_t::next() noexcept {
+file_info_t *folder_info_iterator_t::next() noexcept {
     if (current) {
         for (auto file = advance(); file; file = advance()) {
             auto seq = file->get_sequence();
@@ -79,13 +72,13 @@ file_info_t* folder_info_iterator_t::next() noexcept {
     return nullptr;
 }
 
-file_info_t* folder_info_iterator_t::advance() noexcept {
+file_info_t *folder_info_iterator_t::advance() noexcept {
     if (current) {
         auto children = &current->get_children();
         if (children->size() > 0) {
             current = children->front();
         } else if (current->parent) {
-            REDO:
+        REDO:
             if (auto sibling = next_sibling(current); sibling) {
                 current = sibling;
             } else {
@@ -94,12 +87,12 @@ file_info_t* folder_info_iterator_t::advance() noexcept {
                     goto REDO;
                 }
             }
-        }  else {
+        } else {
             current = nullptr;
         }
     }
     if (current) {
-        return static_cast<model::file_info_t*>(current);
+        return static_cast<model::file_info_t *>(current);
     }
     return nullptr;
 }

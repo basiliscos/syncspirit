@@ -320,7 +320,6 @@ TEST_CASE("move block", "[model]") {
     CHECK(cluster->get_blocks().size() == 2);
 }
 
-
 TEST_CASE("duplicate blocks", "[model]") {
     auto local_id = device_id_t::from_string(device_id_local).value();
     auto local_device = device_t::create(local_id, "my-device").value();
@@ -498,10 +497,7 @@ TEST_CASE("update folder-3: out-of-order files", "[model]") {
     SECTION("single ooo file") {
         auto sample_file = mk_file("some/file/path/content.bin");
         auto initial_seq = folder_peer->get_max_sequence();
-        REQUIRE(builder.make_index(sha256, "1234-5678")
-                    .add(sample_file, peer_device)
-                    .finish()
-                    .apply());
+        REQUIRE(builder.make_index(sha256, "1234-5678").add(sample_file, peer_device).finish().apply());
         CHECK(folder_peer->get_max_sequence() == initial_seq);
         CHECK(folder_peer->get_children().size() == 0);
         CHECK(folder_peer->get_seen_dirs().empty());
@@ -559,19 +555,13 @@ TEST_CASE("update folder-3: out-of-order files", "[model]") {
 
     SECTION("restore ooo file") {
         auto file_1 = mk_file("path/content.bin");
-        REQUIRE(builder.make_index(sha256, "1234-5678")
-                    .add(file_1, peer_device)
-                    .finish()
-                    .apply());
+        REQUIRE(builder.make_index(sha256, "1234-5678").add(file_1, peer_device).finish().apply());
         CHECK(folder_peer->get_children().size() == 0);
         CHECK(folder_peer->get_seen_dirs().empty());
         CHECK(folder_peer->get_orphaned_files().container.size() == 1);
 
         auto file_2 = mk_file("path");
-        REQUIRE(builder.make_index(sha256, "1234-5678")
-                    .add(file_2, peer_device)
-                    .finish()
-                    .apply());
+        REQUIRE(builder.make_index(sha256, "1234-5678").add(file_2, peer_device).finish().apply());
 
         auto path_1 = utils::path_t::make_generic("path");
         auto path_2 = utils::path_t::make_generic("path/content.bin");
@@ -580,7 +570,6 @@ TEST_CASE("update folder-3: out-of-order files", "[model]") {
         CHECK(folder_peer->get_seen_dirs().empty());
         CHECK(folder_peer->get_orphaned_files().container.empty());
     }
-
 }
 
 int _init() {

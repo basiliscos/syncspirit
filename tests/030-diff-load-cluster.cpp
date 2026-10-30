@@ -364,7 +364,7 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
             REQUIRE(diff->apply(*controller, {}));
             auto &presences = folder_info->get_children();
             REQUIRE(presences.size() == 1);
-            target = static_cast<model::file_info_t*>(presences.front());
+            target = static_cast<model::file_info_t *>(presences.front());
             REQUIRE(target);
             REQUIRE(target->iterate_blocks().get_total() == 11);
             REQUIRE(target->iterate_blocks().next()->get_hash() == block->get_hash());
@@ -401,11 +401,11 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
         key_file[0] = db::prefix::file_info;
         std::copy(id_file.begin(), id_file.end(), key_file.data() + 1);
 
-        SECTION("dir first"){
+        SECTION("dir first") {
             container.emplace_back(item_t{key_dir, std::move(db_d)});
             container.emplace_back(item_t{key_file, std::move(db_file)});
         }
-        SECTION("file first"){
+        SECTION("file first") {
             container.emplace_back(item_t{key_file, std::move(db_file)});
             container.emplace_back(item_t{key_dir, std::move(db_d)});
         }

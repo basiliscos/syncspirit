@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "pending_folder.h"
 #include "db/prefix.h"
@@ -28,7 +28,7 @@ outcome::result<pending_folder_ptr_t> pending_folder_t::create(utils::bytes_view
 
     auto ptr = pending_folder_ptr_t();
     ptr = new pending_folder_t(key, device.value());
-    ptr->assign_fields(data);
+    ptr->assign_data(data);
     return outcome::success(std::move(ptr));
 }
 
@@ -36,7 +36,7 @@ outcome::result<pending_folder_ptr_t> pending_folder_t::create(const bu::uuid &u
                                                                const device_id_t &device_) noexcept {
     auto ptr = pending_folder_ptr_t();
     ptr = new pending_folder_t(uuid, device_);
-    ptr->assign_fields(data);
+    ptr->assign_data(data);
     return outcome::success(std::move(ptr));
 }
 
@@ -51,7 +51,7 @@ pending_folder_t::pending_folder_t(utils::bytes_view_t key_, const device_id_t &
     std::copy(key_.begin(), key_.end(), key);
 }
 
-void pending_folder_t::assign_fields(const db::PendingFolder &data) noexcept {
+void pending_folder_t::assign_data(const db::PendingFolder &data) noexcept {
     auto &f = db::get_folder(data);
     id = db::get_id(f);
     folder_data_t::assign_fields(f);

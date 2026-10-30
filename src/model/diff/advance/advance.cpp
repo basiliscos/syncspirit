@@ -90,7 +90,7 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     auto &blocks_map = cluster.get_blocks();
     if (proto::get_size(proto_local)) {
         auto blocks_size = proto::get_blocks_size(proto_local);
-        for (int i = 0; i < blocks_size; ++i) {
+        for (std::size_t i = 0; i < blocks_size; ++i) {
             auto &proto_block = proto::get_blocks(proto_local, i);
             auto h = proto::get_hash(proto_block);
             auto strict_hash = block_info_t::make_strict_hash(h);
@@ -125,7 +125,7 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     LOG_DEBUG(log, "advance_t ({}), folder = {}, {}{} name = {}{}", stringify(action), folder_id, type_str, flags, name,
               file_str);
 
-    auto current = (cluster_diff_t *){};
+    auto current = (cluster_diff_t *)(nullptr);
     if (!new_blocks.empty()) {
         assert(action == advance_action_t::local_update);
         current = assign_child(new modify::add_blocks_t(std::move(new_blocks)));
@@ -159,7 +159,6 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
     auto my_device = cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
     auto local_folder = folder->get_folder_info(*my_device);
-    auto peer_folder = folder->get_folder_info(peer_id);
     auto name = proto::get_name(proto_local);
     auto path = utils::make_generic_view(name, allocator);
 
@@ -206,8 +205,8 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
     }
     local_folder->update_max_sequnece(*local_file_ptr);
 
-    LOG_TRACE(log, "advance_t ({}), file: '{}', size: {}, blocks: {}, seq.: {}", stringify(action), *local_file_ptr, size,
-              proto::get_blocks_size(proto_local), sequence);
+    LOG_TRACE(log, "advance_t ({}), file: '{}', size: {}, blocks: {}, seq.: {}", stringify(action), *local_file_ptr,
+              size, proto::get_blocks_size(proto_local), sequence);
 
     local_file_ptr->notify_update();
 

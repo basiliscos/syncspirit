@@ -206,8 +206,8 @@ static auto instantiate(cluster_t &cluster, sequencer_t &sequencer, const device
     auto seen_file_names = string_views_t(allocator);
     auto skipped_file_indices = skipped_file_indices_t(allocator);
     auto orphaned_files = model::orphaned_files_t();
-    auto& seen_dirs  = fi->get_seen_dirs();
-    auto& path_cache = cluster.get_path_cache();
+    auto &seen_dirs = fi->get_seen_dirs();
+    auto &path_cache = cluster.get_path_cache();
 
     // pass 1: skip "outdated" files and pick only recent ones
     for (int i = files_count - 1; i >= 0; --i) {
@@ -305,24 +305,24 @@ static auto instantiate(cluster_t &cluster, sequencer_t &sequencer, const device
                 seen_dirs.emplace(path_cache.get_path(name));
             }
         } else {
-          orphaned_files.record(path, path_cache, std::move(f));
+            orphaned_files.record(path, path_cache, std::move(f));
         }
     }
 
     // pass 3: try to handle temporally orphaned files
     {
-        using orphans_container_t = std::pmr::vector<orphaned_files_t::container_t*>;
+        using orphans_container_t = std::pmr::vector<orphaned_files_t::container_t *>;
         auto orphans_container = orphans_container_t(allocator);
         orphans_container.reserve(2);
         orphans_container.push_back(&orphaned_files.container);
         orphans_container.push_back(&fi->get_orphaned_files().container);
-        auto& c = orphaned_files.container;
-        for (auto c: orphans_container) {
+        auto &c = orphaned_files.container;
+        for (auto c : orphans_container) {
             for (auto it = c->begin(); it != c->end();) {
-                auto& [parent_path, children] = *it;
+                auto &[parent_path, children] = *it;
                 auto parent_name = string_t(parent_path->get_full_name(), allocator);
                 if (seen_dirs.count(parent_name)) {
-                    for (auto& f: children) {
+                    for (auto &f : children) {
                         auto is_dir = proto::get_type(f) == proto::FileInfoType::DIRECTORY;
                         if (is_dir) {
                             auto name = path_cache.get_path(proto::get_name(f));

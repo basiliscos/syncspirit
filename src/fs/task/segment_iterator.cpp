@@ -17,13 +17,13 @@ segment_iterator_t::segment_iterator_t(const r::address_ptr_t &back_addr_,
                                        std::int64_t offset_, std::int32_t block_index_, std::int32_t block_count_,
                                        std::int32_t block_size_, std::int32_t last_block_size_,
                                        std::int64_t last_write_time_) noexcept
-    : back_addr{back_addr_}, context{std::move(context_)}, path{std::move(path_)}, offset{offset_},
-      block_index{block_index_}, block_count{block_count_}, block_size{block_size_}, last_block_size{last_block_size_},
-      last_write_time{last_write_time_} {
+    : back_addr{back_addr_}, path{std::move(path_)}, offset{offset_}, block_index{block_index_},
+      block_count{block_count_}, block_size{block_size_}, last_block_size{last_block_size_},
+      last_write_time{last_write_time_}, context{std::move(context_)} {
     assert(block_count > 0);
 }
 
-bool segment_iterator_t::process(fs_slave_t &fs_slave, execution_context_t &exec_ctx) noexcept {
+bool segment_iterator_t::process(fs_slave_t &, execution_context_t &exec_ctx) noexcept {
     using byte_chunks_t = std::pmr::vector<utils::bytes_t>;
 
     assert(!ec);

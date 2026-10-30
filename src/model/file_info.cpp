@@ -162,17 +162,15 @@ file_info_t::size_full_t::~size_full_t() {}
 
 file_info_t::size_less_t::~size_less_t() {}
 
-file_info_t::file_info_t(utils::bytes_view_t key_, const folder_info_ptr_t &folder_info) noexcept:
-    presence_t{nullptr, folder_info->get_device()}
-    {
+file_info_t::file_info_t(utils::bytes_view_t key_, const folder_info_ptr_t &folder_info) noexcept
+    : presence_t{nullptr, folder_info->get_device()} {
     auto uuid_from_key = key_.subspan(1);
     assert(uuid_from_key.subspan(0, uuid_length) == folder_info->get_uuid());
     std::copy(uuid_from_key.begin(), uuid_from_key.end(), key);
 }
 
 file_info_t::file_info_t(const bu::uuid &uuid, const folder_info_ptr_t &folder_info_) noexcept
-    :    presence_t{nullptr, folder_info_->get_device()}
-{
+    : presence_t{nullptr, folder_info_->get_device()} {
     fill(key, uuid, folder_info_);
 }
 
@@ -207,7 +205,7 @@ utils::bytes_t file_info_t::create_key(const bu::uuid &uuid, const folder_info_p
     return key;
 }
 
-file_info_t* file_info_t::get_sibling_file(const device_t* device) noexcept {
+file_info_t *file_info_t::get_sibling_file(const device_t *device) noexcept {
     return get_typed_sibling<file_info_t>(device);
 }
 
@@ -222,7 +220,7 @@ std::uint64_t file_info_t::get_block_offset(size_t block_index) const noexcept {
 
 auto file_info_t::fields_update(const db::FileInfo &source, utils::path_cache_t &path_cache) noexcept
     -> outcome::result<void> {
-    features= (features & ~LOCAL_FLAGS) | as_flags(db::get_type(source));
+    features = (features & ~LOCAL_FLAGS) | as_flags(db::get_type(source));
     name = path_cache.get_path(db::get_name(source));
     sequence = db::get_sequence(source);
     permissions = db::get_permissions(source);
@@ -419,12 +417,12 @@ void file_info_t::recheck(const folder_info_t &folder_info) noexcept {
     auto self = folder_info.get_device();
     auto folder = folder_info.get_folder();
     auto entity = get_entity();
-    for (auto& p : folder->get_presences()) {
+    for (auto &p : folder->get_presences()) {
         auto peer = const_cast<model::device_t *>(p->get_device());
         if (peer != self) {
             auto fit = peer->get_iterator();
             if (fit) {
-                auto peer_file = static_cast<file_info_t*>(entity->get_presence(peer));
+                auto peer_file = static_cast<file_info_t *>(entity->get_presence(peer));
                 if (peer_file) {
                     auto fi = folder->get_folder_info(*peer);
                     fit->recheck(*fi, *peer_file);
@@ -478,7 +476,7 @@ auto file_info_t::get_path(const folder_info_t &folder_info, const utils::alloca
     return folder_info.get_folder()->get_path().get_view(allocator) / *name;
 }
 
-void file_info_t::synchronizing_unlock() noexcept { features= features & ~features_t::synchronizing; }
+void file_info_t::synchronizing_unlock() noexcept { features = features & ~features_t::synchronizing; }
 
 void file_info_t::synchronizing_lock() noexcept { features |= features_t::synchronizing; }
 
@@ -649,8 +647,7 @@ utils::poly_path_view_t file_info_t::make_conflicting_name(const utils::allocato
                    ymd.month.as_number(), ymd.day.as_number(), time.hours(), time.minutes(), time.seconds(),
                    device_short, ext);
     auto parent = utils::make_native_view(name->get_parent_name(), allocator);
-    auto full_name = parent / utils::make_native_view(conflicted_name, allocator);
-    return full_name;
+    return parent / utils::make_native_view(conflicted_name, allocator);
 }
 
 auto file_info_t::guard(const model::folder_info_t &folder_info) noexcept -> guard_t {

@@ -14,7 +14,7 @@ using namespace syncspirit;
 using namespace syncspirit::model::diff::modify;
 
 remove_files_t::remove_files_t(const folder_info_t &fi, orphaned_blocks_t *orphaned_blocks_) noexcept {
-    using queue_t = std::pmr::list<model::presence_t*>;
+    using queue_t = std::pmr::list<model::presence_t *>;
     using F = model::presence_t::features_t;
 
     auto &device = *fi.get_device();
@@ -28,13 +28,13 @@ remove_files_t::remove_files_t(const folder_info_t &fi, orphaned_blocks_t *orpha
 
     auto local_orphaned_blocks = orphaned_blocks_t();
     auto &orphaned_blocks = orphaned_blocks_ ? *orphaned_blocks_ : local_orphaned_blocks;
-    queue.push_back(&const_cast<folder_info_t&>(fi));
+    queue.push_back(&const_cast<folder_info_t &>(fi));
 
     while (!queue.empty()) {
         auto p = queue.front();
         queue.pop_front();
         if (p->get_features() & F::cluster) {
-            auto file = static_cast<model::file_info_t*>(p);
+            auto file = static_cast<model::file_info_t *>(p);
             orphaned_blocks.record(*file);
             auto id = file->get_full_id();
             auto key = utils::bytes_t(id.size() + 1);
@@ -43,7 +43,7 @@ remove_files_t::remove_files_t(const folder_info_t &fi, orphaned_blocks_t *orpha
             keys.push_back(std::move(key));
             paths.push_back(file->get_name()->clone());
         }
-        for (auto& c: p->get_children()) {
+        for (auto &c : p->get_children()) {
             queue.push_back(c);
         }
     };

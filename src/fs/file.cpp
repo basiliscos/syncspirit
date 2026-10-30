@@ -20,7 +20,7 @@ using boost::nowide::narrow;
 auto file_t::open_write(fs_proxy_t &fs_proxy, const utils::poly_path_view_t &model_path,
                         std::uint64_t file_size) noexcept -> outcome::result<file_t> {
     auto path = file_size > 0 ? model_path.make_temporal() : model_path.clone();
-    auto result = fs_proxy.open_write(file_size > 0 ? model_path.make_temporal() : model_path, file_size);
+    auto result = fs_proxy.open_write(path, file_size);
     if (result.has_error()) {
         return result.assume_error();
     }

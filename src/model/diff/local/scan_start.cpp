@@ -17,7 +17,7 @@ scan_start_t::scan_start_t(std::string_view folder_id_, utils::path_t path_, con
 }
 
 auto scan_start_t::apply_impl(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
-    using queue_t = std::pmr::list<model::presence_t*>;
+    using queue_t = std::pmr::list<model::presence_t *>;
     using F = model::presence_t::features_t;
     auto &cluster = controller.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_id);
@@ -38,7 +38,7 @@ auto scan_start_t::apply_impl(apply_controller_t &controller, void *custom) cons
         auto p = queue.front();
         queue.pop_front();
         if (p->get_features() & F::cluster) {
-            auto &local_file = *static_cast<model::file_info_t*>(p);
+            auto &local_file = *static_cast<model::file_info_t *>(p);
             if (local_file.is_local()) {
                 if (path.empty() || path.contains(*local_file.get_name())) {
                     local_file.mark_local(false);
@@ -47,7 +47,7 @@ auto scan_start_t::apply_impl(apply_controller_t &controller, void *custom) cons
                 }
             }
         }
-        for (auto& c: p->get_children()) {
+        for (auto &c : p->get_children()) {
             queue.push_back(c);
         }
     }

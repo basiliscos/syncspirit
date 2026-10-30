@@ -243,7 +243,7 @@ size_t path_hash_t::operator()(const path_base_t &item) const noexcept {
     return std::hash<std::string_view>()(item.get_full_name());
 }
 
-size_t path_hash_t::operator()(const path_base_t* item) const noexcept {
+size_t path_hash_t::operator()(const path_base_t *item) const noexcept {
     return std::hash<std::string_view>()(item->get_full_name());
 }
 
@@ -263,7 +263,7 @@ bool path_eq_t::operator()(const path_base_t &lhs, const std::string_view rhs) c
     return lhs.get_full_name() == rhs;
 }
 bool path_eq_t::operator()(const path_base_t &lhs, const path_ptr_t &rhs) const {
-    return rhs.get() ?  lhs == *rhs: false;
+    return rhs.get() ? lhs == *rhs : false;
 }
 
 bool path_eq_t::operator()(const std::string_view lhs, const path_base_t &rhs) const {

@@ -203,7 +203,7 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
                             auto folder = local_folder->get_folder();
                             auto &folder_path = folder->get_path();
                             auto name = child_info.path.relativize(folder_path);
-                            for (auto& p : folder->get_presences()) {
+                            for (auto &p : folder->get_presences()) {
                                 auto fi = static_cast<model::folder_info_t *>(p.get());
 #if 0
                                 if (auto file = fi->get_file_infos().by_name(name)) {
@@ -221,7 +221,7 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
                                     }
                                 }
 #endif
-                            std::abort();
+                                std::abort();
                             }
                         }
                         return 0;

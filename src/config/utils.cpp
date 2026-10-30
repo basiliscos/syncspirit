@@ -127,7 +127,7 @@ static std::string get_device_name() noexcept {
 
 static main_t make_default_config(const utils::poly_path_view_t &config_path, const utils::poly_path_view_t &config_dir,
                                   bool is_home) {
-    auto dir = config_path;
+    auto &dir = config_path;
     std::string cert_file = home_path + "/cert.pem";
     std::string key_file = home_path + "/key.pem";
     if (!is_home) {
@@ -561,7 +561,7 @@ std::string serialize(const main_t& cfg) noexcept {
     // clang-format on
     auto out = std::stringstream();
     out << tbl;
-    return std::move(out.str());
+    return out.str();
 }
 
 outcome::result<main_t> generate_config(const utils::poly_path_view_t &config_path) {

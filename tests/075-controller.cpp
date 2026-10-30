@@ -633,7 +633,7 @@ void test_downloading() {
                     CHECK(peer_actor->blocks_requested == 2);
                     REQUIRE(folder_my);
                     CHECK(folder_my->get_max_sequence() == 2ul);
-                    REQUIRE(folder_my->get_children().size()== 2);
+                    REQUIRE(folder_my->get_children().size() == 2);
                     {
                         auto f = folder_my->get_by_path(path_1);
                         REQUIRE(f);
@@ -665,7 +665,7 @@ void test_downloading() {
                     CHECK(peer_actor->blocks_requested == 1);
                     REQUIRE(folder_my);
                     CHECK(folder_my->get_max_sequence() == 2ul);
-                    REQUIRE(folder_my->get_children().size()== 2);
+                    REQUIRE(folder_my->get_children().size() == 2);
                     {
                         auto f = folder_my->get_by_path(path_1);
                         REQUIRE(f);
@@ -1169,7 +1169,6 @@ void test_downloading_special() {
     F(true, 10).run();
 }
 
-
 void test_downloading_errors() {
     struct F : fixture_t {
         using fixture_t::fixture_t;
@@ -1567,7 +1566,6 @@ void test_uniqueness() {
         }
     };
     F(true, 10, true).run();
-
 }
 
 void test_initiate_my_sharing() {

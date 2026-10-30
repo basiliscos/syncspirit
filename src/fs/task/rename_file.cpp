@@ -12,7 +12,7 @@ rename_file_t::rename_file_t(utils::path_t path_, utils::path_t new_name_, std::
     : path{std::move(path_)}, new_name{std::move(new_name_)}, modification_s{modification_s_},
       context{std::move(context_)} {}
 
-bool rename_file_t::process(fs_slave_t &fs_slave, execution_context_t &context) noexcept {
+bool rename_file_t::process(fs_slave_t &, execution_context_t &context) noexcept {
     auto parent = path.get_view(context.allocator).get_parent();
     auto name = new_name.get_view(context.allocator);
     auto new_path = parent / name;

@@ -16,7 +16,7 @@ template <typename T, typename S = std::uint32_t> struct compact_vector_t {
     compact_vector_t(compact_vector_t &&other) { (*this) = std::move(other); }
     ~compact_vector_t() {
         if (ptr) {
-            for (auto i = 0; i < sz; ++i) {
+            for (S i = 0; i < sz; ++i) {
                 ptr[i].~T();
             }
             delete[] ptr;
@@ -41,7 +41,7 @@ template <typename T, typename S = std::uint32_t> struct compact_vector_t {
         }
         sz = other.sz;
         ptr = new T[sz];
-        for (auto i = 0; i < sz; ++i) {
+        for (S i = 0; i < sz; ++i) {
             ptr[i] = other.ptr[i];
         }
         return *this;

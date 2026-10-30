@@ -56,7 +56,6 @@ void watcher_t::rename_self_descending(int parent_wd, std::string_view prev_path
                 auto tail = prev_view.substr(tail_index);
                 auto new_sz = prev_view.size() + sz_diff;
                 auto new_value = std::string();
-                auto ex_path = std::string_view(guard.path);
                 new_value.reserve(static_cast<std::size_t>(new_sz));
                 new_value += folder_path;
                 new_value += new_path;

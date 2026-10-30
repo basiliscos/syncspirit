@@ -65,7 +65,7 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     inline const presence_t *get_best() const noexcept { return best; }
 
     void add_child(entity_t &child) noexcept;
-    entity_t* get_or_create_child(std::string_view name) noexcept;
+    entity_t *get_or_create_child(std::string_view name) noexcept;
     void add_presense(presence_t &) noexcept;
     void remove_presense(presence_t &) noexcept;
     const entity_stats_t &get_stats() noexcept;
@@ -82,7 +82,7 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     void clear_children() noexcept;
     void set_parent(entity_t *parent) noexcept;
     void commit(const utils::path_t &path, const model::device_t *device) noexcept;
-    cluster_t& get_cluster() noexcept;
+    cluster_t &get_cluster() noexcept;
     virtual entity_ptr_t create_child(std::string_view name) noexcept;
 
     inline entities_monitor_t *get_monitor() noexcept {
@@ -92,7 +92,6 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
         }
         return e->entities_monitor;
     }
-
 
     entity_t *parent;
     presences_t presences;

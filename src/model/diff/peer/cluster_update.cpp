@@ -179,7 +179,7 @@ cluster_update_t::cluster_update_t(const utils::path_t &default_path, const clus
 
         auto r = try_make_path(label);
         if (!r) {
-            r = try_make_path(folder_id);
+            r = std::move(try_make_path(folder_id));
         }
         if (!r) {
             this->ec = r.assume_error();
@@ -432,7 +432,7 @@ cluster_update_t::cluster_update_t(const utils::path_t &default_path, const clus
     keys_view_t removed_introduced_devices;
     if (!source.get_skip_introduction_removals()) {
         for (auto fit : cluster.get_folders()) {
-            for (auto& p : fit.item->get_presences()) {
+            for (auto &p : fit.item->get_presences()) {
                 auto &fi = *static_cast<model::folder_info_t *>(p.get());
                 auto &i_device = fi.get_device()->device_id();
                 if (fi.is_introduced_by(source.device_id())) {

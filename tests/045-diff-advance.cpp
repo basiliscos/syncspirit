@@ -73,7 +73,7 @@ TEST_CASE("remove folder", "[model]") {
                     proto::add_blocks(pr_local) = b_2;
                     REQUIRE(builder.local_update(folder->get_id(), pr_local).apply());
                     REQUIRE(folder_local->get_children().size() == 1);
-                    auto f_local  = folder_local->get_by_path(path);
+                    auto f_local = folder_local->get_by_path(path);
                     CHECK(f_local->iterate_blocks(0).next() == bi_2);
                     CHECK(f_local->get_version().as_proto() != file_peer->get_version().as_proto());
                 }
@@ -97,11 +97,12 @@ TEST_CASE("remove folder", "[model]") {
                     proto::clear_blocks(pr_local);
                     auto pr_2 = pr_local;
                     proto::set_name(pr_2, "b.txt");
-                    REQUIRE(builder.local_update(folder->get_id(), pr_local).local_update(folder->get_id(), pr_2).apply());
+                    REQUIRE(
+                        builder.local_update(folder->get_id(), pr_local).local_update(folder->get_id(), pr_2).apply());
                     auto children = &folder_local->get_children();
                     REQUIRE(children->size() == 2);
-                    auto f_1 = static_cast<model::file_info_t*>(children->at(0));
-                    auto f_2 = static_cast<model::file_info_t*>(children->at(1));
+                    auto f_1 = static_cast<model::file_info_t *>(children->at(0));
+                    auto f_2 = static_cast<model::file_info_t *>(children->at(1));
                     CHECK(f_1->get_name()->get_filename() == "a.txt");
                     CHECK(f_2->get_name()->get_filename() == "b.txt");
 
@@ -168,7 +169,6 @@ TEST_CASE("remove folder", "[model]") {
             auto path_new = file_peer->make_conflicting_name(allocator);
             auto l_new = folder_local->get_by_path(path_new);
             CHECK(l_new);
-
         }
         SECTION("after unsharing") {
             REQUIRE(builder.unshare_folder(*folder_peer).advance(*file_peer, *folder_peer).apply());

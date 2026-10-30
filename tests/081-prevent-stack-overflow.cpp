@@ -123,14 +123,14 @@ struct fixture_t {
     }
 
     std::size_t count_local_files() noexcept {
-        auto queue = std::list<presence_t*>();
+        auto queue = std::list<presence_t *>();
         queue.push_back(local_folder.get());
         auto r = std::size_t{0};
-        while(!queue.empty()) {
+        while (!queue.empty()) {
             ++r;
             auto p = queue.front();
             queue.pop_front();
-            for (auto c: p->get_children()) {
+            for (auto c : p->get_children()) {
                 queue.push_back(c);
             }
         }

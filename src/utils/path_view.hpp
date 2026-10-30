@@ -32,14 +32,15 @@ template <typename Allocator> struct path_view_t final : path_base_t {
     }
 
     template <typename CharT, typename Traits = details::traits::generic<CharT>>
-    explicit path_view_t(std::basic_string_view<CharT> normalized, const Allocator &allocator_,
-                         const Traits &t) noexcept
+    explicit path_view_t(std::basic_string_view<CharT> normalized, const Allocator &allocator_, const Traits &) noexcept
         : allocator{allocator_} {
         auto separators = Traits::separators;
         auto decomposed = path_decomposer_t::decompose(normalized, allocator, separators);
         data = decomposed.data;
         components = decomposed.components;
     }
+
+    path_view_t(path_view_t &&other) noexcept : allocator{other.allocator} { *this = std::move(other); }
 
     ~path_view_t() {
         if (data) {
@@ -59,7 +60,6 @@ template <typename Allocator> struct path_view_t final : path_base_t {
     path_view_t get_parent() const noexcept {
         if (components) {
             assert(data);
-            auto str_sz = *reinterpret_cast<const std::uint32_t *>(data);
             auto ptr = reinterpret_cast<const std::uint8_t *>(data) + sizeof(std::uint32_t);
             auto new_str_sz = std::uint32_t{0};
             for (size_t i = 0; i < components; ++i) {
@@ -123,11 +123,16 @@ template <typename Allocator> struct path_view_t final : path_base_t {
 
     path_view_t clone() const noexcept { return path_view_t(*this, allocator); }
 
-    path_view_t &operator=(const path_view_t &path) noexcept {
+    path_view_t &operator=(const path_base_t &path) noexcept {
         if (data) {
             deallocate();
         }
         copy(path);
+        return *this;
+    }
+    path_view_t &operator=(path_view_t &&path) noexcept {
+        std::swap(data, path.data);
+        std::swap(components, path.components);
         return *this;
     }
 
@@ -136,7 +141,6 @@ template <typename Allocator> struct path_view_t final : path_base_t {
         using namespace boost::nowide::utf;
 
         using traits_in_t = utf_traits<char>;
-        using traits_out_t = utf_traits<wchar_t>;
 
         auto w_allocator = wallocator_t(allocator);
         auto r = wstring_t(w_allocator);

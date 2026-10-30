@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "hasher_plugin.h"
 #include "messages.h"
@@ -8,17 +8,6 @@
 
 using namespace rotor;
 using namespace syncspirit::hasher;
-
-namespace {
-namespace to {
-struct get_plugin {};
-} // namespace to
-} // namespace
-
-template <>
-auto actor_base_t::access<to::get_plugin, const std::type_index *>(const std::type_index *identity_) noexcept {
-    return get_plugin(*identity_);
-}
 
 const std::type_index hasher_plugin_t::class_identity = typeid(hasher_plugin_t);
 

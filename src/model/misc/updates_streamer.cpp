@@ -17,7 +17,7 @@ void updates_streamer_t::update_info_t::fetch() noexcept {
         updated_files.push_back({file, file->get_sequence()});
         file = it.next();
     }
-    auto comparator = [](const sequenced_file_t& lhs, sequenced_file_t& rhs) -> bool {
+    auto comparator = [](const sequenced_file_t &lhs, sequenced_file_t &rhs) -> bool {
         return lhs.sequence < rhs.sequence;
     };
     std::sort(updated_files.begin(), updated_files.end(), comparator);
@@ -31,7 +31,7 @@ updates_streamer_t::updates_streamer_t(cluster_t &cluster_, device_t &device) no
 void updates_streamer_t::refresh_remote() noexcept {
     auto &folders = cluster.get_folders();
     auto local_device = cluster.get_device().get();
-    auto local_sha256 = local_device ->device_id().get_sha256();
+    auto local_sha256 = local_device->device_id().get_sha256();
     auto &remote_views = peer->get_remote_view_map();
     auto current_folder = std::string_view();
     if (current != -1) {
@@ -40,10 +40,10 @@ void updates_streamer_t::refresh_remote() noexcept {
     auto updates = std::uint_fast32_t{0};
     for (auto &it : folders) {
         auto &folder = *it.item;
-        auto local_folder = static_cast<folder_info_t*>(folder.get_presence(local_device));
-        auto peer_folder = static_cast<folder_info_t*>(local_folder->get_sibling(peer.get()));
-        auto predicate = [&](const update_info_t& item) {return item.local_folder == local_folder; };
-        auto it_update = std::find_if( update_infos.begin(), update_infos.end(), predicate);
+        auto local_folder = static_cast<folder_info_t *>(folder.get_presence(local_device));
+        auto peer_folder = static_cast<folder_info_t *>(local_folder->get_sibling(peer.get()));
+        auto predicate = [&](const update_info_t &item) { return item.local_folder == local_folder; };
+        auto it_update = std::find_if(update_infos.begin(), update_infos.end(), predicate);
         auto remove_update = true;
         if (folder.get_folder_type() != db::FolderType::receive) {
             if (peer_folder) {
@@ -75,7 +75,7 @@ void updates_streamer_t::refresh_remote() noexcept {
     if (current == -1) {
         if (!current_folder.empty()) {
             int index{0};
-            for(auto& it_update: update_infos) {
+            for (auto &it_update : update_infos) {
                 if (it_update.local_folder->get_folder()->get_id() == current_folder) {
                     current = index;
                     break;
@@ -84,21 +84,19 @@ void updates_streamer_t::refresh_remote() noexcept {
             }
         }
         if (current == -1 && !update_infos.empty()) {
-            current  = 0;
+            current = 0;
         }
     }
 }
 
-void updates_streamer_t::on_remote_refresh() noexcept {
-    refresh_remote();
-}
+void updates_streamer_t::on_remote_refresh() noexcept { refresh_remote(); }
 
 auto updates_streamer_t::next() noexcept -> update_t {
     auto iterations = std::size_t{0};
     if (current != -1) {
         while (iterations < update_infos.size()) {
-            auto& update = update_infos[current];
-            auto& [folder_info, updated_files, seen_sequence, fetched] = update_infos[current];
+            auto &update = update_infos[current];
+            auto &[folder_info, updated_files, seen_sequence, fetched] = update_infos[current];
             if (!fetched) {
                 update.fetch();
             }
@@ -124,7 +122,7 @@ auto updates_streamer_t::next() noexcept -> update_t {
 }
 
 bool updates_streamer_t::on_update(file_info_t &file, const folder_info_t &fi) noexcept {
-    for (auto& update: update_infos) {
+    for (auto &update : update_infos) {
         if (update.local_folder == &fi) {
             if (update.fetched) {
                 update.updated_files.push_back({&file, file.get_sequence()});

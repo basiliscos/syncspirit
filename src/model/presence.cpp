@@ -11,7 +11,10 @@
 #include <uni_algo/case.h>
 #endif
 
-#define NORMALIZE_IF_NEEDED() if (!(features & F::normalized)) { normalize(); }
+#define NORMALIZE_IF_NEEDED()                                                                                          \
+    if (!(features & F::normalized)) {                                                                                 \
+        normalize();                                                                                                   \
+    }
 
 namespace syncspirit::model {
 
@@ -126,7 +129,7 @@ presence_t *presence_t::get_child(std::string_view name, bool is_dir) noexcept {
     return nullptr;
 }
 
-presence_t *presence_t::get_sibling(const device_t* device_) noexcept {
+presence_t *presence_t::get_sibling(const device_t *device_) noexcept {
     assert(device_ != device);
     return entity->get_presence(device_);
 }
@@ -134,7 +137,7 @@ presence_t *presence_t::get_sibling(const device_t* device_) noexcept {
 void presence_t::forget_entity() noexcept { entity = nullptr; }
 
 void presence_t::forget_presence() noexcept {
-    for (auto& c: children) {
+    for (auto &c : children) {
         c->forget_presence();
     }
     if (parent) {
@@ -146,13 +149,13 @@ void presence_t::forget_presence() noexcept {
     }
 }
 
-auto presence_t::get_folder_info() noexcept -> folder_info_t* {
+auto presence_t::get_folder_info() noexcept -> folder_info_t * {
     auto p = this;
     while (p->parent) {
         p = p->parent;
     }
     assert(p->get_features() & F::folder);
-    return static_cast<folder_info_t*>(p);
+    return static_cast<folder_info_t *>(p);
 }
 
 bool presence_t::is_unique() const noexcept {
@@ -175,7 +178,7 @@ bool presence_t::is_unique() const noexcept {
     return true;
 }
 
-presence_t* presence_t::set_parent(entity_t *entity_, presence_t *parent_) noexcept {
+presence_t *presence_t::set_parent(entity_t *entity_, presence_t *parent_) noexcept {
     if (entity_) {
         entity = entity_;
         entity->add_presense(*this);
@@ -184,7 +187,7 @@ presence_t* presence_t::set_parent(entity_t *entity_, presence_t *parent_) noexc
     return this;
 }
 
-void presence_t::add_child(presence_t* child, std::string_view name) noexcept {
+void presence_t::add_child(presence_t *child, std::string_view name) noexcept {
     auto child_entity = entity->get_or_create_child(name);
     child->set_parent(child_entity, this);
     auto reset_normalization = false;
@@ -199,7 +202,7 @@ void presence_t::add_child(presence_t* child, std::string_view name) noexcept {
     }
 }
 
-void presence_t::remove_child(const presence_t & child) noexcept {
+void presence_t::remove_child(const presence_t &child) noexcept {
     // no need to bisect, as children are remove from tail
     for (auto it = children.rbegin(); it != children.rend(); ++it) {
         if (*it == &child) {
@@ -209,8 +212,6 @@ void presence_t::remove_child(const presence_t & child) noexcept {
     }
 }
 
-void presence_t::reset_normalization() noexcept {
-    features = features & ~F::normalized;
-}
+void presence_t::reset_normalization() noexcept { features = features & ~F::normalized; }
 
 } // namespace syncspirit::model

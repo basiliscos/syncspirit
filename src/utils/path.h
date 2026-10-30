@@ -101,7 +101,7 @@ struct SYNCSPIRIT_API path_eq_t {
 
     bool operator()(const path_base_t &lhs, const path_base_t &rhs) const;
     bool operator()(const path_base_t &lhs, std::string_view rhs) const;
-    bool operator()(const path_base_t &lhs, const path_ptr_t& rhs) const;
+    bool operator()(const path_base_t &lhs, const path_ptr_t &rhs) const;
     bool operator()(const std::string_view lhs, const path_base_t &rhs) const;
     bool operator()(const std::string_view lhs, const std::string_view rhs) const;
     bool operator()(const std::string_view lhs, const path_ptr_t &rhs) const;
@@ -133,7 +133,7 @@ struct SYNCSPIRIT_API path_hash_t {
     using is_transparent = void;
 
     size_t operator()(const path_base_t &item) const noexcept;
-    size_t operator()(const path_base_t* item) const noexcept;
+    size_t operator()(const path_base_t *item) const noexcept;
     size_t operator()(const path_ptr_t &item) const noexcept;
     size_t operator()(std::string_view item) const noexcept;
 
@@ -154,10 +154,7 @@ template <> struct hash<syncspirit::utils::path_t> : syncspirit::utils::path_has
 template <> struct hash<syncspirit::utils::path_ptr_t> {
     using item_t = syncspirit::utils::path_ptr_t;
     using hash_t = std::hash<syncspirit::utils::path_t>;
-    size_t operator()(const item_t &item) const noexcept {
-        return hash_t()(*item);
-    }
+    size_t operator()(const item_t &item) const noexcept { return hash_t()(*item); }
 };
-
 
 } // namespace std

@@ -61,7 +61,7 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
     struct folder_update_t {
         using it_t = typename support::file_updates_t::iterator;
         std::string folder_id;
-        support::file_updates_t updates;
+        support::file_updates_t updates{};
 
         bool update(std::string_view relative_path, update_type_t type, folder_update_t *prev,
                     std::string prev_path_rel, bool requires_refinement) noexcept;

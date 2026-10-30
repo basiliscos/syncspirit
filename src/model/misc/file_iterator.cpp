@@ -11,16 +11,16 @@ using namespace syncspirit::model;
 file_iterator_t::file_iterator_t(cluster_t &cluster_, const device_ptr_t &peer_) noexcept
     : cluster{cluster_}, peer{peer_.get()}, folder_index{0} {
 
-    for (auto& it: cluster.get_folders()) {
-        auto& folder = *it.item;
+    for (auto &it : cluster.get_folders()) {
+        auto &folder = *it.item;
         check(folder.is_shared_with(*peer), folder);
     }
 };
 
 file_iterator_t::~file_iterator_t() {}
 
-void file_iterator_t::check(model::folder_info_t* peer_folder, model::folder_t& folder) noexcept {
-    auto predicate = [&](const substate_t& ss) { return ss.fi->get_folder() == &folder; };
+void file_iterator_t::check(model::folder_info_t *peer_folder, model::folder_t &folder) noexcept {
+    auto predicate = [&](const substate_t &ss) { return ss.fi->get_folder() == &folder; };
     auto it = std::find_if(substates.begin(), substates.end(), predicate);
     bool erase = false;
     if (peer_folder) {
@@ -37,15 +37,13 @@ void file_iterator_t::check(model::folder_info_t* peer_folder, model::folder_t& 
     } else {
         erase = true;
     }
-    if (erase && it != substates.end())  {
+    if (erase && it != substates.end()) {
         substates.erase(it);
         folder_index = 0;
     }
 }
 
-void file_iterator_t::on_upsert(folder_t &folder) noexcept {
-    check(folder.is_shared_with(*peer), folder);
-}
+void file_iterator_t::on_upsert(folder_t &folder) noexcept { check(folder.is_shared_with(*peer), folder); }
 
 auto file_iterator_t::next() noexcept -> result_t {
     auto folders_count = substates.size();
@@ -53,7 +51,7 @@ auto file_iterator_t::next() noexcept -> result_t {
 
     while (folder_scans < folders_count) {
         auto &ss = substates[folder_index];
-        auto& [peer_folder, it, seen_index, seen_sequence] = ss;
+        auto &[peer_folder, it, seen_index, seen_sequence] = ss;
         auto folder = peer_folder->get_folder();
         auto &local_folder = *folder->get_folder_info(*cluster.get_device());
         auto do_scan = !folder->is_paused() && !folder->is_scheduled() && !folder->is_suspended() && !it->is_finished();
@@ -70,13 +68,12 @@ auto file_iterator_t::next() noexcept -> result_t {
         if (do_scan) {
             for (auto file = it->next(); file; file = it->next()) {
                 if (!cluster.is_locked(file->get_name().get())) {
-                    auto local_file = static_cast<model::file_info_t*>(file->get_entity()->get_presence(local_device));
+                    auto local_file = static_cast<model::file_info_t *>(file->get_entity()->get_presence(local_device));
                     auto action = resolve(*file, local_file, local_folder);
                     if (action != advance_action_t::ignore) {
                         return {file, peer_folder.get(), local_file, action};
                     }
                 }
-
             }
         }
         folder_index = (folder_index + 1) % folders_count;
@@ -90,7 +87,7 @@ void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
     auto can_receive = peer_folder->get_folder()->get_folder_type() != db::FolderType::send;
     if (can_receive) {
         bool updated = false;
-        for (auto& ss: substates) {
+        for (auto &ss : substates) {
             if (ss.fi->get_folder() == folder) {
                 auto peer_index = peer_folder->get_index();
                 if (peer_index != ss.seen_index) {
@@ -109,7 +106,7 @@ void file_iterator_t::on_upsert(folder_info_ptr_t peer_folder) noexcept {
     }
 }
 
-void file_iterator_t::on_remove(const folder_info_t* peer_folder) noexcept {
+void file_iterator_t::on_remove(const folder_info_t *peer_folder) noexcept {
     for (auto it = substates.begin(); it != substates.end(); ++it) {
         if (it->fi == peer_folder) {
             substates.erase(it);
@@ -120,14 +117,14 @@ void file_iterator_t::on_remove(const folder_info_t* peer_folder) noexcept {
 }
 
 void file_iterator_t::recheck(const folder_info_t &remote_fi, file_info_t &remote) noexcept {
-    for (auto &ss: substates) {
+    for (auto &ss : substates) {
         if (ss.fi.get() == &remote_fi) {
             auto folder = ss.fi->get_folder();
             auto can_receive = folder->get_folder_type() != db::FolderType::send;
             if (can_receive) {
                 auto local_device = folder->get_cluster()->get_device().get();
                 auto local_folder = folder->get_folder_info(*local_device);
-                auto local_file = static_cast<file_info_t*>(remote.get_entity()->get_presence(local_device));
+                auto local_file = static_cast<file_info_t *>(remote.get_entity()->get_presence(local_device));
                 if (resolve(remote, local_file, *local_folder) != advance_action_t::ignore) {
                     ss.it->set_min_sequence(remote.get_sequence() - 1);
                 }

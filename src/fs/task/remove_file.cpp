@@ -10,7 +10,7 @@ using namespace syncspirit::fs::task;
 
 remove_file_t::remove_file_t(utils::path_t path_) noexcept : path{std::move(path_)} {}
 
-bool remove_file_t::process(fs_slave_t &fs_slave, execution_context_t &context) noexcept {
+bool remove_file_t::process(fs_slave_t &, execution_context_t &context) noexcept {
     auto view = path.get_view(context.allocator);
     ec = context.fs_proxy->remove_file(view);
     if (!ec) {

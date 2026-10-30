@@ -159,7 +159,7 @@ TEST_CASE("new file diff", "[model]") {
         REQUIRE(folder_info->get_children().size() == 1);
         CHECK(blocks.size() == 0);
 
-        file= folder_info->get_by_path(path);
+        file = folder_info->get_by_path(path);
         CHECK(file->is_deleted());
         REQUIRE(file->iterate_blocks().get_total() == 0);
         CHECK(file->get_sequence() > sequence);

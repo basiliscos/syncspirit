@@ -1096,7 +1096,7 @@ void test_peer_3_folders_6_files() {
             {
                 auto get_peer_file =
                     [&](std::string_view folder_id,
-                        std::string_view name) -> std::pair<model::file_info_t*, model::folder_info_t *> {
+                        std::string_view name) -> std::pair<model::file_info_t *, model::folder_info_t *> {
                     auto folder = cluster->get_folders().by_id(folder_id);
                     auto folder_info = folder->get_folder_info(*peer_device);
                     auto path = utils::path_t::make_generic(name);

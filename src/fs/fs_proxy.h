@@ -31,8 +31,8 @@ struct SYNCSPIRIT_API fs_proxy_t {
     std::error_code set_perms(const utils::poly_path_view_t &path, std::uint32_t permissions) noexcept;
     std::error_code create_link(const utils::path_base_t &target, const utils::path_base_t &path) noexcept;
 
-    pt::ptime deadline;
     updates_mediator_t &updates_mediator;
+    pt::ptime deadline;
     std::uint_fast32_t mediator_updates = 0;
 };
 

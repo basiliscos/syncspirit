@@ -19,12 +19,12 @@ struct SYNCSPIRIT_API orphaned_files_t {
     using container_t = std::map<utils::path_ptr_t, files_t, utils::path_comparator_t>;
 
     orphaned_files_t() noexcept = default;
-    orphaned_files_t(const orphaned_files_t&) = delete;
-    orphaned_files_t(orphaned_files_t&&) noexcept = default;
+    orphaned_files_t(const orphaned_files_t &) = delete;
+    orphaned_files_t(orphaned_files_t &&) noexcept = default;
 
-    orphaned_files_t& operator +=(orphaned_files_t) noexcept;
-    void record(const utils::poly_path_view_t&, utils::path_cache_t&, file_t) noexcept;
-    files_t commit(utils::path_t& parent_path) noexcept;
+    orphaned_files_t &operator+=(orphaned_files_t) noexcept;
+    void record(const utils::poly_path_view_t &, utils::path_cache_t &, file_t) noexcept;
+    files_t commit(utils::path_t &parent_path) noexcept;
 
     container_t container;
 };

@@ -30,7 +30,7 @@ struct SYNCSPIRIT_API updates_streamer_t {
 
   private:
     struct sequenced_file_t {
-        model::file_info_t* file;
+        model::file_info_t *file;
         std::int64_t sequence;
     };
     using updated_files_t = std::deque<sequenced_file_t>;

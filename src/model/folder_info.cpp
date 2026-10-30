@@ -34,21 +34,21 @@ auto folder_info_t::decompose_key(utils::bytes_view_t key) -> decomposed_key_t {
     return decomposed_key_t(device_key, folder_id, folder_info_id);
 }
 
-bool folder_info_t::path_eq_t::operator()(const utils::path_base_t* lhs, std::string_view rhs) const {
+bool folder_info_t::path_eq_t::operator()(const utils::path_base_t *lhs, std::string_view rhs) const {
     if (lhs) {
         return lhs->get_full_name() == rhs;
     }
     return false;
 }
 
-bool folder_info_t::path_eq_t::operator()(std::string_view lhs, const utils::path_base_t* rhs) const {
+bool folder_info_t::path_eq_t::operator()(std::string_view lhs, const utils::path_base_t *rhs) const {
     if (rhs) {
         return lhs == rhs->get_full_name();
     }
     return false;
 }
 
-bool folder_info_t::path_eq_t::operator()(const utils::path_base_t* lhs, const utils::path_base_t* rhs) const {
+bool folder_info_t::path_eq_t::operator()(const utils::path_base_t *lhs, const utils::path_base_t *rhs) const {
     if (lhs == rhs) {
         return true;
     } else if (lhs && rhs) {
@@ -124,19 +124,19 @@ bool folder_info_t::operator==(const folder_info_t &other) const noexcept {
     return r.first == key + data_length;
 }
 
-void folder_info_t::add_file(file_info_t* file_info) noexcept {
+void folder_info_t::add_file(file_info_t *file_info) noexcept {
     auto path = file_info->get_name().get();
     auto ok = file_cache.insert({path, file_info}).second;
     assert(ok);
     (void)ok;
     auto parent_name = path->get_parent_name();
-    auto parent = parent_name.empty() ? this: [&]() -> presence_t* {
+    auto parent = parent_name.empty() ? this : [&]() -> presence_t * {
         auto it = file_cache.find(parent_name);
         return it == file_cache.end() ? nullptr : it->second;
     }();
     if (!parent) {
-        spdlog::critical("missing parent presence for '{}' in folder '{}' for device {}", *path,
-                         get_folder()->get_id(), device->device_id().get_short());
+        spdlog::critical("missing parent presence for '{}' in folder '{}' for device {}", *path, get_folder()->get_id(),
+                         device->device_id().get_short());
         assert(parent);
     }
     auto filename = path->get_filename();
@@ -146,7 +146,7 @@ void folder_info_t::add_file(file_info_t* file_info) noexcept {
     update_max_sequnece(*file_info);
 }
 
-void folder_info_t::update_max_sequnece(const file_info_t& file_info) noexcept {
+void folder_info_t::update_max_sequnece(const file_info_t &file_info) noexcept {
     if (auto seq = file_info.get_sequence(); seq > max_sequence) {
         max_sequence = seq;
     }
@@ -178,18 +178,18 @@ bool folder_info_t::is_introduced_by(const model::device_id_t &device) const noe
 
 utils::bytes_view_t folder_info_t::get_introducer_device_key() const noexcept { return introducer_device_key; }
 
-file_info_t * folder_info_t::get_by_path(const utils::path_base_t& path) const noexcept  {
+file_info_t *folder_info_t::get_by_path(const utils::path_base_t &path) const noexcept {
     auto it = file_cache.find(&path);
     return it != file_cache.end() ? it->second : nullptr;
 }
 
 void folder_info_t::clear() noexcept {
-    while(children.size()) {
+    while (children.size()) {
         children.back()->forget_presence();
     }
 }
 
-void folder_info_t::forget_file(const utils::path_base_t& path) noexcept {
+void folder_info_t::forget_file(const utils::path_base_t &path) noexcept {
     auto it = file_cache.find(&path);
     assert(it != file_cache.end());
     file_cache.erase(it);
