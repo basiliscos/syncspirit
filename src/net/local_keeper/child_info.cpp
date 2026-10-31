@@ -2,23 +2,22 @@
 // SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "child_info.h"
-#include "model/folder.h"
-#include "model/folder_info.h"
+#include "model/cluster.h"
 #include "proto/proto-helpers-bep.h"
 
 #include <cassert>
 
 using namespace syncspirit::net::local_keeper;
 
-child_info_t::child_info_t(parent_t backend, presentation::presence_ptr_t self_, presentation::presence_ptr_t parent_,
+child_info_t::child_info_t(parent_t backend, model::file_info_ptr_t self_, model::presence_ptr_t parent_,
                            generation_t generation_) noexcept
     : parent_t(std::move(backend)), self(std::move(self_)), parent(std::move(parent_)), generation{generation_} {
     assert(!path.empty());
     ec = backend.ec;
 }
 
-child_info_t::child_info_t(proto::FileInfo info, utils::path_t path_, presentation::presence_ptr_t self_,
-                           presentation::presence_ptr_t parent_, generation_t generation_) noexcept
+child_info_t::child_info_t(proto::FileInfo info, utils::path_t path_, model::file_info_ptr_t self_,
+                           model::presence_ptr_t parent_, generation_t generation_) noexcept
     : self{std::move(self_)}, parent(std::move(parent_)), generation{generation_} {
     path = std::move(path_);
     assert(!path.empty());
@@ -66,10 +65,9 @@ std::string_view child_info_t::relative_path(const model::folder_info_t &local_f
 }
 
 auto child_info_t::fetch_model(const model::folder_info_t &local_folder) const -> const model::file_info_t * {
-#if 0
     auto &folder_path = local_folder.get_folder()->get_path();
-    auto name = path.relativize(local_folder.get_folder()->get_path());
-    return local_folder.get_file_infos().by_name(name).get();
-#endif
-    std::abort();
+    auto path_str = path.relativize(local_folder.get_folder()->get_path());
+    auto &path_cache = local_folder.get_folder()->get_cluster()->get_path_cache();
+    auto path = path_cache.get_path(path_str);
+    return local_folder.get_by_path(*path);
 }

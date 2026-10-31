@@ -21,7 +21,7 @@ namespace r = rotor;
 
 struct folder_slave_t;
 using allocator_t = std::pmr::polymorphic_allocator<char>;
-using F = presentation::presence_t::features_t;
+using F = model::presence_t::features_t;
 
 using folder_slave_ptr_t = r::intrusive_ptr_t<folder_slave_t>;
 

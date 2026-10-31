@@ -26,10 +26,10 @@ struct suspend_scan_t {
 };
 struct unsuspend_scan_t {};
 struct removed_dir_t {
-    presentation::presence_ptr_t presence;
+    model::file_info_ptr_t presence;
 };
 struct confirmed_deleted_t {
-    presentation::presence_ptr_t presence;
+    model::file_info_ptr_t presence;
 };
 
 struct abort_hashing_t {
