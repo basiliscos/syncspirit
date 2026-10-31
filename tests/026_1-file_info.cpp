@@ -110,11 +110,11 @@ TEST_CASE("file_info_t::local_file", "[model]") {
     SECTION("there is identical local file") {
         proto::set_sequence(pr_file, folder_my->get_max_sequence() + 1);
         auto file_my = file_info_t::create(sequencer->next_uuid(), pr_file, folder_my).value();
-        folder_my->add_file(file_my.get());
+        folder_my->add_file(*file_my);
 
         proto::set_sequence(pr_file, folder_peer->get_max_sequence() + 1);
         auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_file, folder_peer).value();
-        folder_peer->add_file(file_peer.get());
+        folder_peer->add_file(*file_peer);
 
         auto lf = folder_my->get_by_path(*file_peer->get_name());
         REQUIRE(lf);

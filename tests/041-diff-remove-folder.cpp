@@ -81,7 +81,7 @@ TEST_CASE("remove folder", "[model]") {
 
         auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_1_peer).value();
         fi->assign_block(b1.get(), 0);
-        fi_1_peer->add_file(fi.get());
+        fi_1_peer->add_file(*fi);
         return fi;
     }();
 
@@ -101,7 +101,7 @@ TEST_CASE("remove folder", "[model]") {
 
         auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_1_mine).value();
         fi->assign_block(b2.get(), 0);
-        fi_1_mine->add_file(fi.get());
+        fi_1_mine->add_file(*fi);
         return fi;
     }();
 
@@ -121,7 +121,7 @@ TEST_CASE("remove folder", "[model]") {
 
         auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_2_mine).value();
         fi->assign_block(b3.get(), 0);
-        fi_2_mine->add_file(fi.get());
+        fi_2_mine->add_file(*fi);
         return fi;
     }();
 
@@ -138,7 +138,7 @@ TEST_CASE("remove folder", "[model]") {
 
     SECTION("peer has seen the folder (index != 0)") {
         fi_1_peer->set_index(123);
-        fi_1_peer->add_file(file_1.get());
+        fi_1_peer->add_file(*file_1);
         REQUIRE(builder.remove_folder(*f1).remove_folder(*f2).apply());
         CHECK(cluster->get_pending_folders().size() == 1);
         CHECK(cluster->get_blocks().size() == 0);

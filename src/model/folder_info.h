@@ -62,7 +62,7 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     bool operator==(const folder_info_t &other) const noexcept;
     bool operator!=(const folder_info_t &other) const noexcept { return !(*this == other); }
 
-    void add_file(file_info_t *file_info) noexcept;
+    void add_file(file_info_t &file_info) noexcept;
     void update_max_sequnece(const file_info_t &file_info) noexcept;
 
     void serialize(db::FolderInfo &storage) const noexcept;

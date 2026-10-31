@@ -124,9 +124,9 @@ bool folder_info_t::operator==(const folder_info_t &other) const noexcept {
     return r.first == key + data_length;
 }
 
-void folder_info_t::add_file(file_info_t *file_info) noexcept {
-    auto path = file_info->get_name().get();
-    auto ok = file_cache.insert({path, file_info}).second;
+void folder_info_t::add_file(file_info_t &file_info) noexcept {
+    auto path = file_info.get_name().get();
+    auto ok = file_cache.insert({path, &file_info}).second;
     assert(ok);
     (void)ok;
     auto parent_name = path->get_parent_name();
@@ -141,9 +141,9 @@ void folder_info_t::add_file(file_info_t *file_info) noexcept {
     }
     auto filename = path->get_filename();
     parent->get_entity()->get_or_create_child(filename);
-    parent->add_child(file_info, filename);
+    parent->add_child(&file_info, filename);
 
-    update_max_sequnece(*file_info);
+    update_max_sequnece(file_info);
 }
 
 void folder_info_t::update_max_sequnece(const file_info_t &file_info) noexcept {

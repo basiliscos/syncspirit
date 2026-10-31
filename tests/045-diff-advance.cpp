@@ -63,7 +63,7 @@ TEST_CASE("remove folder", "[model]") {
     SECTION("with file-peer") {
         auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_peer).value();
         file_peer->assign_block(bi_1.get(), 0);
-        folder_peer->add_file(file_peer.get());
+        folder_peer->add_file(*file_peer);
 
         SECTION("local update") {
             SECTION("content changes") {
@@ -149,7 +149,7 @@ TEST_CASE("remove folder", "[model]") {
 
         auto file_peer = file_info_t::create(sequencer->next_uuid(), pr_fi_remote, folder_peer).value();
         file_peer->assign_block(bi_1.get(), 0);
-        folder_peer->add_file(file_peer.get());
+        folder_peer->add_file(*file_peer);
 
         REQUIRE(folder_local->get_children().size() == 1);
 

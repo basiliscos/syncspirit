@@ -57,7 +57,7 @@ TEST_CASE("remove peer", "[model]") {
 
         auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, folder_info).value();
         fi->assign_block(block.get(), 0);
-        folder_info->add_file(fi.get());
+        folder_info->add_file(*fi);
 
         REQUIRE(blocks_map.size() == 1);
         REQUIRE(cluster->get_devices().size() == 2);
@@ -121,7 +121,7 @@ TEST_CASE("remove peer", "[model]") {
 
             auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_1).value();
             fi->assign_block(b1.get(), 0);
-            fi_1->add_file(fi.get());
+            fi_1->add_file(*fi);
             return fi;
         }();
 
@@ -149,7 +149,7 @@ TEST_CASE("remove peer", "[model]") {
             auto fi = file_info_t::create(sequencer->next_uuid(), pr_fi, fi_2).value();
             fi->assign_block(b2.get(), 0);
             fi->assign_block(b1.get(), 1);
-            fi_2->add_file(fi.get());
+            fi_2->add_file(*fi);
             return fi;
         }();
 

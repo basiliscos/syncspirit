@@ -63,7 +63,7 @@ TEST_CASE("updates_streamer", "[model]") {
         proto::add_counters(v, proto::Counter(my_device->device_id().get_uint(), 0));
 
         auto f = file_info_t::create(sequencer->next_uuid(), pr_file, my_folder).value();
-        my_folder->add_file(f.get());
+        my_folder->add_file(*f);
         return f;
     };
 

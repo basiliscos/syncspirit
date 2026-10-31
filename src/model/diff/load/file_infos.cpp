@@ -50,7 +50,7 @@ auto file_infos_t::apply_impl(apply_controller_t &controller, void *custom) cons
             assert(block);
             fi->assign_block(block.get(), i);
         }
-        folder_info->add_file(fi.get());
+        folder_info->add_file(*fi);
     }
     return applicator_t::apply_sibling(controller, custom);
 }

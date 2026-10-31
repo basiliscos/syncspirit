@@ -195,7 +195,7 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
     local_file_ptr->mark_local(true);
     local_file_ptr->set_sequence(sequence);
     if (!prev_file) {
-        local_folder->add_file(local_file_ptr);
+        local_folder->add_file(*local_file_ptr);
     } else {
         auto parent = local_file->get_parent();
         auto is_dir = local_file->is_dir();

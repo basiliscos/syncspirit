@@ -147,7 +147,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
                     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
                     my_file->mark_local(true);
-                    my_folder->add_file(my_file.get());
+                    my_folder->add_file(*my_file);
 
                     auto [f, fi, lf, action] = file_iterator->next();
                     REQUIRE(f);
@@ -162,7 +162,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
                     proto::set_value(c_1, 3);
 
                     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
-                    my_folder->add_file(my_file.get());
+                    my_folder->add_file(*my_file);
 
                     CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
                 }
@@ -173,7 +173,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
                     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
                     my_file->mark_local(true);
-                    my_folder->add_file(my_file.get());
+                    my_folder->add_file(*my_file);
 
                     CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
                 }
@@ -183,7 +183,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
                     auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
                     my_file->mark_local(true);
-                    my_folder->add_file(my_file.get());
+                    my_folder->add_file(*my_file);
 
                     CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});
                 }
@@ -349,7 +349,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
             proto::add_counters(v, proto::Counter(1, 1));
 
             auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
-            my_folder->add_file(my_file.get());
+            my_folder->add_file(*my_file);
 
             proto::add_counters(v, proto::Counter(2, 2));
             REQUIRE(
@@ -388,7 +388,7 @@ TEST_CASE("file iterator, single folder", "[model]") {
 
             proto::add_counters(v, proto::Counter(2, 2));
             auto my_file = file_info_t::create(sequencer->next_uuid(), pr_fi, my_folder).value();
-            my_folder->add_file(my_file.get());
+            my_folder->add_file(*my_file);
 
             REQUIRE(builder.apply());
             CHECK(file_iterator->next() == R{{}, {}, {}, A::ignore});

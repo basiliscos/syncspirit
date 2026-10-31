@@ -94,7 +94,7 @@ auto update_folder_t::apply_impl(apply_controller_t &controller, void *custom) c
                 LOG_TRACE(log, "update_folder_t, apply(); skipping update for '{}', seq. {}", new_seq, *file);
             }
         } else {
-            folder_info->add_file(file.get());
+            folder_info->add_file(*file);
         }
         folder_info->update_max_sequnece(*file);
         if (folder_info == cache_folder && file->is_dir()) {

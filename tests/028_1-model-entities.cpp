@@ -54,7 +54,7 @@ TEST_CASE("entities & presences", "[model]") {
 
     SECTION("simple addition") {
         auto file = mk_file("file.bin");
-        folder_info->add_file(file.get());
+        folder_info->add_file(*file);
         CHECK(folder_info->get_max_sequence() == sequence);
         REQUIRE(folder_info->get_children().size() == 1);
     }
@@ -66,14 +66,14 @@ TEST_CASE("entities & presences", "[model]") {
             auto f_3 = mk_file("c.bin");
 
             SECTION("inverse order") {
-                folder_info->add_file(f_3.get());
-                folder_info->add_file(f_2.get());
-                folder_info->add_file(f_1.get());
+                folder_info->add_file(*f_3);
+                folder_info->add_file(*f_2);
+                folder_info->add_file(*f_1);
             }
             SECTION("direct order") {
-                folder_info->add_file(f_1.get());
-                folder_info->add_file(f_2.get());
-                folder_info->add_file(f_3.get());
+                folder_info->add_file(*f_1);
+                folder_info->add_file(*f_2);
+                folder_info->add_file(*f_3);
             }
 
             auto &children = folder_info->get_children();
@@ -87,14 +87,14 @@ TEST_CASE("entities & presences", "[model]") {
             auto f_2 = mk_file("b", FT::DIRECTORY);
             auto f_3 = mk_file("c", FT::FILE);
             SECTION("inverse order") {
-                folder_info->add_file(f_3.get());
-                folder_info->add_file(f_2.get());
-                folder_info->add_file(f_1.get());
+                folder_info->add_file(*f_3);
+                folder_info->add_file(*f_2);
+                folder_info->add_file(*f_1);
             }
             SECTION("direct order") {
-                folder_info->add_file(f_1.get());
-                folder_info->add_file(f_2.get());
-                folder_info->add_file(f_3.get());
+                folder_info->add_file(*f_1);
+                folder_info->add_file(*f_2);
+                folder_info->add_file(*f_3);
             }
 
             auto &children = folder_info->get_children();
@@ -127,7 +127,7 @@ TEST_CASE("entities & presences", "[model]") {
         }
         SECTION("single file") {
             auto f = mk_file("a", FT::FILE);
-            folder_info->add_file(f.get());
+            folder_info->add_file(*f);
             auto it = folder_info->iterate();
             CHECK(it->next() == f);
             CHECK(it->next() == nullptr);
@@ -138,9 +138,9 @@ TEST_CASE("entities & presences", "[model]") {
             auto f_1 = mk_file("a", FT::DIRECTORY);
             auto f_2 = mk_file("b", FT::DIRECTORY);
             auto f_3 = mk_file("c", FT::DIRECTORY);
-            folder_info->add_file(f_3.get());
-            folder_info->add_file(f_2.get());
-            folder_info->add_file(f_1.get());
+            folder_info->add_file(*f_3);
+            folder_info->add_file(*f_2);
+            folder_info->add_file(*f_1);
 
             auto it = folder_info->iterate();
             CHECK(it->next() == f_1);
@@ -156,9 +156,9 @@ TEST_CASE("entities & presences", "[model]") {
             auto f_1 = mk_file("a", FT::DIRECTORY);
             auto f_2 = mk_file("b", FT::DIRECTORY);
             auto f_3 = mk_file("c", FT::DIRECTORY);
-            folder_info->add_file(f_3.get());
-            folder_info->add_file(f_2.get());
-            folder_info->add_file(f_1.get());
+            folder_info->add_file(*f_3);
+            folder_info->add_file(*f_2);
+            folder_info->add_file(*f_1);
             auto it = folder_info->iterate();
             auto seq = f_2->get_sequence();
             CHECK(iterate(seq) == strings_t{"b", "c"});
@@ -170,10 +170,10 @@ TEST_CASE("entities & presences", "[model]") {
             auto f_2 = mk_file("b", FT::DIRECTORY);
             auto f_3 = mk_file("a/a0", FT::DIRECTORY);
             auto f_4 = mk_file("a/a1", FT::DIRECTORY);
-            folder_info->add_file(f_1.get());
-            folder_info->add_file(f_2.get());
-            folder_info->add_file(f_3.get());
-            folder_info->add_file(f_4.get());
+            folder_info->add_file(*f_1);
+            folder_info->add_file(*f_2);
+            folder_info->add_file(*f_3);
+            folder_info->add_file(*f_4);
 
             auto it = folder_info->iterate();
             CHECK(it->next() == f_1);
@@ -192,10 +192,10 @@ TEST_CASE("entities & presences", "[model]") {
             auto f_2 = mk_file("b", FT::DIRECTORY);
             auto f_3 = mk_file("b/b0", FT::DIRECTORY);
             auto f_4 = mk_file("b/b1", FT::DIRECTORY);
-            folder_info->add_file(f_1.get());
-            folder_info->add_file(f_2.get());
-            folder_info->add_file(f_4.get());
-            folder_info->add_file(f_3.get());
+            folder_info->add_file(*f_1);
+            folder_info->add_file(*f_2);
+            folder_info->add_file(*f_4);
+            folder_info->add_file(*f_3);
 
             auto it = folder_info->iterate();
             CHECK(it->next() == f_1);
@@ -215,22 +215,22 @@ TEST_CASE("entities & presences", "[model]") {
             auto f_3 = mk_file("d");
             auto f_4 = mk_file("e");
             auto f_0 = mk_file("a");
-            folder_info->add_file(f_1.get());
-            folder_info->add_file(f_2.get());
-            folder_info->add_file(f_3.get());
+            folder_info->add_file(*f_1);
+            folder_info->add_file(*f_2);
+            folder_info->add_file(*f_3);
 
             auto it = folder_info->iterate();
             CHECK(it->next() == f_1);
             CHECK(it->next() == f_2);
 
             SECTION("tail") {
-                folder_info->add_file(f_4.get());
+                folder_info->add_file(*f_4);
                 CHECK(it->next() == f_3);
                 CHECK(it->next() == f_4);
                 CHECK(it->next() == nullptr);
             }
             SECTION("head") {
-                folder_info->add_file(f_0.get());
+                folder_info->add_file(*f_0);
                 CHECK(it->next() == f_3);
                 CHECK(it->next() == f_0);
                 CHECK(it->next() == nullptr);

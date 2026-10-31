@@ -1000,7 +1000,7 @@ void test_downloading() {
                 auto file_my = model::file_info_t::create(uuid, pr_file_my, folder_my).value();
                 file_my->assign_block(bi_1.get(), 0);
                 file_my->mark_local_available(0);
-                folder_my->add_file(file_my.get());
+                folder_my->add_file(*file_my);
 
                 peer_actor->forward(index);
                 peer_actor->push_response(data_2, 0);
@@ -1856,7 +1856,7 @@ void test_uploading() {
             auto uuid = sup->sequencer->next_uuid();
             auto file_info = model::file_info_t::create(uuid, file, folder_my).value();
             file_info->assign_block(b.get(), 0);
-            folder_my->add_file(file_info.get());
+            folder_my->add_file(*file_info);
 
             auto req = proto::Request();
             proto::set_id(req, 1);
