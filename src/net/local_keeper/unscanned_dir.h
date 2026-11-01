@@ -4,8 +4,7 @@
 #pragma once
 
 #include "child_info.h"
-#include "model/file_info.h"
-#include <memory>
+#include "model/presence.h"
 
 namespace syncspirit::net::local_keeper {
 
@@ -13,7 +12,7 @@ struct unscanned_dir_t {
     using dir_info_t = std::unique_ptr<child_info_t>;
     using generation_t = child_info_t::generation_t;
 
-    unscanned_dir_t(utils::path_t path_, model::file_info_ptr_t presence_, utils::path_t single_child_,
+    unscanned_dir_t(utils::path_t path_, model::presence_ptr_t presence_, utils::path_t single_child_,
                     generation_t generation_, bool recurse_, bool requires_refinement_)
         : path(std::move(path_)), presence(std::move(presence_)), single_child{std::move(single_child_)},
           generation{generation_}, recurse{recurse_ ? 1u : 0}, requires_refinement{requires_refinement_ ? 1u : 0} {}
@@ -26,7 +25,7 @@ struct unscanned_dir_t {
     }
 
     utils::path_t path;
-    model::file_info_ptr_t presence;
+    model::presence_ptr_t presence;
     utils::path_t single_child;
     dir_info_t dir_info;
     generation_t generation;

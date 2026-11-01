@@ -6,6 +6,7 @@
 #include "hash_context.h"
 #include "constants.h"
 #include "fs/utils.h"
+#include "model/misc/resolver.h"
 #include "model/diff/advance/advance.h"
 #include "model/diff/local/blocks_availability.h"
 #include "model/diff/local/file_availability.h"
@@ -36,48 +37,43 @@ auto make_context(model::folder_info_ptr_t local_folder, std::string_view start_
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
     auto folder = local_folder->get_folder();
-    auto augmentation = folder->get_augmentation().get();
-    auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
     auto local_device = folder->get_cluster()->get_device();
-    auto folder_presence = folder_entity->get_presence(local_device.get());
-    auto presence = folder_presence;
+    auto folder_presence = folder->get_folder_info(*local_device);
+    auto presence = static_cast<model::presence_t *>(folder_presence);
     auto skip_path = utils::make_native_view(start_subdir, allocator);
 
-    auto comparator = presentation::presence_t::child_comparator_t{};
     for (const auto name : skip_path) {
         if (auto p = presence->get_child(name, true); p) {
-            presence = p;
+            if (p->get_features() & F::deleted) {
+                break;
+            } else {
+                presence = p;
+            }
         } else {
             return {};
         }
     }
-    auto [path, child] = [&]() -> std::pair<utils::poly_path_view_t, utils::path_t> {
-        auto &folder_path = folder->get_path();
-        if (presence == folder_presence)
-            return {folder_path.get_view(allocator), utils::path_t()};
 
-        auto parent = presence->get_parent();
-        while (parent && (parent->get_features() & F::deleted)) {
-            presence = parent;
-            parent = parent->get_parent();
-        }
-        auto path = utils::make_empty_view(allocator);
-        if (parent == folder_presence) {
-            path = folder_path.get_view(allocator);
-        } else {
-            auto dir_presence = static_cast<presentation::cluster_file_presence_t *>(parent);
-            auto &file = dir_presence->get_file_info();
-            path = folder_path / file.get_name()->get_view(allocator);
+    auto partial = presence != folder_presence;
+    auto path = utils::make_empty_view(allocator);
+    auto child = utils::path_t();
+    auto parent = presence->get_parent();
+    if (!partial) {
+        path = folder->get_path().get_view(allocator);
+    } else {
+        if (parent) {
+            if (parent == folder_presence) {
+                path = folder->get_path().get_view(allocator);
+            } else {
+                path = static_cast<model::file_info_t *>(parent)->get_path(*folder_presence, allocator);
+            }
         }
         auto child = presence->get_entity()->get_path()->clone();
         presence = parent;
-        return {path, std::move(child)};
-    }();
-
+    }
     auto stack = local_keeper::stack_t();
-    stack.push_front(complete_scan_t{!child.empty()});
+    stack.push_front(complete_scan_t{partial});
     stack.push_front(unscanned_dir_t(path.detach(), presence, std::move(child), 0, recurse, false));
-
     auto ptr = folder_context_ptr_t();
     ptr.reset(new folder_context_t(std::move(local_folder), std::move(stack), path.detach()));
     return ptr;
@@ -174,7 +170,6 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
     } else if (type == proto::FileInfoType::SYMLINK) {
         stack.push_front(child_ready_t(std::move(child_info)));
     } else {
-        using namespace presentation;
         assert(type == proto::FileInfoType::FILE);
         if (child_info.path.is_temporal()) {
             auto seconds_ago = ctx.get_now() - child_info.last_write_time;
@@ -200,25 +195,18 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
                             auto folder = local_folder->get_folder();
                             auto &folder_path = folder->get_path();
                             auto name = child_info.path.relativize(folder_path);
+                            auto path = folder->get_cluster()->get_path_cache().get_path(name);
                             for (auto &p : folder->get_presences()) {
                                 auto fi = static_cast<model::folder_info_t *>(p.get());
-#if 0
-                                if (auto file = fi->get_file_infos().by_name(name)) {
-                                    auto augmentation = file->get_augmentation().get();
-                                    auto file_presence = static_cast<cluster_file_presence_t *>(augmentation);
-                                    auto best = file_presence->get_entity()->get_best();
-                                    if (best && best->get_features() & F::cluster) {
-                                        auto mutable_best = const_cast<presentation::presence_t *>(best);
-                                        auto cp = static_cast<cluster_file_presence_t *>(mutable_best);
-                                        auto &best_file = cp->get_file_info();
-                                        auto match = best_file.is_file() && best_file.get_size() == child_info.size;
+                                if (auto file = fi->get_by_path(*path); file) {
+                                    auto action = model::resolve(*file, nullptr, *local_folder);
+                                    if (action == model::advance_action_t::remote_copy) {
+                                        auto match = file->is_file() && file->get_size() == child_info.size;
                                         if (match) {
-                                            return best_file.get_block_size();
+                                            return file->get_block_size();
                                         }
                                     }
                                 }
-#endif
-                                std::abort();
                             }
                         }
                         return 0;
@@ -335,15 +323,15 @@ int folder_context_t::process(hash_incomplete_file_ptr_t &item, stack_context_t 
 }
 
 int folder_context_t::process(removed_dir_t &item, stack_context_t &ctx) noexcept {
-    using queue_t = std::pmr::list<presentation::presence_t *>;
-    using processed_t = std::pmr::unordered_set<presentation::presence_t *>;
+    using queue_t = std::pmr::list<model::file_info_t *>;
+    using processed_t = std::pmr::unordered_set<model::file_info_t *>;
     auto folder_id = local_folder->get_folder()->get_id();
 
     auto queue = queue_t(ctx.allocator);
     auto processed = processed_t(ctx.allocator);
     queue.push_back(item.presence.get());
 
-    auto get_children = [&](presentation::presence_t *p) -> presentation::presence_t::children_t * {
+    auto get_children = [&](model::file_info_t *p) -> model::presence_t::children_t * {
         auto f = p->get_features();
         if (f & (F::local | F::directory)) {
             auto it = processed.find(p);
@@ -367,13 +355,12 @@ int folder_context_t::process(removed_dir_t &item, stack_context_t &ctx) noexcep
             for (auto it = children->rbegin(); it != children->rend(); ++it) {
                 auto c = *it;
                 if (c->get_features() & F::local) {
-                    queue.push_front(c);
+                    queue.push_front(static_cast<model::file_info_t*>(c));
                 }
             }
             continue;
         } else {
-            auto local = static_cast<presentation::local_file_presence_t *>(item);
-            auto data = local->get_file_info().as_proto(false);
+            auto data = item->as_proto(false);
             proto::set_deleted(data, true);
             ctx.local_update(std::move(data), folder_id);
             queue.pop_front();
@@ -383,20 +370,18 @@ int folder_context_t::process(removed_dir_t &item, stack_context_t &ctx) noexcep
 }
 
 int folder_context_t::process(confirmed_deleted_t &item, stack_context_t &ctx) {
-    auto dir_presence = static_cast<presentation::local_file_presence_t *>(item.presence.get());
-    auto &dir = const_cast<model::file_info_t &>(dir_presence->get_file_info());
+    auto &dir = *item.presence;
     ctx.push_back(new model::diff::local::file_availability_t(dir, *local_folder));
 
     auto dirs_stack = dirs_stack_t(stack);
     for (auto child : item.presence->get_children()) {
+        auto file = static_cast<model::file_info_t*>(child);
         auto f = child->get_features();
         if (f & F::local) {
             if (f & F::directory) {
-                dirs_stack.push_front(confirmed_deleted_t(child));
+                dirs_stack.push_front(confirmed_deleted_t(file));
             } else {
-                auto file_presence = static_cast<presentation::local_file_presence_t *>(child);
-                auto &file = const_cast<model::file_info_t &>(file_presence->get_file_info());
-                ctx.push_back(new model::diff::local::file_availability_t(file, *local_folder));
+                ctx.push_back(new model::diff::local::file_availability_t(*file, *local_folder));
             }
         }
     }
@@ -407,7 +392,7 @@ int folder_context_t::process(incomplete_t &item, stack_context_t &ctx) noexcept
     auto name = item.path.get_stem();
     auto self_device = ctx.cluster.get_device().get();
     auto action = model::advance_action_t::ignore;
-    auto presence = (presentation::presence_t *)(nullptr);
+    auto presence = (model::file_info_t*)(nullptr);
     auto ignore = [&]() -> bool {
         auto seconds_ago = ctx.get_now() - item.last_write_time;
         if (seconds_ago < constants::tmp_min_age) {
@@ -417,34 +402,35 @@ int folder_context_t::process(incomplete_t &item, stack_context_t &ctx) noexcept
             return false;
         }
     }();
+    auto local_file = (model::file_info_t*)(nullptr);
     if (!ignore && item.parent) {
         auto &entities = item.parent->get_entity()->get_children();
-        auto comparator = presentation::entity_t::name_comparator_t{};
+        auto comparator = model::entity_t::name_comparator_t{};
         auto it = std::lower_bound(entities.begin(), entities.end(), name, comparator);
         if (it != entities.end() && (*it)->get_path()->get_filename() == name) {
-            presence = const_cast<presentation::presence_t *>((*it)->get_best());
-            if (presence && presence->get_device() == self_device) {
-                presence = nullptr;
+            auto& entity = *it;
+            local_file = static_cast<model::file_info_t*>(entity->get_presence(self_device));
+            for (auto& c: (*it)->get_presences()) {
+                if (c->get_device() != self_device) {
+                    auto peer_file = static_cast<model::file_info_t*>(c.get());
+                    auto action = model::resolve(*peer_file, local_file, *local_folder);
+                    if (action == model::advance_action_t::remote_copy) {
+                        presence = peer_file;
+                        break;
+                    }
+                }
             }
         }
     }
     if (presence) {
-        auto cp = static_cast<const presentation::cluster_file_presence_t *>(presence);
-        auto &peer_file = cp->get_file_info();
+        auto &peer_file = *presence;
         if (peer_file.get_size() != item.size) {
             presence = nullptr;
         } else if (peer_file.is_synchronizing()) {
             LOG_DEBUG(log, "ignoring '{}' (synchronizing)", item.path);
             ignore = true;
         } else {
-            auto local_file = (const model::file_info_t *)(nullptr);
-            auto local_fi = local_folder.get();
-            auto local_presence = presence->get_entity()->get_presence(self_device);
-            if (local_presence->get_features() & F::cluster) {
-                auto cp = static_cast<const presentation::cluster_file_presence_t *>(local_presence);
-                local_file = &cp->get_file_info();
-            }
-            action = model::resolve(peer_file, local_file, *local_fi);
+            action = model::resolve(peer_file, local_file, *local_folder);
             if (action == model::advance_action_t::ignore) {
                 presence = nullptr;
             }
@@ -458,7 +444,7 @@ int folder_context_t::process(incomplete_t &item, stack_context_t &ctx) noexcept
         } else {
             LOG_TRACE(log, "scheduling rehashing of '{}'", item.path);
             auto &child_info = static_cast<child_info_t &>(item);
-            auto ptr = hash_incomplete_file_ptr_t(new hash_incomplete_file_t(std::move(child_info), presence, action));
+            auto ptr = hash_incomplete_file_ptr_t(new hash_incomplete_file_t(std::move(child_info), *presence, action));
             stack.emplace_front(std::move(ptr));
         }
     }
@@ -466,8 +452,7 @@ int folder_context_t::process(incomplete_t &item, stack_context_t &ctx) noexcept
 }
 
 int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx) noexcept {
-    auto cp = static_cast<const presentation::cluster_file_presence_t *>(item.self.get());
-    auto &peer_file = cp->get_file_info();
+    auto &peer_file = *item.self;
     auto &blocks = item.blocks;
     auto it = peer_file.iterate_blocks();
     auto schedule_removal = it.get_total() != static_cast<std::uint32_t>(blocks.size());
@@ -492,12 +477,9 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
                     return peer_file.get_name()->get_view(ctx.allocator);
                 } else {
                     assert(item.action == model::advance_action_t::resolve_remote_win);
-                    auto self_device = ctx.cluster.get_device().get();
-                    auto local_presence = item.self->get_entity()->get_presence(self_device);
-                    assert(local_presence->get_features() & F::cluster);
-                    auto lp = static_cast<const presentation::cluster_file_presence_t *>(local_presence);
-                    auto &local_file = cp->get_file_info();
-                    return local_file.make_conflicting_name(ctx.allocator);
+                    auto local_device = ctx.cluster.get_device().get();
+                    auto local_file = peer_file.get_sibling_file(local_device);
+                    return local_file->make_conflicting_name(ctx.allocator);
                 }
             }();
             auto rename_ctx = hasher::payload::extendended_context_prt_t();
@@ -509,8 +491,8 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
             if (matched) {
                 using namespace model::diff::local;
                 LOG_DEBUG(log, "matched {} of {} blocks of '{}'", matched, blocks.size(), item.path);
-                auto &peer_folder = cp->get_folder()->get_folder_info();
-                ctx.push_back(new blocks_availability_t(peer_file, peer_folder, std::move(valid_blocks)));
+                auto peer_folder = static_cast<model::folder_info_t*>(local_folder->get_entity()->get_presence(peer_file.get_device()));
+                ctx.push_back(new blocks_availability_t(peer_file, *peer_folder, std::move(valid_blocks)));
             } else {
                 schedule_removal = true;
             }
@@ -603,6 +585,8 @@ void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
     }
     ++ctx.hashes_pool;
 }
+
+#if 0
 
 void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept {
     using checked_chidren_t = std::pmr::set<std::string_view>;
@@ -942,5 +926,6 @@ bool folder_context_t::ensure_folder_existance(stack_context_t &ctx) noexcept {
     }
     return true;
 }
+#endif
 
 } // namespace syncspirit::net::local_keeper
