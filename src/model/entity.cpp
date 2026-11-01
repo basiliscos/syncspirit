@@ -4,6 +4,7 @@
 #include "entity.h"
 #include "presence.h"
 #include "folder.h"
+#include "misc/resolver.h"
 #include "cluster.h"
 #include "utils/path_view.hpp"
 #include "entity/file.h"
@@ -73,6 +74,20 @@ void entity_t::add_child(entity_t &child) noexcept {
 
 void entity_t::commit(const utils::path_t &, const model::device_t *) noexcept {
     // TODO
+}
+
+file_info_t *entity_t::find_best() noexcept {
+    auto it = presences.begin();
+    auto best = static_cast<file_info_t *>(it->get());
+    ++it;
+    while (it != presences.end()) {
+        auto other = static_cast<file_info_t *>(it->get());
+        auto r = model::compare(*best, *other);
+        ++it;
+        if (r < 0) {
+            best = other;
+        }
+    }
 }
 
 auto entity_t::get_presences() const noexcept -> const presences_t & { return presences; }

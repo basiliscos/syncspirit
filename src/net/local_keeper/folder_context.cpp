@@ -355,7 +355,7 @@ int folder_context_t::process(removed_dir_t &item, stack_context_t &ctx) noexcep
             for (auto it = children->rbegin(); it != children->rend(); ++it) {
                 auto c = *it;
                 if (c->get_features() & F::local) {
-                    queue.push_front(static_cast<model::file_info_t*>(c));
+                    queue.push_front(static_cast<model::file_info_t *>(c));
                 }
             }
             continue;
@@ -375,7 +375,7 @@ int folder_context_t::process(confirmed_deleted_t &item, stack_context_t &ctx) {
 
     auto dirs_stack = dirs_stack_t(stack);
     for (auto child : item.presence->get_children()) {
-        auto file = static_cast<model::file_info_t*>(child);
+        auto file = static_cast<model::file_info_t *>(child);
         auto f = child->get_features();
         if (f & F::local) {
             if (f & F::directory) {
@@ -392,7 +392,7 @@ int folder_context_t::process(incomplete_t &item, stack_context_t &ctx) noexcept
     auto name = item.path.get_stem();
     auto self_device = ctx.cluster.get_device().get();
     auto action = model::advance_action_t::ignore;
-    auto presence = (model::file_info_t*)(nullptr);
+    auto presence = (model::file_info_t *)(nullptr);
     auto ignore = [&]() -> bool {
         auto seconds_ago = ctx.get_now() - item.last_write_time;
         if (seconds_ago < constants::tmp_min_age) {
@@ -402,17 +402,17 @@ int folder_context_t::process(incomplete_t &item, stack_context_t &ctx) noexcept
             return false;
         }
     }();
-    auto local_file = (model::file_info_t*)(nullptr);
+    auto local_file = (model::file_info_t *)(nullptr);
     if (!ignore && item.parent) {
         auto &entities = item.parent->get_entity()->get_children();
         auto comparator = model::entity_t::name_comparator_t{};
         auto it = std::lower_bound(entities.begin(), entities.end(), name, comparator);
         if (it != entities.end() && (*it)->get_path()->get_filename() == name) {
-            auto& entity = *it;
-            local_file = static_cast<model::file_info_t*>(entity->get_presence(self_device));
-            for (auto& c: (*it)->get_presences()) {
+            auto &entity = *it;
+            local_file = static_cast<model::file_info_t *>(entity->get_presence(self_device));
+            for (auto &c : (*it)->get_presences()) {
                 if (c->get_device() != self_device) {
-                    auto peer_file = static_cast<model::file_info_t*>(c.get());
+                    auto peer_file = static_cast<model::file_info_t *>(c.get());
                     auto action = model::resolve(*peer_file, local_file, *local_folder);
                     if (action == model::advance_action_t::remote_copy) {
                         presence = peer_file;
@@ -491,7 +491,8 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
             if (matched) {
                 using namespace model::diff::local;
                 LOG_DEBUG(log, "matched {} of {} blocks of '{}'", matched, blocks.size(), item.path);
-                auto peer_folder = static_cast<model::folder_info_t*>(local_folder->get_entity()->get_presence(peer_file.get_device()));
+                auto peer_folder = static_cast<model::folder_info_t *>(
+                    local_folder->get_entity()->get_presence(peer_file.get_device()));
                 ctx.push_back(new blocks_availability_t(peer_file, *peer_folder, std::move(valid_blocks)));
             } else {
                 schedule_removal = true;
@@ -586,8 +587,6 @@ void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
     ++ctx.hashes_pool;
 }
 
-#if 0
-
 void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept {
     using checked_chidren_t = std::pmr::set<std::string_view>;
     --blocked;
@@ -624,9 +623,9 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
             return handle_scan_error(task, ctx);
         } else {
             auto path = task.path.get_view(ctx.allocator).get_parent();
-            auto p = static_cast<presentation::local_file_presence_t *>(task.presence.get());
-            auto &child = p->get_file_info().get_name();
-            auto sub_task = fs::task::scan_dir_t(path.detach(), p->get_parent(), child->clone(), false, false, false);
+            auto child = static_cast<model::file_info_t *>(task.presence.get());
+            auto sub_task = fs::task::scan_dir_t(path.detach(), child->get_parent(), child->get_name()->clone(), false,
+                                                 false, false);
             push(std::move(sub_task));
             return;
         }
@@ -645,7 +644,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
             continue;
         }
         auto is_dir = info.file_type == utils::file_type_t::DIRECTORY;
-        auto presence = presentation::get_child(task.presence.get(), name_str, is_dir);
+        auto presence = model::get_child(task.presence.get(), name_str, is_dir);
         if (presence) {
             auto filename = presence->get_entity()->get_path()->get_filename();
             checked_children.emplace(filename);
@@ -668,7 +667,8 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
 
     if (dir_presence) {
         auto dirs_stack = dirs_stack_t(stack);
-        for (auto child : dir_presence->get_children()) {
+        for (auto cp : dir_presence->get_children()) {
+            auto child = static_cast<model::file_info_t *>(cp);
             auto features = child->get_features();
             if (features & F::local) {
                 auto &child_path = *child->get_entity()->get_path();
@@ -686,8 +686,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
                         if (is_dir) {
                             dirs_stack.push_front(removed_dir_t(child));
                         } else {
-                            auto file = static_cast<presentation::local_file_presence_t *>(child);
-                            auto file_data = file->get_file_info().as_proto(false);
+                            auto file_data = child->as_proto(false);
                             proto::set_deleted(file_data, true);
                             ctx.local_update(std::move(file_data), folder_id);
                         }
@@ -699,30 +698,28 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
             }
         }
 
-        using queue_t = std::pmr::list<presentation::entity_t *>;
+        using queue_t = std::pmr::list<model::entity_t *>;
         auto queue = queue_t(ctx.allocator);
         for (auto child_entity : dir_presence->get_entity()->get_children()) {
             auto filename = child_entity->get_path()->get_filename();
             if (!checked_children.count(filename)) {
-                auto best = child_entity->get_best();
+                auto best = child_entity->find_best();
                 if (best->get_features() & F::deleted) {
-                    queue.emplace_back(child_entity);
+                    queue.emplace_back(child_entity.get());
                 }
             }
         }
         while (!queue.empty()) {
             auto child_entity = queue.front();
             queue.pop_back();
-            auto best = child_entity->get_best();
-            auto presence = static_cast<const presentation::cluster_file_presence_t *>(best);
-            auto &peer_file = presence->get_file_info();
-            auto pr_file = peer_file.as_proto(true);
+            auto peer_file = child_entity->find_best();
+            auto pr_file = peer_file->as_proto(true);
             ctx.local_update(std::move(pr_file), folder_id);
-            if (best->get_features() & F::directory) {
+            if (peer_file->get_features() & F::directory) {
                 for (auto c : child_entity->get_children()) {
-                    auto best = child_entity->get_best();
+                    auto best = child_entity->find_best();
                     if (best->get_features() & F::deleted) {
-                        queue.emplace_back(c);
+                        queue.emplace_back(c.get());
                     }
                 }
             }
@@ -734,6 +731,9 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
         stack.erase(it_done);
     }
 }
+
+#if 0
+
 
 void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_context_t &ctx) {
     ++io_generation;

@@ -19,6 +19,7 @@ struct entity_t;
 using entity_ptr_t = model::intrusive_ptr_t<entity_t>;
 
 struct presence_t;
+struct file_info_t;
 using presence_ptr_t = model::intrusive_ptr_t<presence_t>;
 struct cluster_file_presence_t;
 
@@ -62,7 +63,7 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
 
     inline entity_t *get_parent() noexcept { return parent; }
     inline const entity_t *get_parent() const noexcept { return parent; }
-    inline const presence_t *get_best() const noexcept { return best; }
+    file_info_t *find_best() noexcept;
 
     void add_child(entity_t &child) noexcept;
     entity_t *get_or_create_child(std::string_view name) noexcept;

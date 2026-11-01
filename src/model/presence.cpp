@@ -65,8 +65,8 @@ bool CP::operator()(const presence_t *l, const presence_like_t &r) const {
     return l->entity->get_path()->get_filename() < r.name;
 }
 
-presence_t *get_child(presence_t *parent, std::string_view name, bool is_dir) noexcept {
-    return parent ? parent->get_child(name, is_dir) : nullptr;
+file_info_t *get_child(presence_t *parent, std::string_view name, bool is_dir) noexcept {
+    return parent ? static_cast<file_info_t *>(parent->get_child(name, is_dir)) : nullptr;
 }
 
 presence_t::presence_t(entity_t *entity_, model::device_t *device_) noexcept

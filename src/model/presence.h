@@ -19,10 +19,11 @@ using presence_ptr_t = model::intrusive_ptr_t<presence_t>;
 struct cluster_file_presence_t;
 struct file_entity_t;
 struct folder_info_t;
+struct file_info_t;
 
 struct folder_info_iterator_t;
 
-presence_t *get_child(presence_t *parent, std::string_view name, bool is_dir) noexcept;
+file_info_t *get_child(presence_t *parent, std::string_view name, bool is_dir) noexcept;
 
 struct SYNCSPIRIT_API presence_t : model::augmentable_t {
     using children_t = std::vector<presence_t *>;
