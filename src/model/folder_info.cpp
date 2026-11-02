@@ -183,6 +183,11 @@ file_info_t *folder_info_t::get_by_path(const utils::path_base_t &path) const no
     return it != file_cache.end() ? it->second : nullptr;
 }
 
+file_info_t *folder_info_t::get_by_path(const std::string_view &path) const noexcept {
+    auto it = file_cache.find(path);
+    return it != file_cache.end() ? it->second : nullptr;
+}
+
 void folder_info_t::clear() noexcept {
     while (children.size()) {
         children.back()->forget_presence();

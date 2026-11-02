@@ -88,6 +88,7 @@ file_info_t *entity_t::find_best() noexcept {
             best = other;
         }
     }
+    return best;
 }
 
 auto entity_t::get_presences() const noexcept -> const presences_t & { return presences; }

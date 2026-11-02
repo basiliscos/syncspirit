@@ -76,6 +76,7 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     inline std::int64_t get_max_sequence() const noexcept { return max_sequence; }
 
     file_info_t *get_by_path(const utils::path_base_t &path) const noexcept;
+    file_info_t *get_by_path(const std::string_view &path) const noexcept;
     void clear() noexcept;
     void forget_file(const utils::path_base_t &path) noexcept;
 

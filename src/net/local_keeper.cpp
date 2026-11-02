@@ -14,8 +14,6 @@
 #include "model/diff/modify/upsert_folder.h"
 #include "model/messages.h"
 #include "names.h"
-#include "presentation/folder_entity.h"
-#include "presentation/folder_presence.h"
 #include "proto/proto-helpers-bep.h"
 #include "proto/proto-helpers-db.h"
 #include "utils/string_comparator.hpp"
@@ -207,13 +205,12 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
     if ((folder->is_suspended() && !folder->get_suspend_reason()) || state != r::state_t::OPERATIONAL) {
         do_scan = false;
     }
-#if 0
     if (do_scan) {
-        LOG_DEBUG(log, "initiating scan of {} from '{}'", diff.folder_id, diff.sub_dir);
+        LOG_DEBUG(log, "initiating scan of {} from '{}'", diff.folder_id, diff.path);
         auto local_folder = folder->get_folder_info(*cluster->get_device());
-        auto folder_ctx = local_keeper::make_context(local_folder, diff.sub_dir, true);
+        auto folder_ctx = local_keeper::make_context(local_folder, diff.path, true);
         if (!folder_ctx) {
-            LOG_ERROR(log, "cannot initialize scan of '{}'({})", diff.folder_id, diff.sub_dir);
+            LOG_ERROR(log, "cannot initialize scan of '{}'({})", diff.folder_id, diff.path);
             auto now = r::pt::microsec_clock::local_time();
             auto finish = model::diff::cluster_diff_ptr_t();
             finish = new model::diff::local::scan_finish_t(diff.folder_id, now);
@@ -224,8 +221,6 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
     } else {
         LOG_DEBUG(log, "skipping scan of {}", diff.folder_id);
     }
-#endif
-    std::abort();
     return diff.visit_next(*this, custom);
 }
 
@@ -378,17 +373,15 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
                                    lc_context_t &stack_ctx) noexcept {
     using namespace model::diff;
     using queue_t = std::pmr::list<model::file_info_t *>;
-    using F = presentation::presence_t::features_t;
+    using F = model::presence_t::features_t;
 
     auto folder = local_folder.get_folder();
     auto folder_id = folder->get_id();
     auto new_name = proto::get_name(change);
     auto &prev_name = change.prev_path;
     LOG_DEBUG(log, "(input) handle rename '{}' -> '{}' in folder '{}'", prev_name, new_name, folder_id);
-#if 0
-    auto &local_files = local_folder.get_file_infos();
 
-    auto f_root = local_files.by_name(prev_name);
+    auto f_root = local_folder.get_by_path(prev_name);
     if (!f_root) {
         auto it = stack_ctx.name_2_file.find(prev_name);
         if (it != stack_ctx.name_2_file.end()) {
@@ -401,7 +394,7 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
 
     auto assembler = model::diff::diff_assember_t(constants::diffs_batch);
     auto queue = queue_t(stack_ctx.allocator);
-    queue.emplace_back(f_root.get());
+    queue.emplace_back(f_root);
     while (!queue.empty()) {
         auto f = queue.front();
         queue.pop_front();
@@ -443,12 +436,10 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
             auto full_path = fmt::format("{}/{}", folder_path, new_sub_name);
             just_created_dirs.insert(std::move(full_path));
 
-            auto presence = static_cast<presentation::presence_t *>(f->get_augmentation().get());
-            for (auto c : presence->get_children()) {
+            for (auto c : f->get_children()) {
                 auto features = c->get_features();
                 if (!(features & F::deleted) && !(features & F::missing) && (features & F::local)) {
-                    auto cp = static_cast<presentation::cluster_file_presence_t *>(c);
-                    auto file_info = const_cast<model::file_info_t *>(&cp->get_file_info());
+                    auto file_info = static_cast<model::file_info_t *>(c);
                     queue.emplace_back(file_info);
                 }
             }
@@ -458,8 +449,6 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
         auto diff = assembler.consume();
         stack_ctx.push_back(diff.get());
     }
-#endif
-    std::abort();
 }
 
 void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload::file_changes_t &changes,

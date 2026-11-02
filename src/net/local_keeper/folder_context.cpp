@@ -5,7 +5,6 @@
 #include "folder_context.h"
 #include "hash_context.h"
 #include "constants.h"
-#include "fs/utils.h"
 #include "model/misc/resolver.h"
 #include "model/diff/advance/advance.h"
 #include "model/diff/local/blocks_availability.h"
@@ -30,7 +29,7 @@ struct rename_context_t final : hasher::payload::extendended_context_t {
     rehashed_incomplete_t item;
 };
 
-auto make_context(model::folder_info_ptr_t local_folder, std::string_view start_subdir, bool recurse) noexcept
+auto make_context(model::folder_info_ptr_t local_folder, const utils::path_base_t &skip_path, bool recurse) noexcept
     -> folder_context_ptr_t {
     auto buffer = std::array<std::byte, 1024 * 32>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
@@ -40,7 +39,6 @@ auto make_context(model::folder_info_ptr_t local_folder, std::string_view start_
     auto local_device = folder->get_cluster()->get_device();
     auto folder_presence = folder->get_folder_info(*local_device);
     auto presence = static_cast<model::presence_t *>(folder_presence);
-    auto skip_path = utils::make_native_view(start_subdir, allocator);
 
     for (const auto name : skip_path) {
         if (auto p = presence->get_child(name, true); p) {
