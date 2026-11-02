@@ -732,9 +732,6 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
     }
 }
 
-#if 0
-
-
 void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_context_t &ctx) {
     ++io_generation;
     auto &ec = task.ec;
@@ -753,10 +750,8 @@ void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_co
             LOG_WARN(log, "I/O error during processing '{}': {}", task.path, ec);
             auto presence = hash_file.self.get();
             if (presence && presence->get_features() & F::local) {
-                auto file_presence = static_cast<presentation::local_file_presence_t *>(presence);
-                auto &file = const_cast<model::file_info_t &>(file_presence->get_file_info());
                 auto local_fi = local_folder.get();
-                ctx.push_back(new model::diff::modify::mark_reachable_t(file, *local_fi, false));
+                ctx.push_back(new model::diff::modify::mark_reachable_t(*presence, *local_fi, false));
             } else if (hash_file.incomplete) {
                 LOG_DEBUG(log, "scheduling(3) removal of '{}'", task.path);
                 push(fs::task::remove_file_t(task.path.clone()));
@@ -782,10 +777,9 @@ void folder_context_t::post_process(fs::task::rename_file_t &task, stack_context
         push(std::move(sub_task));
     } else {
         auto &item = raname_ctx->item;
-        auto cp = static_cast<const presentation::cluster_file_presence_t *>(item.self.get());
-        auto &peer_file = cp->get_file_info();
-        auto peer = cp->get_device();
-        auto &peer_folder = cp->get_folder()->get_folder_info();
+        auto &peer_file = *item.self;
+        auto peer = peer_file.get_device();
+        auto &peer_folder = *local_folder->get_typed_sibling<model::folder_info_t>(peer_file.get_device());
         auto &sequencer = ctx.sequencer;
         auto diff =
             model::diff::advance::advance_t::create(item.action, peer_file, peer_folder, sequencer, ctx.allocator);
@@ -847,7 +841,7 @@ void folder_context_t::handle_scan_error(fs::task::scan_dir_t &task, stack_conte
     log->warn("cannot scan '{}': {}", task.path, ec);
     auto dir_presence = task.presence.get();
     if (dir_presence && dir_presence->get_features() & F::local) {
-        using queue_t = std::pmr::list<presentation::presence_t *>;
+        using queue_t = std::pmr::list<model::presence_t *>;
         auto queue = queue_t(ctx.allocator);
         queue.emplace_back(dir_presence);
 
@@ -856,8 +850,7 @@ void folder_context_t::handle_scan_error(fs::task::scan_dir_t &task, stack_conte
             auto presence = queue.front();
             queue.pop_front();
             auto features = presence->get_features();
-            auto file_presence = static_cast<presentation::local_file_presence_t *>(presence);
-            auto &file = file_presence->get_file_info();
+            auto &file = *static_cast<model::file_info_t *>(presence);
             auto diff = model::diff::cluster_diff_ptr_t();
             diff.reset(new model::diff::modify::mark_reachable_t(file, *local_fi, false));
             ctx.push_back(diff.get());
@@ -926,6 +919,5 @@ bool folder_context_t::ensure_folder_existance(stack_context_t &ctx) noexcept {
     }
     return true;
 }
-#endif
 
 } // namespace syncspirit::net::local_keeper
