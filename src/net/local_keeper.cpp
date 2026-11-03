@@ -453,10 +453,9 @@ void local_keeper_t::handle_rename(fs::payload::file_info_t &change, const model
 
 void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload::file_changes_t &changes,
                                 lc_context_t &stack_ctx) noexcept {
-#if 0
     using namespace model::diff;
     using strings_t = std::pmr::unordered_set<std::pmr::string, utils::string_hash_t, utils::string_eq_t>;
-    using relation_t = std::tuple<presentation::presence_t *, presentation::presence_t *, bool>;
+    using relation_t = std::tuple<model::file_info_t *, model::presence_t *, bool>;
     using I = syncspirit_watcher_impl_t;
     using CI = local_keeper::child_info_t;
     auto scheduled_dirs = strings_t(stack_ctx.allocator);
@@ -464,15 +463,11 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
     auto folder = local_folder.get_folder();
     auto &folder_path = folder->get_path();
     auto folder_id = folder->get_id();
-    auto &local_files = local_folder.get_file_infos();
     auto unexamined = local_keeper::unexamined_items_t();
-    auto augmentation = local_folder.get_augmentation().get();
-    auto folder_presence = static_cast<presentation::folder_presence_t *>(augmentation);
 
-    auto immediate_update = [&](fs::payload::file_info_t &change, presentation::presence_t *self,
-                                presentation::presence_t *parent) {
+    auto immediate_update = [&](fs::payload::file_info_t &change, model::file_info_t *self, model::presence_t *parent) {
         auto name = proto::get_name(change);
-        auto file = local_files.by_name(name);
+        auto file = local_folder.get_by_path(name);
         bool update = true;
         if (file) {
             if (proto::get_deleted(change)) {
@@ -508,34 +503,30 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
             LOG_DEBUG(log, "ignoring update on '{}'", name);
         }
     };
-    auto delayed_update = [&](fs::payload::file_info_t change, presentation::presence_t *self,
-                              presentation::presence_t *parent, bool recurse_children) {
-        using R = presentation::presence_link_t;
+    auto delayed_update = [&](fs::payload::file_info_t change, model::file_info_t *self, model::presence_t *parent,
+                              bool recurse_children) {
         auto name = proto::get_name(change);
         auto path = folder->get_path().get_view(stack_ctx.allocator);
         if (name.size()) {
             path = path / utils::make_native_view(name, stack_ctx.allocator);
         }
         if (!parent) {
-            parent = folder_presence;
+            parent = &local_folder;
         }
 
         auto child_info = CI(std::move(change), path.detach(), self, parent, 0);
         auto item = unexamined_t(std::move(child_info), true, recurse_children, change.requires_refinement);
         unexamined.push_back(std::move(item));
     };
-    auto handle_delete = [&](fs::payload::file_info_t change, presentation::presence_t *self,
-                             presentation::presence_t *parent) {
+    auto handle_delete = [&](fs::payload::file_info_t change, model::file_info_t *self, model::presence_t *parent) {
         auto name = proto::get_name(change);
-        auto file = local_folder.get_file_infos().by_name(name);
+        auto file = local_folder.get_by_path(name);
         if (!file || file->is_deleted()) {
             LOG_DEBUG(log, "ignoring removal '{}' in folder '{}' as it is already missing", name, folder_id);
             return;
         }
         if (file->is_dir() && change.requires_refinement) {
-            auto aug = file->get_augmentation().get();
-            auto presence = static_cast<presentation::presence_t *>(aug);
-            auto parent = presence->get_parent();
+            auto parent = file->get_parent();
             if (!parent) {
                 LOG_ERROR(log, "missing parent for '{}' in local folder '{}'", name, folder_id);
                 return;
@@ -543,9 +534,9 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
 
             auto folder_path = folder->get_path().get_view(stack_ctx.allocator);
             auto path = folder_path / *parent->get_entity()->get_path();
-            auto child_name = utils::path_t::make_native(presence->get_entity()->get_path()->get_filename());
+            auto child_path = file->get_name();
             auto item =
-                unscanned_dir_t(path.detach(), parent, std::move(child_name), 0, true, change.requires_refinement);
+                unscanned_dir_t(path.detach(), parent, child_path->clone(), 0, true, change.requires_refinement);
             unexamined.push_back(std::move(item));
         } else {
             immediate_update(change, self, parent);
@@ -573,22 +564,18 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
     auto get_relation = [&](fs::payload::file_info_t &change) -> relation_t {
         auto name = proto::get_name(change);
         if (!name.empty()) {
-            auto self_file = local_files.by_name(name);
-            auto self = (presentation::presence_t *)(nullptr);
-            auto parent = (presentation::presence_t *)(nullptr);
-            if (self_file) {
-                auto aug = self_file->get_augmentation().get();
-                self = static_cast<presentation::presence_t *>(aug);
+            auto self = local_folder.get_by_path(name);
+            auto parent = (model::presence_t *)(nullptr);
+            if (self) {
                 parent = self->get_parent();
             } else {
                 auto slash = name.find_last_of('/');
                 if (slash != std::string_view::npos) {
                     auto sub_dir = name.substr(0, slash);
-                    auto parent_file = local_files.by_name(sub_dir);
-                    if (parent_file) {
-                        if (parent_file->is_local()) {
-                            auto aug = parent_file->get_augmentation().get();
-                            parent = static_cast<presentation::presence_t *>(aug);
+                    auto candidate = local_folder.get_by_path(sub_dir);
+                    if (candidate) {
+                        if (candidate->is_local()) {
+                            parent = candidate;
                         }
                     } else {
                         auto view = folder_path.get_view(stack_ctx.allocator);
@@ -599,7 +586,7 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
                         }
                     }
                 } else {
-                    parent = folder_presence;
+                    parent = &local_folder;
                 }
             }
             return {self, parent, parent != nullptr};
@@ -645,6 +632,4 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
         auto folder_ctx = local_keeper::make_context(&local_folder, std::move(unexamined));
         stack_ctx.new_contexts.emplace_back(std::move(folder_ctx));
     }
-#endif
-    std::abort();
 }
