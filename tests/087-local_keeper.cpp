@@ -1249,8 +1249,6 @@ void test_resurrection() {
     F().run();
 }
 
-#if 0
-
 void test_partial_scan() {
     struct F : fixture_t {
         void main(const utils::allocator_t &allocator) noexcept override {
@@ -1266,11 +1264,10 @@ void test_partial_scan() {
             write_file(file_1, "12345");
             write_file(file_2, "67890");
             builder->scan_start(folder->get_id()).apply(*sup);
-            auto &files = folder_info->get_file_infos();
-            REQUIRE(files.size() == 6 + 2);
+            REQUIRE(test::count_children(*local_folder) == 6 + 2);
 
-            auto f_1 = files.by_name(narrow(L"а/б/в/файл-1.bin"));
-            auto f_2 = files.by_name(narrow(L"x/y/z/файл-2.bin"));
+            auto f_1 = local_folder->get_by_path(narrow(L"а/б/в/файл-1.bin"));
+            auto f_2 = local_folder->get_by_path(narrow(L"x/y/z/файл-2.bin"));
 
             REQUIRE(f_1);
             REQUIRE(f_2);
@@ -1282,9 +1279,10 @@ void test_partial_scan() {
             write_file(file_2, "6789012345");
             SECTION("existing dir") {
                 auto subdir = GENERATE(L"а", L"а/б", L"а/б/в");
-                builder->scan_start(folder->get_id(), narrow(subdir)).apply(*sup);
+                auto path = utils::path_t::make_generic(narrow(subdir));
+                builder->scan_start(folder->get_id(), std::move(path)).apply(*sup);
                 CHECK(subdir != std::wstring_view());
-                REQUIRE(files.size() == 6 + 2);
+                REQUIRE(test::count_children(*local_folder) == 6 + 2);
                 CHECK(f_1->get_sequence() != seq_1);
                 CHECK(f_2->get_sequence() == seq_2);
             }
@@ -1295,9 +1293,11 @@ void test_partial_scan() {
                 remove_all(root_path / subdir);
                 INFO("subdir: " << subdir);
                 CHECK(subdir != std::string_view{});
-                builder->scan_start(folder->get_id(), narrow(L"а/б/в")).apply(*sup);
-                auto dir = files.by_name(narrow(L"а/б/в"));
+                auto path = utils::path_t::make_generic(narrow(L"а/б/в"));
+                builder->scan_start(folder->get_id(), std::move(path)).apply(*sup);
+                auto dir = local_folder->get_by_path(narrow(L"а/б/в"));
                 REQUIRE(dir);
+#if 0
                 auto aug = folder->get_augmentation().get();
                 auto folder_entity = static_cast<presentation::folder_entity_t *>(aug);
                 auto &a_entity = *folder_entity->get_children().begin();
@@ -1308,15 +1308,17 @@ void test_partial_scan() {
                 auto &presence_stats = presence->get_stats();
                 CHECK(entity_stats.entities == 2);
                 CHECK(entity_stats.entities == presence_stats.local_entries);
+#endif
                 CHECK(!folder->is_suspended());
             }
             SECTION("resurrection") {
                 remove_all(root_path / L"а");
-                auto dir_a = files.by_name(narrow(L"а"));
-                auto dir_x = files.by_name("x");
-                auto dir_b = files.by_name(narrow(L"а/б"));
-                auto dir_c = files.by_name(narrow(L"а/б/в"));
-                builder->scan_start(folder->get_id(), narrow(L"а/б")).apply(*sup);
+                auto dir_a = local_folder->get_by_path(narrow(L"а"));
+                auto dir_x = local_folder->get_by_path("x");
+                auto dir_b = local_folder->get_by_path(narrow(L"а/б"));
+                auto dir_c = local_folder->get_by_path(narrow(L"а/б/в"));
+                auto path = utils::path_t::make_generic(narrow(L"а/б"));
+                builder->scan_start(folder->get_id(), path.clone()).apply(*sup);
 
                 REQUIRE(dir_a->is_deleted());
                 REQUIRE(dir_b->is_deleted());
@@ -1324,7 +1326,7 @@ void test_partial_scan() {
                 CHECK(!dir_x->is_deleted());
 
                 create_directories(root_path / L"а/б/в");
-                builder->scan_start(folder->get_id(), narrow(L"а/б")).apply(*sup);
+                builder->scan_start(folder->get_id(), path.clone()).apply(*sup);
 
                 CHECK(!dir_a->is_deleted());
                 CHECK(!dir_b->is_deleted());
@@ -1335,6 +1337,8 @@ void test_partial_scan() {
     };
     F().run();
 }
+
+#if 0
 
 void test_scan_errors() {
     struct F : fixture_t {
