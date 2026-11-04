@@ -13,6 +13,7 @@
 #include "utils/path.h"
 #include "utils/path_view.hpp"
 #include "syncspirit-test-export.h"
+#include <functional>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 #define SYNCSPIRIT_WIN
@@ -53,6 +54,7 @@ struct test_apply_controller_t final : model::arc_base_t<test_apply_controller_t
 };
 
 using apply_controller_ptr_t = model::intrusive_ptr_t<test_apply_controller_t>;
+using file_function_t = std::function<void(model::file_info_t &)>;
 
 struct SYNCSPIRIT_TEST_API path_guard_t : utils::path_t {
     using utils::path_t::path_t;
@@ -77,6 +79,9 @@ SYNCSPIRIT_TEST_API std::string hash_string(const std::string_view &hash) noexce
 SYNCSPIRIT_TEST_API bool has_ipv6() noexcept;
 SYNCSPIRIT_TEST_API utils::bytes_t make_key(model::block_info_ptr_t block);
 SYNCSPIRIT_TEST_API bool wine_environment();
+
+SYNCSPIRIT_TEST_API std::size_t count_children(model::presence_t &) noexcept;
+SYNCSPIRIT_TEST_API void apply_children(model::presence_t &, file_function_t) noexcept;
 
 SYNCSPIRIT_TEST_API bool is_empty(const utils::poly_path_view_t &path);
 SYNCSPIRIT_TEST_API std::size_t create_directories(const utils::poly_path_view_t &path);

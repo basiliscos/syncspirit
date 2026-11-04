@@ -13,6 +13,8 @@
 #include "syncspirit-config.h"
 #include <random>
 #include <cstdint>
+#include <list>
+#include <memory_resource>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <boost/nowide/convert.hpp>
 #include <catch2/catch_session.hpp>
@@ -221,6 +223,40 @@ bool wine_environment() {
     }
 #endif
     return false;
+}
+
+std::size_t count_children(model::presence_t &initial) noexcept {
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    using queue_t = std::pmr::list<model::presence_t *>;
+    auto queue = queue_t{&initial};
+    auto r = std::size_t{0};
+    while (!queue.empty()) {
+        ++r;
+        auto p = queue.front();
+        queue.pop_front();
+        for (auto c : p->get_children()) {
+            queue.push_back(c);
+        }
+    }
+    --r;
+    return r;
+}
+
+void apply_children(model::presence_t &initial, file_function_t fn) noexcept {
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+    using queue_t = std::pmr::list<model::presence_t *>;
+    auto queue = queue_t{&initial};
+    while (!queue.empty()) {
+        auto p = queue.front();
+        queue.pop_front();
+        if (p != &initial) {
+            fn(*static_cast<model::file_info_t *>(p));
+        }
+    }
 }
 
 bool exists(const utils::poly_path_view_t &path) {

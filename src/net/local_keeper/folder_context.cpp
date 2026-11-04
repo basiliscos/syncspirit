@@ -330,8 +330,7 @@ int folder_context_t::process(removed_dir_t &item, stack_context_t &ctx) noexcep
     queue.push_back(item.presence.get());
 
     auto get_children = [&](model::file_info_t *p) -> model::presence_t::children_t * {
-        auto f = p->get_features();
-        if (f & (F::local | F::directory)) {
+        if (p->is_dir() && p->get_device() == local_folder->get_device()) {
             auto it = processed.find(p);
             if (it != processed.end()) {
                 processed.erase(it);
@@ -352,9 +351,7 @@ int folder_context_t::process(removed_dir_t &item, stack_context_t &ctx) noexcep
         if (children) {
             for (auto it = children->rbegin(); it != children->rend(); ++it) {
                 auto c = *it;
-                if (c->get_features() & F::local) {
-                    queue.push_front(static_cast<model::file_info_t *>(c));
-                }
+                queue.push_front(static_cast<model::file_info_t *>(c));
             }
             continue;
         } else {
@@ -373,9 +370,9 @@ int folder_context_t::process(confirmed_deleted_t &item, stack_context_t &ctx) {
 
     auto dirs_stack = dirs_stack_t(stack);
     for (auto child : item.presence->get_children()) {
-        auto file = static_cast<model::file_info_t *>(child);
-        auto f = child->get_features();
-        if (f & F::local) {
+        if (child->get_device() == local_folder->get_device()) {
+            auto file = static_cast<model::file_info_t *>(child);
+            auto f = child->get_features();
             if (f & F::directory) {
                 dirs_stack.push_front(confirmed_deleted_t(file));
             } else {
@@ -667,8 +664,8 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
         auto dirs_stack = dirs_stack_t(stack);
         for (auto cp : dir_presence->get_children()) {
             auto child = static_cast<model::file_info_t *>(cp);
-            auto features = child->get_features();
-            if (features & F::local) {
+            if (child->get_device() == local_folder->get_device()) {
+                auto features = child->get_features();
                 auto &child_path = *child->get_entity()->get_path();
                 auto filename = child_path.get_filename();
                 if (!checked_children.count(filename)) {
@@ -747,7 +744,7 @@ void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_co
         if (hash_file.commit_error(ec, delta)) {
             LOG_WARN(log, "I/O error during processing '{}': {}", task.path, ec);
             auto presence = hash_file.self.get();
-            if (presence && presence->get_features() & F::local) {
+            if (presence && presence->get_device() == local_folder->get_device()) {
                 auto local_fi = local_folder.get();
                 ctx.push_back(new model::diff::modify::mark_reachable_t(*presence, *local_fi, false));
             } else if (hash_file.incomplete) {
@@ -838,7 +835,7 @@ void folder_context_t::handle_scan_error(fs::task::scan_dir_t &task, stack_conte
     auto &ec = task.ec;
     log->warn("cannot scan '{}': {}", task.path, ec);
     auto dir_presence = task.presence.get();
-    if (dir_presence && dir_presence->get_features() & F::local) {
+    if (dir_presence && dir_presence->get_device() == local_folder->get_device()) {
         using queue_t = std::pmr::list<model::presence_t *>;
         auto queue = queue_t(ctx.allocator);
         queue.emplace_back(dir_presence);
@@ -854,9 +851,7 @@ void folder_context_t::handle_scan_error(fs::task::scan_dir_t &task, stack_conte
             ctx.push_back(diff.get());
 
             for (auto &child : presence->get_children()) {
-                if (child->get_features() & F::local) {
-                    queue.emplace_back(child);
-                }
+                queue.emplace_back(child);
             }
         }
     }
