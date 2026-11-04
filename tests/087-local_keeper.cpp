@@ -837,9 +837,6 @@ void test_deleted() {
     F().run();
 }
 
-#if 0
-
-
 void test_changed() {
     struct F : fixture_t {
         void main(const utils::allocator_t &allocator) noexcept override {
@@ -885,7 +882,7 @@ void test_changed() {
                 proto::set_size(pr_file, data_1.size() + data_2.size());
 
                 builder->local_update(folder->get_id(), pr_file).apply(*sup);
-                REQUIRE(files->size() == 1);
+                REQUIRE(test::count_children(*local_folder) == 1);
                 REQUIRE(blocks.size() == 2);
 
                 write_file(file_path, "5432109876");
@@ -897,7 +894,7 @@ void test_changed() {
                 builder->scan_start(folder->get_id()).apply(*sup);
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
 
-                CHECK(files->size() == 1);
+                CHECK(test::count_children(*local_folder) == 1);
                 CHECK(blocks.size() == 1);
                 auto file_2 = local_folder->get_by_path(file_name.get_full_name());
                 CHECK(file_2->is_local());
@@ -943,7 +940,7 @@ void test_changed() {
                 }
 
                 builder->local_update(folder->get_id(), pr_file).apply(*sup);
-                REQUIRE(files->size() == 1);
+                REQUIRE(test::count_children(*local_folder) == 1);
                 REQUIRE(blocks.size() == 1);
 
                 auto file_1 = local_folder->get_by_path(file_name.get_full_name());
@@ -953,7 +950,7 @@ void test_changed() {
                 builder->scan_start(folder->get_id()).apply(*sup);
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
 
-                CHECK(files->size() == 1);
+                CHECK(test::count_children(*local_folder) == 1);
                 auto file_2 = local_folder->get_by_path(file_name.get_full_name());
                 CHECK(file_2->is_local());
                 REQUIRE(file_2->iterate_blocks().get_total() == 1);
@@ -993,7 +990,7 @@ void test_changed() {
                 }
 
                 builder->local_update(folder->get_id(), pr_file).apply(*sup);
-                REQUIRE(files->size() == 1);
+                REQUIRE(test::count_children(*local_folder) == 1);
 
                 auto file_1 = local_folder->get_by_path(file_name.get_full_name());
                 file_1->mark_local(false);
@@ -1002,7 +999,7 @@ void test_changed() {
                 builder->scan_start(folder->get_id()).apply(*sup);
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
 
-                CHECK(files->size() == 1);
+                CHECK(test::count_children(*local_folder) == 1);
                 auto file_2 = local_folder->get_by_path(file_name.get_full_name());
                 CHECK(file_2->is_local());
                 auto seq_2 = file_2->get_sequence();
@@ -1019,7 +1016,7 @@ void test_changed() {
                 auto target_1 = utils::make_native_view("/some/where", allocator);
                 create_symlink(target_1, file_path, ec);
                 builder->scan_start(folder->get_id()).apply(*sup);
-                REQUIRE(files->size() == 1);
+                REQUIRE(test::count_children(*local_folder) == 1);
                 auto file_1 = local_folder->get_by_path(file_path.get_filename());
                 REQUIRE(file_1);
                 auto seq_1 = file_1->get_sequence();
@@ -1074,7 +1071,7 @@ void test_changed() {
                 proto::set_size(pr_file, data_1.size() + data_2.size());
 
                 builder->local_update(folder->get_id(), pr_file).apply(*sup);
-                REQUIRE(files->size() == 1);
+                REQUIRE(test::count_children(*local_folder) == 1);
                 REQUIRE(blocks.size() == 2);
 
                 write_file(file_path, b1 + b2 + b3);
@@ -1086,7 +1083,7 @@ void test_changed() {
                 builder->scan_start(folder->get_id()).apply(*sup);
                 REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
 
-                CHECK(files->size() == 1);
+                CHECK(test::count_children(*local_folder) == 1);
                 CHECK(blocks.size() == 3);
                 auto file_2 = local_folder->get_by_path(file_name.get_full_name());
                 CHECK(file_2->is_local());
@@ -1211,13 +1208,12 @@ void test_resurrection() {
             write_file(root_path / "a/b/c/file.bin", "12345");
 
             builder->scan_start(folder->get_id()).apply(*sup);
-            auto &files = folder_info->get_file_infos();
-            CHECK(files.size() == 4);
+            REQUIRE(test::count_children(*local_folder) == 4);
 
-            auto dir_a = files.by_name("a");
-            auto dir_b = files.by_name("a/b");
-            auto dir_c = files.by_name("a/b/c");
-            auto file = files.by_name("a/b/c/file.bin");
+            auto dir_a = local_folder->get_by_path("a");
+            auto dir_b = local_folder->get_by_path("a/b");
+            auto dir_c = local_folder->get_by_path("a/b/c");
+            auto file = local_folder->get_by_path("a/b/c/file.bin");
 
             REQUIRE(dir_a);
             REQUIRE(dir_b);
@@ -1252,6 +1248,8 @@ void test_resurrection() {
     };
     F().run();
 }
+
+#if 0
 
 void test_partial_scan() {
     struct F : fixture_t {
@@ -2288,9 +2286,9 @@ int _init() {
     REGISTER_TEST_CASE(test_create_dir, "test_create_dir", "[net]");
     REGISTER_TEST_CASE(test_no_changes, "test_no_changes", "[net]");
     REGISTER_TEST_CASE(test_deleted, "test_deleted", "[net]");
-    // REGISTER_TEST_CASE(test_changed, "test_changed", "[net]");
-    // REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");
-    // REGISTER_TEST_CASE(test_resurrection, "test_resurrection", "[net]");
+    REGISTER_TEST_CASE(test_changed, "test_changed", "[net]");
+    REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");
+    REGISTER_TEST_CASE(test_resurrection, "test_resurrection", "[net]");
     // REGISTER_TEST_CASE(test_partial_scan, "test_partial_scan", "[net]");
     // REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
     // REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
