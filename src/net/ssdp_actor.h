@@ -17,6 +17,7 @@ namespace net {
 struct ssdp_actor_config_t : r::actor_config_t {
     config::upnp_config_t upnp_config;
     model::cluster_ptr_t cluster;
+    bool flush_logs = false;
 };
 
 template <typename Actor> struct ssdp_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -28,9 +29,12 @@ template <typename Actor> struct ssdp_actor_config_builder_t : r::actor_config_b
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&upnp_config(const config::upnp_config_t &value) && noexcept {
         parent_t::config.upnp_config = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&flush_logs(bool value) && noexcept {
+        parent_t::config.flush_logs = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -54,6 +58,7 @@ struct SYNCSPIRIT_API ssdp_actor_t : public r::actor_base_t {
     void timer_cancel() noexcept;
     void launch_upnp(const utils::uri_ptr_t &igd_uri) noexcept;
 
+    bool flush_logs = false;
     model::cluster_ptr_t cluster;
     utils::logger_t log;
     asio::io_context::strand &strand;

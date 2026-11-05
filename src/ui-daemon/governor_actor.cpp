@@ -13,13 +13,13 @@ using namespace syncspirit::daemon;
 
 governor_actor_t::governor_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, commands{std::move(cfg.commands)}, sequencer{std::move(cfg.sequencer)},
-      cluster{std::move(cfg.cluster)} {}
+      cluster{std::move(cfg.cluster)}, flush_logs{cfg.flush_logs} {}
 
 void governor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("deamon.governor", false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(net::names::coordinator, coordinator, true).link(false).callback([&](auto phase, auto &ec) {

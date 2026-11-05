@@ -45,8 +45,8 @@ struct file_actor_t::process_context_t : fs_proxy_t {
 };
 
 file_actor_t::file_actor_t(config_t &cfg)
-    : r::actor_base_t{cfg}, concurrent_hashes{cfg.concurrent_hashes}, retension{cfg.change_retension},
-      updates_mediator{cfg.updates_mediator}, scan_dir_callback(cfg.scan_dir_callback),
+    : r::actor_base_t{cfg}, flush_logs{cfg.flush_logs}, concurrent_hashes{cfg.concurrent_hashes},
+      retension{cfg.change_retension}, updates_mediator{cfg.updates_mediator}, scan_dir_callback(cfg.scan_dir_callback),
       watched_folders(cfg.watched_folders) {
     assert(updates_mediator);
     assert(watched_folders);
@@ -60,7 +60,7 @@ void file_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(net::names::fs_actor, false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
     plugin.with_casted<hasher::hasher_plugin_t>([&](auto &p) {
         hasher = &p;

@@ -27,6 +27,7 @@ struct SYNCSPIRIT_API file_actor_config_t : r::actor_config_t {
     updates_mediator_ptr_t updates_mediator;
     watched_folders_ptr_t watched_folders;
     scan_dir_callback_t scan_dir_callback;
+    bool flush_logs = false;
 };
 
 template <typename Actor> struct file_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -52,6 +53,10 @@ template <typename Actor> struct file_actor_config_builder_t : r::actor_config_b
     }
     builder_t &&scan_dir_callback(execution_context_t::scan_dir_callback_t value) && noexcept {
         parent_t::config.scan_dir_callback = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&flush_logs(bool value) && noexcept {
+        parent_t::config.flush_logs = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -110,6 +115,7 @@ struct SYNCSPIRIT_API file_actor_t : public r::actor_base_t {
     outcome::result<file_ptr_t> open_file_ro(const utils::poly_path_view_t &path, const void *context = {}) noexcept;
 
     utils::logger_t log;
+    bool flush_logs = false;
     uint32_t concurrent_hashes;
     r::pt::time_duration retension;
     updates_mediator_ptr_t updates_mediator;

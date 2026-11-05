@@ -28,6 +28,7 @@ struct SYNCSPIRIT_API watcher_config_t : r::actor_config_t {
     updates_mediator_ptr_t updates_mediator;
     watched_folders_ptr_t watched_folders;
     config::fs_config_t fs_config;
+    bool flush_logs = false;
 };
 
 template <typename Actor> struct watcher_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -49,6 +50,10 @@ template <typename Actor> struct watcher_config_builder_t : r::actor_config_buil
     }
     builder_t &&fs_config(const config::fs_config_t &value) && noexcept {
         parent_t::config.fs_config = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&flush_logs(bool value) && noexcept {
+        parent_t::config.flush_logs = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -100,6 +105,7 @@ struct SYNCSPIRIT_API watcher_base_t : r::actor_base_t {
               std::string prev_path, update_type_t type, bool requires_refinement) noexcept;
 
     utils::logger_t log;
+    bool flush_logs = false;
     interval_t retension;
     updates_mediator_ptr_t updates_mediator;
     r::address_ptr_t coordinator;

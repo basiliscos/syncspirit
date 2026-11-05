@@ -99,7 +99,7 @@ folder_context_ptr_t make_context(model::folder_info_ptr_t local_folder, unexami
 folder_context_t::folder_context_t(model::folder_info_ptr_t local_folder_, local_keeper::stack_t stack_,
                                    const utils::path_base_t &initial_path) noexcept
     : local_folder{local_folder_}, stack(std::move(stack_)) {
-    log = utils::get_logger(fmt::format("net.f/{}", local_folder->get_folder()->get_id()));
+    log = utils::make_logger(fmt::format("net.f/{}", local_folder->get_folder()->get_id()));
     auto folder = local_folder->get_folder();
     ignore_permissions = folder->are_permissions_ignored() || !utils::platform_t::permissions_supported(initial_path);
 }

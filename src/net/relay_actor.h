@@ -20,6 +20,7 @@ namespace syncspirit::net {
 struct relay_actor_config_t : r::actor_config_t {
     model::cluster_ptr_t cluster;
     config::relay_config_t config;
+    bool flush_logs = false;
 };
 
 template <typename Actor> struct relay_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -31,9 +32,12 @@ template <typename Actor> struct relay_actor_config_builder_t : r::actor_config_
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&relay_config(const config::relay_config_t &value) && noexcept {
         parent_t::config.config = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&flush_logs(bool value) && noexcept {
+        parent_t::config.flush_logs = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -86,6 +90,7 @@ struct SYNCSPIRIT_API relay_actor_t : public r::actor_base_t {
 
     model::cluster_ptr_t cluster;
     config::relay_config_t config;
+    bool flush_logs = false;
     utils::logger_t log;
 
     r::address_ptr_t http_client;

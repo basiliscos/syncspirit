@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "managed_hasher.h"
 #include "utils/tls.h"
@@ -13,7 +13,7 @@ void managed_hasher_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(fmt::format("hasher-{}", index), false);
-        log = utils::get_logger(fmt::format("managed-hasher-{}", index));
+        log = utils::get_logger(fmt::format("managed-hasher-{}", index), true);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(identity, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {

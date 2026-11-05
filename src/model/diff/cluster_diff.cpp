@@ -41,7 +41,7 @@ cluster_diff_t::~cluster_diff_t() {
     }
 }
 
-auto cluster_diff_t::get_log() noexcept -> utils::logger_t { return utils::get_logger("model.diff"); }
+auto cluster_diff_t::get_log() noexcept -> utils::logger_t { return utils::make_logger("model.diff"); }
 
 cluster_diff_t *cluster_diff_t::assign_sibling(cluster_diff_t *sibling_) noexcept {
     assert(!sibling);

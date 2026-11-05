@@ -21,6 +21,7 @@ struct http_actor_config_t : public r::actor_config_t {
     std::string registry_name;
     std::string ssl_verify_store;
     bool keep_alive;
+    bool flush_logs = false;
 };
 
 template <typename Actor> struct http_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -32,7 +33,6 @@ template <typename Actor> struct http_actor_config_builder_t : r::actor_config_b
         parent_t::config.resolve_timeout = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&request_timeout(const pt::time_duration &value) && noexcept {
         parent_t::config.request_timeout = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
@@ -42,14 +42,16 @@ template <typename Actor> struct http_actor_config_builder_t : r::actor_config_b
         parent_t::config.registry_name = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&ssl_verify_store(std::string_view value) && noexcept {
         parent_t::config.ssl_verify_store = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&keep_alive(bool value = true) && noexcept {
         parent_t::config.keep_alive = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&flush_logs(bool value) && noexcept {
+        parent_t::config.flush_logs = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -105,6 +107,7 @@ struct SYNCSPIRIT_API http_actor_t : public r::actor_base_t {
     std::string ssl_verify_store;
     bool keep_alive = false;
     bool kept_alive = false;
+    bool flush_logs = false;
     r::address_ptr_t resolver;
     queue_t queue;
     bool need_response = false;

@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2026 Ivan Baidakou
 
 #include "updates_mediator.h"
-#include "fs/utils.h"
 
 #include <algorithm>
 #include <memory_resource>
@@ -14,7 +13,7 @@ static constexpr size_t MAX_LOG_ITEMS = 5;
 
 updates_mediator_t::updates_mediator_t(const pt::time_duration &interval_, bool enabled_)
     : interval{interval_}, enabled{enabled_} {
-    log = utils::get_logger("fs.updates_mediator");
+    log = utils::make_logger("fs.updates_mediator");
 }
 
 void updates_mediator_t::mask(const utils::path_base_t &path, const utils::path_base_t &prev_path,

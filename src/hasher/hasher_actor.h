@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -14,6 +14,7 @@ namespace hasher {
 
 struct hasher_actor_config_t : r::actor_config_t {
     uint32_t index;
+    bool flush_logs = false;
 };
 
 template <typename Actor> struct hasher_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -23,6 +24,10 @@ template <typename Actor> struct hasher_actor_config_builder_t : r::actor_config
 
     builder_t &&index(uint32_t value) && noexcept {
         parent_t::config.index = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&flush_logs(bool value) && noexcept {
+        parent_t::config.flush_logs = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -42,6 +47,7 @@ struct SYNCSPIRIT_API hasher_actor_t : public r::actor_base_t {
 
     utils::logger_t log;
     uint32_t index;
+    bool flush_logs = false;
 };
 
 } // namespace hasher

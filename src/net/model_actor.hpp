@@ -19,6 +19,7 @@ template <typename Parent> struct model_actor_t : public Parent {
         using parent_t = Parent::config_t;
         using parent_t::parent_t;
         model::cluster_ptr_t cluster;
+        bool flush_logs = false;
     };
 
     template <typename Actor> struct config_builder_t : Parent::template config_builder_t<Actor> {
@@ -30,6 +31,10 @@ template <typename Parent> struct model_actor_t : public Parent {
             parent_t::config.cluster = value;
             return std::move(*static_cast<typename parent_t::builder_t *>(this));
         }
+        builder_t &&flush_logs(bool value) && noexcept {
+            parent_t::config.flush_logs = value;
+            return std::move(*static_cast<typename parent_t::builder_t *>(this));
+        }
     };
 
     static inline void model_visit_callback(const model::diff::cluster_diff_t &diff,
@@ -37,7 +42,7 @@ template <typename Parent> struct model_actor_t : public Parent {
         reinterpret_cast<model_actor_t *>(custom)->visit(diff, ctx);
     }
 
-    model_actor_t(config_t &cfg) : parent_t(cfg), cluster{cfg.cluster} {}
+    model_actor_t(config_t &cfg) : parent_t(cfg), cluster{cfg.cluster}, flush_logs{cfg.flush_logs} {}
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override {
         parent_t::configure(plugin);
@@ -74,6 +79,7 @@ template <typename Parent> struct model_actor_t : public Parent {
     utils::logger_t log;
     r::address_ptr_t coordinator;
     model::cluster_ptr_t cluster;
+    bool flush_logs = false;
 };
 
 } // namespace syncspirit::net

@@ -109,7 +109,7 @@ struct fixture_t {
 
     fixture_t(bool auto_start_, int64_t max_sequence_, bool auto_share_ = true) noexcept
         : auto_start{auto_start_}, auto_share{auto_share_}, max_sequence{max_sequence_} {
-        log = utils::get_logger("fixture");
+        log = utils::get_logger("fixture", true);
     }
 
     void _start_target(std::string_view url) {

@@ -62,7 +62,7 @@ struct sample_supervisor_t : sample_supervisor_base_t<sample_supervisor_t> {
     using parent_t::cluster;
 
     sample_supervisor_t(config_t &cfg) : parent_t(this, resource::interrupt, cfg) {
-        log = utils::get_logger("sample-sup");
+        log = utils::get_logger("sample-sup", true);
     }
 
     void configure(r::plugin::plugin_base_t &plugin) noexcept override {

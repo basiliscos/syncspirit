@@ -284,7 +284,7 @@ controller_actor_t::controller_actor_t(config_t &config)
       rx_blocks_requested{0}, tx_blocks_requested{0}, outgoing_buffer_max{config.outgoing_buffer_max},
       request_pool{config.request_pool}, hasher_threads{config.hasher_threads},
       advances_per_iteration{config.advances_per_iteration}, default_path(std::move(config.default_path)),
-      announced{false} {
+      announced{false}, flush_logs{config.flush_logs} {
     {
         assert(cluster);
         assert(sequencer);
@@ -304,7 +304,7 @@ void controller_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         std::string id = "net.controller/";
         id += peer->device_id().get_short();
         p.set_identity(id, false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
     plugin.with_casted<hasher::hasher_plugin_t>([&](auto &p) {
         hasher = &p;

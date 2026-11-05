@@ -38,7 +38,7 @@ r::plugin::resource_id_t finalization = 4;
 peer_actor_t::peer_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, device_name{config.device_name}, bep_config{config.bep_config},
       coordinator{config.coordinator}, peer_device_id{config.peer_device_id}, peer_state{std::move(config.peer_state)},
-      transport(std::move(config.transport)), url(config.uri), rx_bytes{0}, tx_bytes{0} {
+      transport(std::move(config.transport)), url(config.uri), flush_logs{config.flush_logs}, rx_bytes{0}, tx_bytes{0} {
     rx_buff.resize(config.bep_config.rx_buff_size);
     assert(bep_config.ping_timeout);
     assert(bep_config.stats_interval);
@@ -51,7 +51,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         auto id = fmt::format("{}/{}", peer_device_id.get_short(), url);
         p.set_identity(id, false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {

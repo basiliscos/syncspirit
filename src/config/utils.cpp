@@ -154,6 +154,7 @@ static main_t make_default_config(const utils::poly_path_view_t &config_path, co
     cfg.key_file = utils::path_t::make_native(key_file);
     cfg.timeout = 30000;
     cfg.start_offline = false;
+    cfg.flush_logs = false;
     cfg.device_name = device;
     cfg.hasher_threads = 3;
     cfg.poll_timeout = 0;
@@ -272,6 +273,7 @@ config_result_t get_config(std::string_view config, const utils::poly_path_view_
         SAFE_GET_VALUE(hasher_threads, std::uint32_t, "main");
         SAFE_GET_VALUE(poll_timeout, std::uint32_t, "main");
         SAFE_GET_VALUE(start_offline, bool, "main");
+        SAFE_GET_VALUE(flush_logs, bool, "main");
         SAFE_GET_VALUE_OPTIONAL(ssl_verify_store, std::string, "main");
         SAFE_GET_PATH_EXPANDED(cert_file, "main");
         SAFE_GET_PATH_EXPANDED(key_file, "main");
@@ -480,6 +482,7 @@ std::string serialize(const main_t& cfg) noexcept {
                      {"key_file", std::string(key_file)},
                      {"timeout", cfg.timeout},
                      {"start_offline", cfg.start_offline},
+                     {"flush_logs", cfg.flush_logs},
                      {"dns_servers", std::move(dns_servers)},
                      {"device_name", cfg.device_name},
                      {"default_location", std::string(cfg.default_location.get_full_name())},

@@ -66,7 +66,7 @@ struct fixture_t {
     using change_messages_t = std::deque<change_message_ptr_t>;
 
     fixture_t(bool auto_launch_ = true) noexcept : auto_launch{auto_launch_}, path_guard{unique_path()} {
-        log = utils::get_logger("fixture");
+        log = utils::get_logger("fixture", true);
     }
 
     void run() noexcept {

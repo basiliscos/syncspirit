@@ -29,7 +29,7 @@ void global_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexc
         addr_announce = p.create_address();
         addr_discovery = p.create_address();
         p.set_identity("net.global_discovery", false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
 
         auto announce_params = announce_url->encoded_params();
         auto announce_id = announce_params.find("id");

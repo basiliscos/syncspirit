@@ -23,7 +23,7 @@ r::plugin::resource_id_t timer = 2;
 } // namespace
 
 ssdp_actor_t::ssdp_actor_t(ssdp_actor_config_t &cfg)
-    : r::actor_base_t::actor_base_t(cfg), cluster{cfg.cluster},
+    : r::actor_base_t::actor_base_t(cfg), flush_logs{cfg.flush_logs}, cluster{cfg.cluster},
       strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, upnp_config{cfg.upnp_config},
       upnp_endpoint(v4::from_string(upnp_addr), upnp_port) {
     rx_buff.resize(RX_BUFF_SIZE);
@@ -33,7 +33,7 @@ void ssdp_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("net.ssdp", false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>(
         [&](auto &p) { p.discover_name(names::coordinator, coordinator, true).link(false); });

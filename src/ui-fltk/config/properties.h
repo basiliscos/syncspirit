@@ -54,7 +54,7 @@ struct path_t : property_t {
 };
 
 struct bool_t : property_t {
-    bool_t(bool value, bool default_value, std::string label = "enabled");
+    bool_t(bool value, bool default_value, std::string label = "enabled", std::string explanation = {});
     error_ptr_t validate_value() noexcept override;
 
     std::uint64_t native_value;
@@ -419,6 +419,15 @@ struct start_offline_t final : impl::bool_t {
     static const char *explanation_;
 
     start_offline_t(bool value, bool default_value);
+    void reflect_to(syncspirit::config::main_t &main) override;
+};
+
+struct flush_logs_t final : impl::bool_t {
+    using parent_t = impl::bool_t;
+
+    static const char *explanation_;
+
+    flush_logs_t(bool value, bool default_value);
     void reflect_to(syncspirit::config::main_t &main) override;
 };
 

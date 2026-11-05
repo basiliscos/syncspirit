@@ -15,7 +15,7 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
     parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("net.cluster", false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, config.flush_logs);
     });
 }
 
@@ -54,6 +54,7 @@ auto cluster_supervisor_t::operator()(const model::diff::contact::peer_state_t &
                 .request_pool(bep.rx_buff_size)
                 .hasher_threads(config.hasher_threads)
                 .default_path(config.default_location)
+                .flush_logs(config.flush_logs)
                 .finish();
         }
     }

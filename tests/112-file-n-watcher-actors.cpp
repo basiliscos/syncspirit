@@ -55,7 +55,7 @@ struct fixture_t {
     using change_message_ptr_t = r::intrusive_ptr_t<fs::message::folder_changes_t>;
     using change_messages_t = std::deque<change_message_ptr_t>;
 
-    fixture_t() noexcept : path_guard{unique_path()} { log = utils::get_logger("fixture"); }
+    fixture_t() noexcept : path_guard{unique_path()} { log = utils::get_logger("fixture", true); }
 
     virtual void create_updates_mediator() { updates_mediator = new fs::updates_mediator_t(retension_timeout * 2); }
 
