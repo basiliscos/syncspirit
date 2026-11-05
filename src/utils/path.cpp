@@ -116,7 +116,7 @@ bool path_base_t::contains(const path_base_t &other) const noexcept {
                         return false;
                     }
                 }
-                return true;
+                return (sz_1 == sz_2) || ((*(ptr_2 - 1) == '/' || *ptr_2 == '/'));
             }
         } else {
             return true;
