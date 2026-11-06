@@ -212,8 +212,11 @@ void net_supervisor_t::on_local_up(model::message::local_up_t &message) noexcept
     if (p.name == names::fs_actor) {
         fs_addr = p.address;
     }
-    LOG_DEBUG(log, "on_local_up, left = {}", local_counter);
+    LOG_DEBUG(log, "on_local_up ({}), left = {}", p.name, local_counter);
     if (local_counter == 0) {
+        if (!app_config.start_offline) {
+            spawn_services();
+        }
         send<model::payload::local_ready_t>(coordinator);
     }
 }
@@ -239,13 +242,10 @@ void net_supervisor_t::on_thread_ready(model::message::thread_ready_t &) noexcep
 void net_supervisor_t::on_ready(message::ready_t &) noexcept {
     LOG_DEBUG(log, "on_ready, counter = {}", local_counter);
     send<model::payload::local_up_t>(coordinator);
-    if (!app_config.start_offline) {
-        spawn_services();
-    }
 }
 
 void net_supervisor_t::spawn_services() noexcept {
-    LOG_TRACE(log, "spawnign services");
+    LOG_TRACE(log, "spawnign services, fs = {}", (void *)fs_addr.get());
     assert(!services_addr);
     auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
         auto timeout = shutdown_timeout * 9 / 10;
