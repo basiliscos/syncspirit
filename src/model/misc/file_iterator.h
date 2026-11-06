@@ -40,6 +40,7 @@ struct SYNCSPIRIT_API file_iterator_t : arc_base_t<file_iterator_t> {
     struct file_comparator_t {
         bool operator()(const file_info_t *l, const file_info_t *r) const;
         db::PullOrder pull_order;
+        const metadata_comparator_t &comparator;
     };
     using file_comparator_ptr_t = std::unique_ptr<file_comparator_t>;
     using queue_t = std::set<file_info_t *, file_comparator_t>;

@@ -481,11 +481,12 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
         if (file) {
             if (proto::get_deleted(change)) {
                 // migrate relevant metadata
+                auto &mtime = file->get_modification();
                 proto::set_type(change, model::file_info_t::as_type(file->get_type()));
-                proto::set_modified_s(change, file->get_modified_s());
-                proto::set_modified_ns(change, file->get_modified_ns());
+                proto::set_modified_s(change, mtime.seconds);
+                proto::set_modified_ns(change, mtime.ns);
             } else {
-                update = !file->identical_by_content_to(change);
+                update = !file->identical_by_content_to(change, local_folder.get_metadata_comparator());
             }
         } else {
             update = true;

@@ -512,7 +512,7 @@ void test_trivial_changes() {
 #ifndef SYNCSPIRIT_WIN
                 CHECK(f->get_permissions() == expected_perms);
 #endif
-                CHECK(f->get_modified_s() == 12345);
+                CHECK(f->get_modification().seconds == 12345);
                 CHECK(f->get_size() == 0);
                 if (file_type == FT::DIRECTORY) {
                     CHECK(f->is_dir());
@@ -760,7 +760,7 @@ void test_hashing() {
             auto f = files_local->by_name(file_name);
             REQUIRE(f);
             CHECK(f->get_permissions() == expected_perms);
-            CHECK(f->get_modified_s() == 12345);
+            CHECK(f->get_modification().seconds == 12345);
             CHECK(f->get_size() == 5);
             CHECK(f->is_file());
         }
@@ -2039,14 +2039,14 @@ void test_renaming_simple() {
                 auto f2 = files_local->by_name(file_name_2);
                 REQUIRE(f2);
                 CHECK(f2->get_permissions() == default_perms);
-                CHECK(f2->get_modified_s() == 12345);
+                CHECK(f2->get_modification().seconds == 12345);
                 CHECK(!f2->is_deleted());
                 CHECK(model::file_info_t::as_type(f2->get_type()) == file_type);
 
                 auto f1 = files_local->by_name(file_name_1);
                 REQUIRE(f1);
                 CHECK(f1->get_permissions() == default_perms);
-                CHECK(f1->get_modified_s() == 12345);
+                CHECK(f1->get_modification().seconds == 12345);
                 CHECK(f1->is_deleted());
             }
 
@@ -2076,7 +2076,7 @@ void test_renaming_simple() {
                 auto f2 = files_local->by_name(file_name_2);
                 REQUIRE(f2);
                 CHECK(f2->get_permissions() == default_perms);
-                CHECK(f2->get_modified_s() == 12345);
+                CHECK(f2->get_modification().seconds == 12345);
                 CHECK(!f2->is_deleted());
                 CHECK(model::file_info_t::as_type(f2->get_type()) == FT::FILE);
                 CHECK(f2->get_block_size() == 5);
@@ -2086,7 +2086,7 @@ void test_renaming_simple() {
                 auto f1 = files_local->by_name(file_name_1);
                 REQUIRE(f1);
                 CHECK(f1->get_permissions() == default_perms);
-                CHECK(f1->get_modified_s() == 12345);
+                CHECK(f1->get_modification().seconds == 12345);
                 CHECK(f1->is_deleted());
                 CHECK(blocks.size() == 1);
             }
@@ -2690,7 +2690,7 @@ void test_renaming_to_ignored() {
             auto f = files_local->by_name("valuable.bin");
             REQUIRE(f);
             CHECK(f->get_permissions() == default_perms);
-            CHECK(f->get_modified_s() == 12345);
+            CHECK(f->get_modification().seconds == 12345);
             CHECK(f->is_deleted());
             CHECK(cluster->get_blocks().size() == 0);
         }

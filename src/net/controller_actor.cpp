@@ -570,7 +570,8 @@ OUTER:
                          peer_folder->get_folder()->get_label());
                 continue;
             }
-            auto ld = compare_with_local(*file, local_file);
+            auto local_folder = peer_folder->get_folder()->get_folder_infos().by_device(*cluster->get_device());
+            auto ld = compare_with_local(*file, local_file, *local_folder);
             if (ld == local_difference_t::content) {
                 auto bi = model::block_iterator_ptr_t();
                 bi = new model::blocks_iterator_t(*file, *peer_folder);
@@ -623,7 +624,7 @@ void controller_actor_t::io_advance(model::advance_action_t action, model::file_
     auto path = peer_file.get_path(peer_folder, allocator);
     auto type = model::file_info_t::as_type(peer_file.get_type());
     auto size = peer_file.get_size();
-    auto modified = peer_file.get_modified_s();
+    auto modified = peer_file.get_modification().seconds;
     auto target = std::string(peer_file.get_link_target());
     auto deleted = peer_file.is_deleted();
     auto perms = peer_file.get_permissions();
@@ -707,7 +708,7 @@ void controller_actor_t::io_finish_file(model::file_info_t *local_file, model::f
     auto path = peer_file.get_path(peer_folder, allocator);
     auto conflict_path = utils::make_empty_view(allocator);
     auto file_size = peer_file.get_size();
-    auto modified_s = peer_file.get_modified_s();
+    auto modified_s = peer_file.get_modification().seconds;
     if (action == model::advance_action_t::resolve_remote_win) {
         assert(local_file);
         conflict_path = peer_folder.get_folder()->get_path() / local_file->make_conflicting_name(allocator);
@@ -733,8 +734,9 @@ void controller_actor_t::io_update_meta(model::file_info_t &peer_file, model::fo
     auto folder_id = std::string(peer_folder.get_folder()->get_id());
     bool no_permissions = !utils::platform_t::permissions_supported(path) ||
                           peer_folder.get_folder()->are_permissions_ignored() || peer_file.has_no_permissions();
-    auto payload = fs::payload::update_meta_t(std::move(context), std::move(folder_id), path.detach(),
-                                              peer_file.get_modified_s(), peer_file.get_permissions(), no_permissions);
+    auto payload =
+        fs::payload::update_meta_t(std::move(context), std::move(folder_id), path.detach(),
+                                   peer_file.get_modification().seconds, peer_file.get_permissions(), no_permissions);
     ctx.push(std::move(payload));
 }
 
@@ -1487,11 +1489,14 @@ bool controller_actor_t::is_unflushed(model::file_info_t *peer_file, model::fold
     return false;
 }
 
-auto controller_actor_t::compare_with_local(model::file_info_t &peer_file, model::file_info_t *local_file) noexcept
-    -> local_difference_t {
+auto controller_actor_t::compare_with_local(model::file_info_t &peer_file, model::file_info_t *local_file,
+                                            const model::folder_info_t &local_folder) noexcept -> local_difference_t {
     using LD = local_difference_t;
-    auto compare_meta = [](model::file_info_t &peer_file, model::file_info_t &local_file) -> local_difference_t {
-        if (local_file.get_modified_s() != peer_file.get_modified_s()) {
+    auto compare_meta = [&](model::file_info_t &peer_file, model::file_info_t &local_file) -> local_difference_t {
+        auto &local_ts = local_file.get_modification();
+        auto &peer_ts = local_file.get_modification();
+        auto ordering = local_folder.get_metadata_comparator().compare(local_ts, peer_ts);
+        if (ordering != model::metadata_comparator_t::ordening_t::equivalent) {
             return LD::meta;
         }
         auto perms_differ = (!local_file.has_no_permissions() && !peer_file.has_no_permissions() &&

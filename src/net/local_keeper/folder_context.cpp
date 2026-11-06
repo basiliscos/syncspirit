@@ -269,8 +269,9 @@ int folder_context_t::process(child_ready_t &info, stack_context_t &ctx) noexcep
     } else {
         bool match = false;
         auto type = info.file_type;
-        auto modification_match =
-            (type == FT::SYMLINK) || (type == FT::DIRECTORY) || (info.last_write_time == file->get_modified_s());
+        auto &comparator = local_folder->get_metadata_comparator();
+        auto modification_match = (type == FT::SYMLINK) || (type == FT::DIRECTORY) ||
+                                  comparator.equal(file->get_modification(), info.last_write_time);
         if (modification_match) {
             if (type == model::file_info_t::as_type(file->get_type())) {
                 auto ignore_perms = ignore_permissions || file->has_no_permissions();
@@ -486,7 +487,7 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
         }
         if (matched == blocks.size()) {
             LOG_DEBUG(log, "scheduling finalization of '{}", item.path);
-            auto modified_s = peer_file.get_modified_s();
+            auto modified_s = peer_file.get_modification().seconds;
             auto name = [&]() -> utils::poly_path_view_t {
                 if (item.action == model::advance_action_t::remote_copy) {
                     return peer_file.get_name()->get_view(ctx.allocator);

@@ -2202,7 +2202,7 @@ void test_conflicts() {
                 CHECK(file_finish.path == file->get_path(*local_folder, allocator));
                 CHECK(file_finish.conflict_path == local_conflict->get_path(*local_folder, allocator));
                 CHECK(file_finish.file_size == 5);
-                CHECK(file_finish.modification_s == file->get_modified_s());
+                CHECK(file_finish.modification_s == file->get_modification().seconds);
             }
             SECTION("remote win (empty, new file type: directory)") {
                 proto::set_modified_s(file, 1734690000);

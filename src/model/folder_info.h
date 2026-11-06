@@ -73,6 +73,11 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t {
     bool is_introduced_by(const model::device_id_t &device) const noexcept;
     utils::bytes_view_t get_introducer_device_key() const noexcept;
 
+    inline const metadata_comparator_t &get_metadata_comparator() const noexcept { return metadata_comparator; }
+    inline void set_metadata_comparator(metadata_comparator_t &&value) noexcept {
+        metadata_comparator = std::move(value);
+    }
+
   private:
     folder_info_t(utils::bytes_view_t key, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
     folder_info_t(const bu::uuid &uuid, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept;
@@ -88,6 +93,7 @@ struct SYNCSPIRIT_API folder_info_t final : augmentable_t {
     device_t *device;
     folder_t *folder;
     file_infos_map_t file_infos;
+    metadata_comparator_t metadata_comparator;
 };
 
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;

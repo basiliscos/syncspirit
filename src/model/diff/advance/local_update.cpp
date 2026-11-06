@@ -25,15 +25,15 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     auto self_id = self.device_id().get_sha256();
 
     auto &folder_infos = folder->get_folder_infos();
-    auto local_folder_info = folder_infos.by_device_id(self_id);
-    auto &local_files = local_folder_info->get_file_infos();
+    auto local_folder = folder_infos.by_device_id(self_id);
+    auto &local_files = local_folder->get_file_infos();
     auto proto_name = proto::get_name(proto_file_);
     assert(proto_name.size());
 
     auto name = std::pmr::string(proto_name, allocator);
     auto local_file = local_files.by_name(name);
 
-    if (auto original_file = get_original(folder_infos, device, proto_file_); original_file) {
+    if (auto original_file = get_original(folder_infos, *local_folder, proto_file_); original_file) {
         initialize(cluster, sequencer, original_file->as_proto(true), name);
     } else {
         proto::set_modified_by(proto_file_, self.device_id().get_uint());
@@ -53,7 +53,7 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     }
 }
 
-auto local_update_t::get_original(const model::folder_infos_map_t &fis, const model::device_t &self,
+auto local_update_t::get_original(const model::folder_infos_map_t &fis, const model::folder_info_t &local_folder,
                                   const proto::FileInfo &local_file) const noexcept -> model::file_info_ptr_t {
     auto r = model::file_info_ptr_t();
     auto name = proto::get_name(local_file);
@@ -67,7 +67,7 @@ auto local_update_t::get_original(const model::folder_infos_map_t &fis, const mo
     for (auto &it_fi : fis) {
         auto fi = it_fi.item.get();
         auto peer_file = model::file_info_ptr_t();
-        if (fi->get_device() != &self) {
+        if (fi->get_device() != local_folder.get_device()) {
             auto &peer_files = fi->get_file_infos();
             auto candidate = peer_files.by_name(name);
             if (candidate) {
@@ -106,7 +106,7 @@ auto local_update_t::get_original(const model::folder_infos_map_t &fis, const mo
             if (!r) {
                 r = std::move(peer_file);
             } else {
-                if (model::compare(*peer_file, *r) > 1) {
+                if (model::compare(*peer_file, *r, local_folder.get_metadata_comparator()) > 1) {
                     r = std::move(peer_file);
                 }
             }

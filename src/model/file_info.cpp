@@ -214,8 +214,7 @@ auto file_info_t::fields_update(const db::FileInfo &source, utils::path_cache_t 
     name = path_cache.get_path(db::get_name(source));
     sequence = db::get_sequence(source);
     permissions = db::get_permissions(source);
-    modified_s = db::get_modified_s(source);
-    modified_ns = db::get_modified_ns(source);
+    modification = {db::get_modified_s(source), db::get_modified_ns(source)};
     modified_by = db::get_modified_by(source);
     if (db::get_deleted(source)) {
         flags |= flags_t::f_deleted;
@@ -253,8 +252,7 @@ auto file_info_t::fields_update(const proto::FileInfo &source, utils::path_cache
     sequence = proto::get_sequence(source);
     flags = (flags & ~0b111111) | as_flags(proto::get_type(source));
     permissions = proto::get_permissions(source);
-    modified_s = proto::get_modified_s(source);
-    modified_ns = proto::get_modified_ns(source);
+    modification = {proto::get_modified_s(source), proto::get_modified_ns(source)};
     modified_by = proto::get_modified_by(source);
     if (proto::get_deleted(source)) {
         flags |= flags_t::f_deleted;
@@ -297,8 +295,8 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
     db::set_sequence(r, sequence);
     db::set_type(r, as_type(flags));
     db::set_permissions(r, permissions);
-    db::set_modified_s(r, modified_s);
-    db::set_modified_ns(r, modified_ns);
+    db::set_modified_s(r, modification.seconds);
+    db::set_modified_ns(r, modification.ns);
     db::set_modified_by(r, modified_by);
     db::set_deleted(r, flags & f_deleted);
     db::set_invalid(r, flags & f_invalid);
@@ -332,8 +330,8 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
     proto::set_sequence(r, sequence);
     proto::set_type(r, as_type(flags));
     proto::set_permissions(r, permissions);
-    proto::set_modified_s(r, modified_s);
-    proto::set_modified_ns(r, modified_ns);
+    proto::set_modified_s(r, modification.seconds);
+    proto::set_modified_ns(r, modification.ns);
     proto::set_modified_by(r, modified_by);
     proto::set_deleted(r, flags & f_deleted);
     proto::set_invalid(r, flags & f_invalid);
@@ -552,8 +550,7 @@ void file_info_t::update(const file_info_t &other) noexcept {
     assert((this->get_uuid() == other.get_uuid()) || version.identical_to(other.version));
 
     permissions = other.permissions;
-    modified_s = other.modified_s;
-    modified_ns = other.modified_ns;
+    modification = other.modification;
     modified_by = other.modified_by;
     version = other.version;
     sequence = other.sequence;
@@ -623,7 +620,7 @@ utils::poly_path_view_t file_info_t::make_conflicting_name(const utils::allocato
     auto file_name = name->get_filename();
     auto ext = name->get_extension();
     auto stem = file_name.substr(0, file_name.size() - ext.size());
-    auto utc = pt::from_time_t(modified_s);
+    auto utc = pt::from_time_t(modification.seconds);
     auto local = adjustor_t::utc_to_local(utc);
     auto ymd = local.date().year_month_day();
     auto time = local.time_of_day();
@@ -664,16 +661,18 @@ bool file_info_t::identical_to(const proto::FileInfo &file) const noexcept {
     return false;
 }
 
-bool file_info_t::identical_by_content_to(const proto::FileInfo &file) const noexcept {
+bool file_info_t::identical_by_content_to(const proto::FileInfo &file,
+                                          const metadata_comparator_t &comparator) const noexcept {
     assert(proto::get_name(file) == name->get_full_name());
     auto sz = proto::get_size(file);
     auto file_size = get_size();
     if (sz != file_size) {
         return false;
     }
-    auto main_meta_eq = proto::get_type(file) == as_type(flags) && proto::get_modified_s(file) == get_modified_s() &&
-                        proto::get_modified_ns(file) == get_modified_ns() && proto::get_deleted(file) == is_deleted() &&
-                        proto::get_invalid(file) == is_invalid();
+
+    auto ts = utils::timestamp_t{proto::get_modified_s(file), proto::get_modified_ns(file)};
+    auto main_meta_eq = proto::get_type(file) == as_type(flags) && comparator.equal(modification, ts) &&
+                        proto::get_deleted(file) == is_deleted() && proto::get_invalid(file) == is_invalid();
 
     if (!main_meta_eq) {
         return false;
