@@ -97,6 +97,7 @@ after the core completion.
 # changes
 
 ## 0.4.8 (xx-xxx-202x)
+ - [core, fs, bugfix] do not report errors upon successful metadata update
  - [core, bugfix] fix app crash caused by race condition
  - [core, bugfix] path `contains()` method now works correctly
 
