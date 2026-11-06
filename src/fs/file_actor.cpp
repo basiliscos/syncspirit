@@ -448,8 +448,10 @@ void file_actor_t::process(payload::update_meta_t &cmd, process_context_t &conte
 
     if (r) {
         LOG_ERROR(log, "cannot update metadata of '{}': {}", path, r);
+        cmd.result = r;
+    } else {
+        cmd.result = outcome::success();
     }
-    cmd.result = r;
 }
 
 auto file_actor_t::open_file_rw(const utils::poly_path_view_t &path, std::uint64_t file_size,

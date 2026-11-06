@@ -44,18 +44,17 @@ struct chain_builder_t {
             auto reply = std::get_if<Reply>(&commands.front());
             REQUIRE(reply);
             auto &result = reply->result;
-            if (result) {
-                response = sys::error_code{};
-            } else {
+            if (!result) {
                 response = result.assume_error();
             }
+            ++received;
             message.reset();
         }
     }
 
     fixture_t &check_success() noexcept {
-        REQUIRE(response);
-        CHECK(!*response);
+        CHECK(received);
+        CHECK(!response);
         return *fixture;
     }
 
@@ -70,6 +69,7 @@ struct chain_builder_t {
         return *fixture;
     }
 
+    std::uint_fast32_t received{0};
     std::optional<sys::error_code> response;
     io_commands_t_ptr_t message;
     fixture_t *fixture;
