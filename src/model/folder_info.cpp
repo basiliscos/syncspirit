@@ -64,14 +64,14 @@ outcome::result<folder_info_ptr_t> folder_info_t::create(const bu::uuid &uuid, c
 
 folder_info_t::folder_info_t(utils::bytes_view_t key_, const device_ptr_t &device_,
                              const folder_ptr_t &folder_) noexcept
-    : device{device_.get()}, folder{folder_.get()}, metadata_comparator{0, true} {
+    : device{device_.get()}, folder{folder_.get()}, metadata_comparator{0, true, true} {
     assert(key_.subspan(1, device_id_t::digest_length) == device->get_key().subspan(1));
     assert(key_.subspan(device_id_t::digest_length + 1, uuid_length) == folder->get_key().subspan(1));
     std::copy(key_.begin(), key_.end(), key);
 }
 
 folder_info_t::folder_info_t(const bu::uuid &uuid, const device_ptr_t &device_, const folder_ptr_t &folder_) noexcept
-    : device{device_.get()}, folder{folder_.get()}, metadata_comparator{0, true} {
+    : device{device_.get()}, folder{folder_.get()}, metadata_comparator{0, true, true} {
     auto device_key = device->get_key().subspan(1);
     auto folder_key = folder->get_key().subspan(1);
     key[0] = prefix;

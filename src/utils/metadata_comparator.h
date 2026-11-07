@@ -13,7 +13,8 @@ namespace syncspirit::utils {
 struct SYNCSPIRIT_API metadata_comparator_t {
     using ordening_t = std::strong_ordering;
 
-    metadata_comparator_t(std::int32_t timestamp_precision_s, bool permissions_supported) noexcept;
+    metadata_comparator_t(std::int32_t timestamp_precision_s, bool permissions_supported,
+                          bool symlinks_supported) noexcept;
     metadata_comparator_t(metadata_comparator_t &&) = default;
     metadata_comparator_t(const metadata_comparator_t &) = delete;
 
@@ -28,6 +29,7 @@ struct SYNCSPIRIT_API metadata_comparator_t {
 
     std::int32_t timestamp_precision_s = 0;
     bool permissions_supported = true;
+    bool symlinks_supported = true;
 };
 
 }; // namespace syncspirit::utils

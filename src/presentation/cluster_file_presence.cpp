@@ -14,7 +14,7 @@ using namespace syncspirit::presentation;
 
 using F = presence_t::features_t;
 
-static const utils::metadata_comparator_t default_comparator(0, 0);
+static const utils::metadata_comparator_t default_comparator(0, true, true);
 
 cluster_file_presence_t::cluster_file_presence_t(std::uint32_t default_features_, file_entity_t &entity,
                                                  model::file_info_t &file_info_,

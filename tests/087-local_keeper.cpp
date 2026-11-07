@@ -93,7 +93,7 @@ struct fixture_t {
     using builder_ptr_t = std::unique_ptr<diff_builder_t>;
 
     fixture_t(bool auto_launch_ = true) noexcept
-        : path_guard{unique_path()}, auto_launch{auto_launch_}, metadata_comparator(0, 0) {
+        : path_guard{unique_path()}, auto_launch{auto_launch_}, metadata_comparator(0, true, true) {
         mediator = new fs::updates_mediator_t(pt::microseconds{1});
     }
 

@@ -76,7 +76,7 @@ struct chain_builder_t {
 
 struct fixture_t {
 
-    fixture_t() noexcept : path_guard{unique_path()}, metadata_comparator(1, 0) {}
+    fixture_t() noexcept : path_guard{unique_path()}, metadata_comparator(1, true, true) {}
 
     virtual configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {

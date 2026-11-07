@@ -79,6 +79,7 @@ block_division_t get_block_size(int64_t sz, int32_t prev_size) noexcept {
 utils::metadata_comparator_t get_comparator(const utils::poly_path_view_t &path) noexcept {
     std::int32_t timestamp_precision_s = 0;
     bool permissions_supported = true;
+    bool symlinks_supported = true;
 #if defined(__linux__) || defined(__unix__)
     struct statfs data{};
     if (::statfs(path.get_full_name().data(), &data) == 0) {
@@ -86,17 +87,20 @@ utils::metadata_comparator_t get_comparator(const utils::poly_path_view_t &path)
         if (data.f_type == MSDOS_SUPER_MAGIC) {
             timestamp_precision_s = 1;
             permissions_supported = false;
+            symlinks_supported = false;
         }
 #elif defined(__unix__)
         if (std::string_view("msdosfs") == sfs.f_fstypename) {
             timestamp_precision_s = 1;
             permissions_supported = false;
+            symlinks_supported = false;
         }
 #endif
     }
 #endif
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     permissions_supported = false;
+    symlinks_supported = false;
     auto wpath = path.get_full_wname(true);
     wchar_t root[MAX_PATH];
     wchar_t fs_name[MAX_PATH + 1];
@@ -111,7 +115,7 @@ utils::metadata_comparator_t get_comparator(const utils::poly_path_view_t &path)
         }
     }
 #endif
-    return {timestamp_precision_s, permissions_supported};
+    return {timestamp_precision_s, permissions_supported, symlinks_supported};
 }
 
 } // namespace syncspirit::fs

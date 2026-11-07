@@ -100,7 +100,9 @@ struct fixture_t {
     using unwatch_folder_msg_t = r::intrusive_ptr_t<fs::message::unwatch_folder_t>;
     using create_dir_msg_t = r::intrusive_ptr_t<fs::message::create_dir_t>;
 
-    fixture_t() noexcept : metadata_comparator(0, permissions_supported) { log = utils::get_logger("fixture", true); }
+    fixture_t() noexcept : metadata_comparator(0, permissions_supported, true) {
+        log = utils::get_logger("fixture", true);
+    }
 
     virtual std::uint32_t get_hash_limit() { return 1; }
 

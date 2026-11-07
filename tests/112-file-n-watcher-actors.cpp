@@ -55,7 +55,7 @@ struct fixture_t {
     using change_message_ptr_t = r::intrusive_ptr_t<fs::message::folder_changes_t>;
     using change_messages_t = std::deque<change_message_ptr_t>;
 
-    fixture_t() noexcept : path_guard{unique_path()}, metadata_comparator{0, true} {
+    fixture_t() noexcept : path_guard{unique_path()}, metadata_comparator{0, true, true} {
         log = utils::get_logger("fixture", true);
     }
 
