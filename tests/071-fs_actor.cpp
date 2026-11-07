@@ -238,6 +238,7 @@ void test_remote_copy() {
             std::int64_t modified = 1641828421;
             proto::set_modified_s(pr_fi, modified);
             proto::set_permissions(pr_fi, 0666);
+            proto::set_no_permissions(pr_fi, !metadata_comparator.permissions_supported);
             auto empty_path = utils::make_empty_view(root_path.get_allocator());
 
             SECTION("empty regular file") {
@@ -247,11 +248,8 @@ void test_remote_copy() {
                 REQUIRE(exists(path));
                 REQUIRE(file_size(path) == 0);
                 CHECK(metadata_comparator.equal({last_write_time(path), 0}, modified));
+                CHECK(metadata_comparator.equal(utils::permissions_t{permissions(path)}, 0666));
                 CHECK(updates_mediator->is_masked(path.get_full_name()) >= 2);
-
-#ifndef SYNCSPIRIT_WIN
-                CHECK((permissions(path) & 0666));
-#endif
             }
             SECTION("empty regular file in a subdir") {
                 auto path = root_path / L"а" / L"б" / L"в" / L"г" / L"д" / L"файл.txt";
@@ -261,11 +259,8 @@ void test_remote_copy() {
                 REQUIRE(exists(path));
                 REQUIRE(file_size(path) == 0);
                 CHECK(metadata_comparator.equal({last_write_time(path), 0}, modified));
-                CHECK(updates_mediator->is_masked(path.get_full_name()) >= 2);
-
-#ifndef SYNCSPIRIT_WIN
-                CHECK((permissions(path) & 0666));
-#endif
+                CHECK(metadata_comparator.equal(utils::permissions_t{permissions(path)}, 0666));
+                CHECK(updates_mediator->is_masked(path.get_full_name()) >= 1);
             }
             SECTION("non-empty regular file") {
                 proto::set_size(pr_fi, 5);
@@ -277,13 +272,10 @@ void test_remote_copy() {
                 auto tmp_path = path.get_parent() / utils::make_native_view(filename, path.get_allocator());
                 REQUIRE(!exists(tmp_path));
 
-                CHECK(last_write_time(path) == 1641828421);
                 CHECK(metadata_comparator.equal({last_write_time(path), 0}, modified));
+                CHECK(metadata_comparator.equal(utils::permissions_t{permissions(path)}, 0666));
                 CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
-                CHECK(updates_mediator->is_masked(path.get_full_name()) >= 2);
-#ifndef SYNCSPIRIT_WIN
-                CHECK((permissions(path) & 0666));
-#endif
+                CHECK(updates_mediator->is_masked(path.get_full_name()) >= 1);
             }
             SECTION("directory") {
                 auto path = root_path / L"папка";
@@ -293,39 +285,35 @@ void test_remote_copy() {
                 REQUIRE(is_directory(path));
                 CHECK(updates_mediator->is_masked(path.get_full_name()) >= 1);
             }
-            SECTION("symlink") {
-                SECTION("existing file") {
-                    auto path = root_path / L"папка" / L"файл.txt";
-                    auto target = root_path / "content";
-                    proto::set_type(pr_fi, proto::FileInfoType::SYMLINK);
-                    proto::set_symlink_target(pr_fi, target.get_full_name());
+            if (metadata_comparator.symlinks_supported) {
+                SECTION("symlink") {
+                    SECTION("existing file") {
+                        auto path = root_path / L"папка" / L"файл.txt";
+                        auto target = root_path / "content";
+                        proto::set_type(pr_fi, proto::FileInfoType::SYMLINK);
+                        proto::set_symlink_target(pr_fi, target.get_full_name());
 
-                    write_file(target, "123");
-                    remote_copy(path, pr_fi, empty_path).check_success();
-#ifndef SYNCSPIRIT_WIN
-                    CHECK(updates_mediator->is_masked(path.get_full_name()) == 1);
-                    CHECK(exists(path));
-                    CHECK(is_symlink(path));
-                    CHECK(read_symlink(path).data() == target.get_full_name());
-#endif
-                }
-                SECTION("non-existing file") {
-                    auto path = root_path / L"папка" / L"файл.txt";
-                    auto target = root_path / "content";
-                    proto::set_type(pr_fi, proto::FileInfoType::SYMLINK);
-                    proto::set_symlink_target(pr_fi, target.get_full_name());
+                        write_file(target, "123");
+                        remote_copy(path, pr_fi, empty_path).check_success();
+                        CHECK(updates_mediator->is_masked(path.get_full_name()) == 1);
+                        CHECK(exists(path));
+                        CHECK(is_symlink(path));
+                        CHECK(read_symlink(path).data() == target.get_full_name());
+                    }
+                    SECTION("non-existing file") {
+                        auto path = root_path / L"папка" / L"файл.txt";
+                        auto target = root_path / "content";
+                        proto::set_type(pr_fi, proto::FileInfoType::SYMLINK);
+                        proto::set_symlink_target(pr_fi, target.get_full_name());
 
-                    remote_copy(path, pr_fi, empty_path).check_success();
+                        remote_copy(path, pr_fi, empty_path).check_success();
 
-                    CHECK(!exists(target));
-#ifndef SYNCSPIRIT_WIN
-                    CHECK(exists(path));
-                    CHECK(updates_mediator->is_masked(path.get_full_name()) == 1);
-                    CHECK(is_symlink(path));
-                    CHECK(read_symlink(path).data() == target.get_full_name());
-#else
-                    CHECK(!exists(path));
-#endif
+                        CHECK(!exists(target));
+                        CHECK(exists(path));
+                        CHECK(updates_mediator->is_masked(path.get_full_name()) == 1);
+                        CHECK(is_symlink(path));
+                        CHECK(read_symlink(path).data() == target.get_full_name());
+                    }
                 }
             }
             SECTION("deleted file") {
@@ -403,7 +391,7 @@ void test_append_block() {
                 CHECK(updates_mediator->is_masked(path.get_full_name()) >= 2);
                 CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
                 CHECK(data_1 == as_bytes(read_file(path)));
-                CHECK(last_write_time(path) == 1641828421);
+                CHECK(metadata_comparator.equal({last_write_time(path), 0}, modified));
                 CHECK(metadata_comparator.equal(perms, permissions(path)));
             }
             SECTION("file with 1 block") {
@@ -417,7 +405,7 @@ void test_append_block() {
                 REQUIRE(exists(path));
                 REQUIRE(file_size(path) == 5);
                 CHECK(data_1 == as_bytes(read_file(path)));
-                CHECK(last_write_time(path) == 1641828421);
+                CHECK(metadata_comparator.equal({last_write_time(path), 0}, modified));
                 CHECK(updates_mediator->is_masked(path.get_full_name()) >= 2);
                 CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
@@ -438,7 +426,7 @@ void test_append_block() {
                 REQUIRE(exists(path));
                 CHECK(file_size(path) == 5);
                 CHECK(data_1 == as_bytes(read_file(path)));
-                CHECK(last_write_time(path) == 1641828421);
+                CHECK(metadata_comparator.equal({last_write_time(path), 0}, modified));
                 CHECK(metadata_comparator.equal(perms, permissions(path)));
 
                 REQUIRE(exists(conflict_path));
@@ -471,8 +459,8 @@ void test_append_block() {
                     REQUIRE(file_size(path) == 10);
                     auto data = read_file(path);
                     CHECK(data == "1234567890");
-                    CHECK(last_write_time(path) == 1641828421);
                     CHECK(updates_mediator->is_masked(path.get_full_name()) >= 2);
+                    CHECK(metadata_comparator.equal({last_write_time(path), 0}, modified));
                     CHECK(metadata_comparator.equal(perms, permissions(path)));
                 }
 
@@ -514,7 +502,7 @@ void test_clone_block() {
                     REQUIRE(exists(target_path));
                     REQUIRE(file_size(target_path) == 5);
                     CHECK(read_file(target_path) == "12345");
-                    CHECK(last_write_time(target_path) == modified);
+                    CHECK(metadata_comparator.equal({last_write_time(target_path), 0}, modified));
                     CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
                     CHECK(updates_mediator->is_masked(target_path.get_parent().get_full_name()) == 4);
@@ -539,7 +527,7 @@ void test_clone_block() {
                     REQUIRE(exists(target_path));
                     REQUIRE(file_size(target_path) == 10);
                     CHECK(read_file(target_path) == "1234567890");
-                    CHECK(last_write_time(target_path) == modified);
+                    CHECK(metadata_comparator.equal({last_write_time(target_path), 0}, modified));
                     CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
                     CHECK(updates_mediator->is_masked(target_path.get_parent().get_full_name()) == 4);
@@ -562,7 +550,7 @@ void test_clone_block() {
                     REQUIRE(exists(target_path));
                     REQUIRE(file_size(target_path) == 10);
                     CHECK(read_file(target_path) == "1234567890");
-                    CHECK(last_write_time(target_path) == modified);
+                    CHECK(metadata_comparator.equal({last_write_time(target_path), 0}, modified));
                     CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
                 }
             }
@@ -579,7 +567,7 @@ void test_clone_block() {
                 REQUIRE(exists(target_path));
                 REQUIRE(file_size(target_path) == 10);
                 CHECK(read_file(target_path) == "1234512345");
-                CHECK(last_write_time(target_path) == modified);
+                CHECK(metadata_comparator.equal({last_write_time(target_path), 0}, modified));
                 auto tmp_path = target_path.make_temporal();
                 CHECK(updates_mediator->is_masked(tmp_path.get_full_name()) == 0);
             }

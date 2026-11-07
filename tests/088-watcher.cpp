@@ -65,7 +65,8 @@ struct fixture_t {
     using change_message_ptr_t = r::intrusive_ptr_t<fs::message::folder_changes_t>;
     using change_messages_t = std::deque<change_message_ptr_t>;
 
-    fixture_t(bool auto_launch_ = true) noexcept : auto_launch{auto_launch_}, path_guard{unique_path()} {
+    fixture_t(bool auto_launch_ = true) noexcept
+        : auto_launch{auto_launch_}, path_guard{unique_path()}, metadata_comparator{0, true, true} {
         log = utils::get_logger("fixture", true);
     }
 
@@ -92,6 +93,7 @@ struct fixture_t {
         auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
         auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
         auto root_path = path_guard.get_view(allocator);
+        metadata_comparator = fs::get_comparator(root_path);
 
         main(root_path, allocator);
 
@@ -181,6 +183,7 @@ struct fixture_t {
 
     bool auto_launch;
     test::path_guard_t path_guard;
+    utils::metadata_comparator_t metadata_comparator;
     fs_context_ptr_r fs_context;
     r::intrusive_ptr_t<supervisor_t> sup;
     fs::updates_mediator_ptr_t updates_mediator;
@@ -256,27 +259,27 @@ void test_watcher_base() {
                     CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
                     CHECK(proto::get_permissions(file_change));
                 }
-#ifndef SYNCSPIRIT_WIN
-                SECTION("symlink") {
-                    auto own_name = utils::make_native_view(L"ссылка", allocator);
-                    auto sub_path = root_path / own_name;
-                    auto where = utils::make_native_view("/to/some/where", allocator);
-                    create_symlink(where, sub_path);
-                    target->push(deadline, folder_id, own_name.get_full_name(), {}, U::created, false);
-                    await_events(poll_t::single, 1);
-                    auto &payload = changes.front()->payload;
-                    REQUIRE(payload.size() == 1);
-                    auto &folder_change = payload[0];
-                    REQUIRE(folder_change.folder_id == folder_id);
-                    REQUIRE(folder_change.file_changes.size() == 1);
-                    auto &file_change = folder_change.file_changes.front();
-                    CHECK(proto::get_name(file_change) == own_name.get_full_name());
-                    CHECK(proto::get_size(file_change) == 0);
-                    CHECK(proto::get_type(file_change) == proto::FileInfoType::SYMLINK);
-                    CHECK(proto::get_permissions(file_change));
-                    CHECK(proto::get_symlink_target(file_change) == where.get_full_name());
+                if (metadata_comparator.symlinks_supported) {
+                    SECTION("symlink") {
+                        auto own_name = utils::make_native_view(L"ссылка", allocator);
+                        auto sub_path = root_path / own_name;
+                        auto where = utils::make_native_view("/to/some/where", allocator);
+                        create_symlink(where, sub_path);
+                        target->push(deadline, folder_id, own_name.get_full_name(), {}, U::created, false);
+                        await_events(poll_t::single, 1);
+                        auto &payload = changes.front()->payload;
+                        REQUIRE(payload.size() == 1);
+                        auto &folder_change = payload[0];
+                        REQUIRE(folder_change.folder_id == folder_id);
+                        REQUIRE(folder_change.file_changes.size() == 1);
+                        auto &file_change = folder_change.file_changes.front();
+                        CHECK(proto::get_name(file_change) == own_name.get_full_name());
+                        CHECK(proto::get_size(file_change) == 0);
+                        CHECK(proto::get_type(file_change) == proto::FileInfoType::SYMLINK);
+                        CHECK(proto::get_permissions(file_change));
+                        CHECK(proto::get_symlink_target(file_change) == where.get_full_name());
+                    }
                 }
-#endif
             }
             SECTION("file moving") {
                 auto name_1 = utils::make_native_view(L"файл-1.bin", allocator);
@@ -724,11 +727,11 @@ void test_tmp_ignoring() {
                 SECTION("rename file tmp -> tmp") {
                     rename(root_path / "01.syncspirit-tmp", root_path / "02.syncspirit-tmp");
                 }
-#ifndef SYNCSPIRIT_WIN
-                SECTION("create symlink") {
-                    create_symlink(utils::path_t::make_native("xxx"), root_path / "my-link.syncspirit-tmp");
+                if (metadata_comparator.symlinks_supported) {
+                    SECTION("create symlink") {
+                        create_symlink(utils::path_t::make_native("xxx"), root_path / "my-link.syncspirit-tmp");
+                    }
                 }
-#endif
                 for (int i = 0; i < 2; ++i) {
                     fs_context->wait_next_event();
                     fs_context->update_time();
@@ -1120,54 +1123,56 @@ void test_real_impl() {
                     }
                 }
             }
-#ifndef SYNCSPIRIT_WIN
-            SECTION("(permissions) file") {
-                auto path = root_path / "my-file";
-                write_file(path, "12345");
-                chmod(path, 0555);
+            if (metadata_comparator.permissions_supported) {
+                SECTION("(permissions) file") {
+                    auto path = root_path / "my-file";
+                    write_file(path, "12345");
+                    chmod(path, 0555);
 
-                watch_folder(folder_id);
+                    watch_folder(folder_id);
 
-                chmod(path, 0222);
-                await_events(poll_t::trigger_timer, 1);
-                auto &payload = changes.front()->payload;
-                REQUIRE(payload.size() == 1);
-                auto &folder_change = payload[0];
-                REQUIRE(folder_change.folder_id == folder_id);
-                REQUIRE(folder_change.file_changes.size() == 1);
-                auto &file_change = folder_change.file_changes.front();
-                CHECK(proto::get_name(file_change) == "my-file");
-                CHECK(proto::get_size(file_change) == 5);
-                CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
-                CHECK(proto::get_permissions(file_change));
-                CHECK(file_change.update_reason == update_type_t::meta);
-                CHECK(!file_change.requires_refinement);
+                    chmod(path, 0222);
+                    await_events(poll_t::trigger_timer, 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == "my-file");
+                    CHECK(proto::get_size(file_change) == 5);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::FILE);
+                    CHECK(proto::get_permissions(file_change));
+                    CHECK(file_change.update_reason == update_type_t::meta);
+                    CHECK(!file_change.requires_refinement);
+                }
             }
-            SECTION("(delete + create) symlink target change") {
-                auto path = root_path / "my-file";
-                auto link_target_1 = utils::make_native_view("/some/where/1", allocator);
-                auto link_target_2 = utils::make_native_view("/some/where/2", allocator);
-                create_symlink(link_target_1, path);
+            if (metadata_comparator.symlinks_supported) {
+                SECTION("(delete + create) symlink target change") {
+                    auto path = root_path / "my-file";
+                    auto link_target_1 = utils::make_native_view("/some/where/1", allocator);
+                    auto link_target_2 = utils::make_native_view("/some/where/2", allocator);
+                    create_symlink(link_target_1, path);
 
-                watch_folder(folder_id);
+                    watch_folder(folder_id);
 
-                remove(path);
-                create_symlink(link_target_2, path);
+                    remove(path);
+                    create_symlink(link_target_2, path);
 
-                await_events(poll_t::trigger_timer, 1);
-                auto &payload = changes.front()->payload;
-                REQUIRE(payload.size() == 1);
-                auto &folder_change = payload[0];
-                REQUIRE(folder_change.folder_id == folder_id);
-                REQUIRE(folder_change.file_changes.size() == 1);
-                auto &file_change = folder_change.file_changes.front();
-                CHECK(proto::get_name(file_change) == "my-file");
-                CHECK(proto::get_size(file_change) == 0);
-                CHECK(proto::get_type(file_change) == proto::FileInfoType::SYMLINK);
-                CHECK(proto::get_symlink_target(file_change) == link_target_2.get_full_name());
-                CHECK(!file_change.requires_refinement);
+                    await_events(poll_t::trigger_timer, 1);
+                    auto &payload = changes.front()->payload;
+                    REQUIRE(payload.size() == 1);
+                    auto &folder_change = payload[0];
+                    REQUIRE(folder_change.folder_id == folder_id);
+                    REQUIRE(folder_change.file_changes.size() == 1);
+                    auto &file_change = folder_change.file_changes.front();
+                    CHECK(proto::get_name(file_change) == "my-file");
+                    CHECK(proto::get_size(file_change) == 0);
+                    CHECK(proto::get_type(file_change) == proto::FileInfoType::SYMLINK);
+                    CHECK(proto::get_symlink_target(file_change) == link_target_2.get_full_name());
+                    CHECK(!file_change.requires_refinement);
+                }
             }
-#endif
         }
     };
     F().run();
@@ -1416,27 +1421,29 @@ void test_unix_notification() {
                 CHECK(w->path_map.size() == 2);
                 CHECK(w->path_to_wd.size() == 2);
             }
-            SECTION("watched dir") {
-                auto path_a = root_path / "a";
-                auto path_b = root_path / "b";
-                auto path_c = root_path / "c";
-                auto path_d = root_path / "d";
-                create_directories(path_a);
-                create_directories(path_c);
-                write_file(path_b, "");
-                create_symlink(utils::make_native_view("/some/where", allocator), path_d);
-                auto task = fs::task::scan_dir_t(root_path.detach(), {}, {}, true, true, false);
-                add_child(task, path_a.get_full_name());
-                add_child(task, path_b.get_full_name(), utils::file_type_t::FILE);
-                add_child(task, path_c.get_full_name());
-                w->notify(task);
-                CHECK(w->path_map.size() == 4 + IMPL_DIFF);
-                CHECK(w->path_to_wd.size() == 4 + IMPL_DIFF);
+            if (metadata_comparator.symlinks_supported) {
+                SECTION("watched dir") {
+                    auto path_a = root_path / "a";
+                    auto path_b = root_path / "b";
+                    auto path_c = root_path / "c";
+                    auto path_d = root_path / "d";
+                    create_directories(path_a);
+                    create_directories(path_c);
+                    write_file(path_b, "");
+                    create_symlink(utils::make_native_view("/some/where", allocator), path_d);
+                    auto task = fs::task::scan_dir_t(root_path.detach(), {}, {}, true, true, false);
+                    add_child(task, path_a.get_full_name());
+                    add_child(task, path_b.get_full_name(), utils::file_type_t::FILE);
+                    add_child(task, path_c.get_full_name());
+                    w->notify(task);
+                    CHECK(w->path_map.size() == 4 + IMPL_DIFF);
+                    CHECK(w->path_to_wd.size() == 4 + IMPL_DIFF);
 
-                // no-harm in double watch
-                w->notify(task);
-                CHECK(w->path_map.size() == 4 + IMPL_DIFF);
-                CHECK(w->path_to_wd.size() == 4 + IMPL_DIFF);
+                    // no-harm in double watch
+                    w->notify(task);
+                    CHECK(w->path_map.size() == 4 + IMPL_DIFF);
+                    CHECK(w->path_to_wd.size() == 4 + IMPL_DIFF);
+                }
             }
             SECTION("watched sub-dir") {
                 auto sub_dir = root_path / L"папка";
