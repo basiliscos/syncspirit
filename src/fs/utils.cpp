@@ -76,18 +76,18 @@ block_division_t get_block_size(int64_t sz, int32_t prev_size) noexcept {
     return {count, (int32_t)bs};
 }
 
-model::metadata_comparator_t get_comparator(const utils::poly_path_view_t &path) noexcept {
-    auto default_comparator = model::metadata_comparator_t(0, true);
+utils::metadata_comparator_t get_comparator(const utils::poly_path_view_t &path) noexcept {
+    auto default_comparator = utils::metadata_comparator_t(0, true);
 #if defined(__linux__) || defined(__unix__)
     struct statfs data{};
     if (::statfs(path.get_full_name().data(), &data) == 0) {
 #if defined(__linux__)
         if (data.f_type == MSDOS_SUPER_MAGIC) {
-            return model::metadata_comparator_t(1, false);
+            return utils::metadata_comparator_t(1, false);
         }
 #elif defined(__unix__)
         if (std::string_view("msdosfs") == sfs.f_fstypename) {
-            return model::metadata_comparator_t(1, false);
+            return utils::metadata_comparator_t(1, false);
         }
 #endif
     }
@@ -102,7 +102,7 @@ model::metadata_comparator_t get_comparator(const utils::poly_path_view_t &path)
         auto ok = GetVolumeInformationW(root, nullptr, 0, nullptr, nullptr, &flags, fs_name, MAX_PATH + 1);
         if (ok) {
             if (std::wstring_view(L"FAT32") == fs_name) {
-                return model::metadata_comparator_t(1, false);
+                return utils::metadata_comparator_t(1, false);
             }
         }
     }

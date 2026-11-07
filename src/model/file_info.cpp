@@ -662,7 +662,7 @@ bool file_info_t::identical_to(const proto::FileInfo &file) const noexcept {
 }
 
 bool file_info_t::identical_by_content_to(const proto::FileInfo &file,
-                                          const metadata_comparator_t &comparator) const noexcept {
+                                          const utils::metadata_comparator_t &comparator) const noexcept {
     assert(proto::get_name(file) == name->get_full_name());
     auto sz = proto::get_size(file);
     auto file_size = get_size();

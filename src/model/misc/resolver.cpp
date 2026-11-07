@@ -12,8 +12,8 @@
 namespace syncspirit::model {
 
 static advance_action_t compare_by_version(const file_info_t &remote, const file_info_t &local,
-                                           const metadata_comparator_t &comparator) noexcept {
-    using O = metadata_comparator_t::ordening_t;
+                                           const utils::metadata_comparator_t &comparator) noexcept {
+    using O = utils::metadata_comparator_t::ordening_t;
     auto &r_v = remote.get_version();
     auto &l_v = local.get_version();
 
@@ -62,7 +62,8 @@ static advance_action_t compare_by_version(const file_info_t &remote, const file
     }
 }
 
-int compare(const file_info_t &file_1, const file_info_t &file_2, const metadata_comparator_t &comparator) noexcept {
+int compare(const file_info_t &file_1, const file_info_t &file_2,
+            const utils::metadata_comparator_t &comparator) noexcept {
     if (file_1.is_deleted() && file_2.is_deleted()) {
         return 0;
     }

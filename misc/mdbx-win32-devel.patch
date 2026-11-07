@@ -1,0 +1,60 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 743d2f31..ff363963 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1133,7 +1133,6 @@ if(WIN32
+         OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/windows-safeseh.obj"
+         COMMAND ${YASM_EXE} -f win32 -o "${CMAKE_CURRENT_BINARY_DIR}/windows-safeseh.obj" "${MDBX_SOURCE_DIR}/windows-safeseh-yasm.asm"
+         DEPENDS "${MDBX_SOURCE_DIR}/windows-safeseh-yasm.asm")
+-      add_library(MyLib ${CMAKE_CURRENT_BINARY_DIR}/file.o)
+       add_library(mdbx_safeseh OBJECT "${CMAKE_CURRENT_BINARY_DIR}/windows-safeseh.obj")
+     else()
+       add_library(mdbx_safeseh OBJECT "${MDBX_SOURCE_DIR}/windows-safeseh.obj")
+diff --git a/src/api-env.c b/src/api-env.c
+index acdb372a..8d1ddf87 100644
+--- a/src/api-env.c
++++ b/src/api-env.c
+@@ -666,30 +666,6 @@ __must_check_result static int env_info_sys(const MDBX_env *env, MDBX_envinfo *o
+   out->mi_sys_ioblk = 0;
+   if (env->dxb_mmap.fd != INVALID_HANDLE_VALUE) {
+ #if IS_WINDOWS
+-    union {
+-      BY_HANDLE_FILE_INFORMATION bh;
+-      FILE_STANDARD_INFO std;
+-#if _WIN32_WINNT >= _WIN32_WINNT_WIN8
+-      FILE_STORAGE_INFO storage;
+-#endif
+-    } sys_finfo;
+-    if (imports.GetFileInformationByHandleEx &&
+-        imports.GetFileInformationByHandleEx(env->dxb_mmap.fd, FileStandardInfo, &sys_finfo.std,
+-                                             sizeof(sys_finfo.std))) {
+-      out->mi_dxb_fsize = sys_finfo.std.EndOfFile.QuadPart;
+-      out->mi_dxb_fallocated = sys_finfo.std.AllocationSize.QuadPart;
+-#if _WIN32_WINNT >= _WIN32_WINNT_WIN8
+-      if (imports.GetFileInformationByHandleEx(env->dxb_mmap.fd, FileStorageInfo, &sys_finfo.storage,
+-                                               sizeof(sys_finfo.storage))) {
+-        out->mi_sys_ioblk = (sys_finfo.storage.FileSystemEffectivePhysicalBytesPerSectorForAtomicity >
+-                             sys_finfo.storage.LogicalBytesPerSector)
+-                                ? sys_finfo.storage.FileSystemEffectivePhysicalBytesPerSectorForAtomicity
+-                                : sys_finfo.storage.LogicalBytesPerSector;
+-      }
+-#endif
+-    } else if (GetFileInformationByHandle(env->dxb_mmap.fd, &sys_finfo.bh)) {
+-      out->mi_dxb_fsize = sys_finfo.bh.nFileSizeLow | (uint64_t)sys_finfo.bh.nFileSizeHigh << 32;
+-    } else
+       return GetLastError();
+ #else
+     struct stat sys_fstat;
+diff --git a/src/osal.c b/src/osal.c
+index 5fdf446b..f1246f4d 100644
+--- a/src/osal.c
++++ b/src/osal.c
+@@ -1109,7 +1109,7 @@ void osal_ioring_reset(osal_ioring_t *ior) {
+     for (ior_item_t *item = ior->pool; item <= ior->last;) {
+       if (!HasOverlappedIoCompleted(&item->ov)) {
+         ASSERT(ior->overlapped_fd);
+-        CancelIoEx(ior->overlapped_fd, &item->ov);
++        CancelIo(ior->overlapped_fd);
+       }
+       if (item->ov.hEvent && item->ov.hEvent != ior)
+         ior_put_event(ior, item->ov.hEvent);

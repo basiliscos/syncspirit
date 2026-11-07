@@ -9,7 +9,7 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include "utils/compact_vector.hpp"
 #include "misc/augmentation.h"
-#include "misc/metadata_comparator.h"
+#include "utils/metadata_comparator.h"
 #include "utils/path.h"
 #include "utils/timestamp.h"
 #include "misc/map.hpp"
@@ -196,7 +196,8 @@ struct SYNCSPIRIT_API file_info_t {
 
     proto::FileInfo get() const noexcept;
     bool identical_to(const proto::FileInfo &file) const noexcept;
-    bool identical_by_content_to(const proto::FileInfo &file, const metadata_comparator_t &comparator) const noexcept;
+    bool identical_by_content_to(const proto::FileInfo &file,
+                                 const utils::metadata_comparator_t &comparator) const noexcept;
 
     static const constexpr auto data_length = uuid_length * 2;
 

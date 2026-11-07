@@ -7,7 +7,7 @@
 #include "utils/timestamp.h"
 #include <compare>
 
-namespace syncspirit::model {
+namespace syncspirit::utils {
 
 struct SYNCSPIRIT_API metadata_comparator_t {
     using ordening_t = std::strong_ordering;
@@ -26,4 +26,4 @@ struct SYNCSPIRIT_API metadata_comparator_t {
     bool permissions_supported = true;
 };
 
-}; // namespace syncspirit::model
+}; // namespace syncspirit::utils

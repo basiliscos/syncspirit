@@ -214,7 +214,6 @@ add_library(syncspirit_core
     src/model/misc/file_block.cpp
     src/model/misc/file_iterator.cpp
     src/model/misc/file_matcher.cpp
-    src/model/misc/metadata_comparator.cpp
     src/model/misc/orphaned_blocks.cpp
     src/model/misc/postponed_files.cpp
     src/model/misc/resolver.cpp
@@ -292,6 +291,7 @@ add_library(syncspirit_core
     src/utils/location.cpp
     src/utils/log.cpp
     src/utils/log-setup.cpp
+    src/utils/metadata_comparator.cpp
     src/utils/network_interface.cpp
     src/utils/path.cpp
     src/utils/path_cache.cpp

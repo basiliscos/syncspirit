@@ -5,7 +5,7 @@
 
 #include <utility>
 
-using namespace syncspirit::model;
+using namespace syncspirit::utils;
 
 metadata_comparator_t::metadata_comparator_t(std::int32_t timestamp_precision_s_, bool permissions_supported_) noexcept
     : timestamp_precision_s{timestamp_precision_s_}, permissions_supported{permissions_supported_} {}

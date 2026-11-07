@@ -9,7 +9,6 @@
 #include "test_supervisor.h"
 #include "access.h"
 #include "utils/error_code.h"
-#include "syncspirit-config.h"
 #include <optional>
 #include <utility>
 #include <utils/platform.h>
@@ -226,7 +225,7 @@ struct fixture_t {
     fs::updates_mediator_ptr_t updates_mediator;
     fs::watched_folders_ptr_t watched_folders;
     test::path_guard_t path_guard;
-    model::metadata_comparator_t metadata_comparator;
+    utils::metadata_comparator_t metadata_comparator;
     r::system_context_t ctx;
     io_commands_t_ptr_t reply;
     std::string folder_id = "1234-5678";

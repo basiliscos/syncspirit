@@ -1493,10 +1493,11 @@ auto controller_actor_t::compare_with_local(model::file_info_t &peer_file, model
                                             const model::folder_info_t &local_folder) noexcept -> local_difference_t {
     using LD = local_difference_t;
     auto compare_meta = [&](model::file_info_t &peer_file, model::file_info_t &local_file) -> local_difference_t {
+        using O = utils::metadata_comparator_t::ordening_t;
         auto &local_ts = local_file.get_modification();
         auto &peer_ts = local_file.get_modification();
         auto ordering = local_folder.get_metadata_comparator().compare(local_ts, peer_ts);
-        if (ordering != model::metadata_comparator_t::ordening_t::equivalent) {
+        if (ordering != O::equivalent) {
             return LD::meta;
         }
         auto perms_differ = (!local_file.has_no_permissions() && !peer_file.has_no_permissions() &&
