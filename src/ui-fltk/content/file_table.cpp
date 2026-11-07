@@ -208,7 +208,7 @@ void file_table_t::refresh() {
 
     block_size_cell->update(std::to_string(file_info.get_block_size()));
     blocks_cell->update(std::to_string(blocks_count));
-    permissions_cell->update(fmt::format("0{:o}", file_info.get_permissions()));
+    permissions_cell->update(fmt::format("0{:o}", file_info.get_permissions().value));
     modified_s_cell->update(fmt::format("{}", modified_s));
     modified_ns_cell->update(fmt::format("{}", file_info.get_modification().ns));
     symlink_target_cell->update(file_info.get_link_target());

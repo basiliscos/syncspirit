@@ -374,13 +374,6 @@ bool platform_t::path_supported(const poly_path_view_t &str_path) noexcept {
     return true;
 }
 
-bool platform_t::permissions_supported(const path_base_t &) noexcept {
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-    return false;
-#endif
-    return true;
-}
-
 void platform_t::set_thread_name(std::string_view name) noexcept {
 #if defined(__linux__)
     pthread_setname_np(pthread_self(), name.data());

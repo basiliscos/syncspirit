@@ -59,10 +59,10 @@ auto local_update_t::get_original(const model::folder_infos_map_t &fis, const mo
     auto name = proto::get_name(local_file);
     auto local_deleted = proto::get_deleted(local_file);
     auto local_invalid = proto::get_invalid(local_file);
-    auto local_perms = proto::get_permissions(local_file);
-    auto local_no_perms = proto::get_no_permissions(local_file);
+    auto local_perms = utils::permissions_t{proto::get_permissions(local_file), proto::get_no_permissions(local_file)};
     auto local_size = proto::get_size(local_file);
     auto local_type = model::file_info_t::as_flags(proto::get_type(local_file));
+    auto &comparator = local_folder.get_metadata_comparator();
 
     for (auto &it_fi : fis) {
         auto fi = it_fi.item.get();
@@ -74,9 +74,7 @@ auto local_update_t::get_original(const model::folder_infos_map_t &fis, const mo
                 if (candidate->get_size() == local_size) {
                     bool matches = local_type == candidate->get_type() && local_deleted == candidate->is_deleted() &&
                                    local_invalid == candidate->is_invalid() &&
-                                   (local_no_perms == candidate->has_no_permissions() ||
-                                    local_perms == candidate->get_permissions());
-
+                                   comparator.equal(candidate->get_permissions(), local_perms);
                     if (matches) {
                         if (candidate->is_file()) {
                             matches = false;
@@ -106,7 +104,7 @@ auto local_update_t::get_original(const model::folder_infos_map_t &fis, const mo
             if (!r) {
                 r = std::move(peer_file);
             } else {
-                if (model::compare(*peer_file, *r, local_folder.get_metadata_comparator()) > 1) {
+                if (model::compare(*peer_file, *r, comparator) > 1) {
                     r = std::move(peer_file);
                 }
             }

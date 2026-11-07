@@ -11,6 +11,7 @@
 #include "misc/augmentation.h"
 #include "utils/metadata_comparator.h"
 #include "utils/path.h"
+#include "utils/permissions.h"
 #include "utils/timestamp.h"
 #include "misc/map.hpp"
 #include "misc/uuid.h"
@@ -47,7 +48,6 @@ struct SYNCSPIRIT_API file_info_t {
         f_type_link        = 1 << 2,
         f_deleted          = 1 << 3,
         f_invalid          = 1 << 4,
-        f_no_permissions   = 1 << 5,
         f_synchronizing    = 1 << 6,
         f_unreachable      = 1 << 7,
         f_local            = 1 << 8,
@@ -207,7 +207,7 @@ struct SYNCSPIRIT_API file_info_t {
     proto::Index generate() noexcept;
     std::size_t expected_meta_size() const noexcept;
 
-    std::uint32_t get_permissions() const noexcept;
+    utils::permissions_t get_permissions() const noexcept;
     bool has_no_permissions() const noexcept;
 
     guard_t guard(const model::folder_info_t &folder_info) noexcept;
@@ -260,7 +260,7 @@ struct SYNCSPIRIT_API file_info_t {
     utils::timestamp_t modification;
     std::uint64_t modified_by;
     std::int64_t sequence;
-    std::uint32_t permissions;
+    utils::permissions_t permissions;
 
     content_t content;
     version_t version;

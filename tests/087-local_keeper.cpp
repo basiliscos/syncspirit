@@ -92,7 +92,8 @@ struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<net::local_keeper_t>;
     using builder_ptr_t = std::unique_ptr<diff_builder_t>;
 
-    fixture_t(bool auto_launch_ = true) noexcept : path_guard{unique_path()}, auto_launch{auto_launch_} {
+    fixture_t(bool auto_launch_ = true) noexcept
+        : path_guard{unique_path()}, auto_launch{auto_launch_}, metadata_comparator(0, 0) {
         mediator = new fs::updates_mediator_t(pt::microseconds{1});
     }
 
@@ -170,6 +171,8 @@ struct fixture_t {
         auto buffer = std::array<std::byte, 1024 * 32>();
         auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
         auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+        auto path_view = path_guard.get_view(allocator);
+        metadata_comparator = fs::get_comparator(path_view);
 
         sup->start();
         sup->do_process();
@@ -181,6 +184,7 @@ struct fixture_t {
 
         folder = cluster->get_folders().by_id(folder_id);
         folder_info = folder->get_folder_infos().by_device(*my_device);
+        folder_info->set_metadata_comparator(metadata_comparator.clone());
         files = &folder_info->get_file_infos();
         folder_info_peer = folder->get_folder_infos().by_device(*peer_device);
         files_peer = &folder_info_peer->get_file_infos();
@@ -229,6 +233,7 @@ struct fixture_t {
     cluster_ptr_t cluster;
     device_ptr_t my_device;
     test::path_guard_t path_guard;
+    utils::metadata_comparator_t metadata_comparator;
     target_ptr_t target;
     updates_mediator_ptr_t mediator;
     model::folder_ptr_t folder;
@@ -345,18 +350,8 @@ void test_simple() {
                     CHECK(file->get_size() == 0);
                     CHECK(blocks.size() == 0);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-#ifndef SYNCSPIRIT_WIN
-                    if (ingore_perms) {
-                        CHECK(file->has_no_permissions());
-                        CHECK(file->get_permissions() == 0666);
-                    } else {
-                        CHECK(!file->has_no_permissions());
-                        CHECK(file->get_permissions() == permissions(file_path));
-                    }
-#else
-                    CHECK(file->has_no_permissions());
-                    CHECK(file->get_permissions() == 0666);
-#endif
+                    auto expected_perms = ingore_perms ? 0666 : permissions(file_path);
+                    CHECK(metadata_comparator.equal(file->get_permissions(), expected_perms));
                 }
 #ifndef SYNCSPIRIT_WIN
                 SECTION("new symlink") {
@@ -943,7 +938,7 @@ void test_changed() {
 
                 SECTION("modification time changed") {
                     proto::set_permissions(pr_file, perms);
-                    proto::set_modified_s(pr_file, modified - 1);
+                    proto::set_modified_s(pr_file, modified - 10);
                 }
                 SECTION("permissions changed") {
                     proto::set_permissions(pr_file, perms - 1);
@@ -969,7 +964,7 @@ void test_changed() {
                 CHECK(file_2->iterate_blocks().next()->get_hash() == hash_1);
                 auto seq_2 = file_2->get_sequence();
 
-                if (!perms_changed || utils::platform_t::permissions_supported(file_path)) {
+                if (!perms_changed || metadata_comparator.permissions_supported) {
                     CHECK(seq_2 > seq_1);
                 } else {
                     CHECK(seq_2 == seq_1);
@@ -993,7 +988,7 @@ void test_changed() {
 
                 SECTION("modification time changed") {
                     proto::set_permissions(pr_file, perms);
-                    proto::set_modified_s(pr_file, modified - 1);
+                    proto::set_modified_s(pr_file, modified - 10);
                 }
                 SECTION("permissions changed") {
                     proto::set_permissions(pr_file, perms - 1);
@@ -1016,7 +1011,7 @@ void test_changed() {
                 CHECK(file_2->is_local());
                 auto seq_2 = file_2->get_sequence();
 
-                if (perms_changed && utils::platform_t::permissions_supported(file_path)) {
+                if (perms_changed && metadata_comparator.permissions_supported) {
                     CHECK(seq_2 > seq_1);
                 } else {
                     CHECK(seq_2 == seq_1);

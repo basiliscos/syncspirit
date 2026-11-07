@@ -213,7 +213,7 @@ auto file_info_t::fields_update(const db::FileInfo &source, utils::path_cache_t 
     flags = (flags & ~0b111111) | as_flags(db::get_type(source));
     name = path_cache.get_path(db::get_name(source));
     sequence = db::get_sequence(source);
-    permissions = db::get_permissions(source);
+    permissions = {db::get_permissions(source), db::get_no_permissions(source)};
     modification = {db::get_modified_s(source), db::get_modified_ns(source)};
     modified_by = db::get_modified_by(source);
     if (db::get_deleted(source)) {
@@ -221,9 +221,6 @@ auto file_info_t::fields_update(const db::FileInfo &source, utils::path_cache_t 
     }
     if (db::get_invalid(source)) {
         flags |= flags_t::f_invalid;
-    }
-    if (db::get_no_permissions(source)) {
-        flags |= flags_t::f_no_permissions;
     }
 
     version = version_t(db::get_version(source));
@@ -251,7 +248,7 @@ auto file_info_t::fields_update(const proto::FileInfo &source, utils::path_cache
     name = path_cache.get_path(proto::get_name(source));
     sequence = proto::get_sequence(source);
     flags = (flags & ~0b111111) | as_flags(proto::get_type(source));
-    permissions = proto::get_permissions(source);
+    permissions = {proto::get_permissions(source), proto::get_no_permissions(source)};
     modification = {proto::get_modified_s(source), proto::get_modified_ns(source)};
     modified_by = proto::get_modified_by(source);
     if (proto::get_deleted(source)) {
@@ -259,9 +256,6 @@ auto file_info_t::fields_update(const proto::FileInfo &source, utils::path_cache
     }
     if (proto::get_invalid(source)) {
         flags |= flags_t::f_invalid;
-    }
-    if (proto::get_no_permissions(source)) {
-        flags |= flags_t::f_no_permissions;
     }
 
     version = version_t(proto::get_version(source));
@@ -294,13 +288,13 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
     db::set_name(r, name->get_full_name());
     db::set_sequence(r, sequence);
     db::set_type(r, as_type(flags));
-    db::set_permissions(r, permissions);
+    db::set_permissions(r, permissions.value);
     db::set_modified_s(r, modification.seconds);
     db::set_modified_ns(r, modification.ns);
     db::set_modified_by(r, modified_by);
     db::set_deleted(r, flags & f_deleted);
     db::set_invalid(r, flags & f_invalid);
-    db::set_no_permissions(r, flags & f_no_permissions);
+    db::set_no_permissions(r, permissions.absent);
     db::set_version(r, version.as_proto());
     if (flags & f_type_file) {
         db::set_size(r, get_size());
@@ -329,13 +323,13 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
     proto::set_name(r, name->get_full_name());
     proto::set_sequence(r, sequence);
     proto::set_type(r, as_type(flags));
-    proto::set_permissions(r, permissions);
+    proto::set_permissions(r, permissions.value);
     proto::set_modified_s(r, modification.seconds);
     proto::set_modified_ns(r, modification.ns);
     proto::set_modified_by(r, modified_by);
     proto::set_deleted(r, flags & f_deleted);
     proto::set_invalid(r, flags & f_invalid);
-    proto::set_no_permissions(r, flags & f_no_permissions);
+    proto::set_no_permissions(r, permissions.absent);
     proto::set_version(r, version.as_proto());
 
     if (flags & f_type_file) {
@@ -533,9 +527,9 @@ std::size_t file_info_t::expected_meta_size() const noexcept {
     return r;
 }
 
-std::uint32_t file_info_t::get_permissions() const noexcept { return permissions; }
+utils::permissions_t file_info_t::get_permissions() const noexcept { return permissions; }
 
-bool file_info_t::has_no_permissions() const noexcept { return flags & f_no_permissions; }
+bool file_info_t::has_no_permissions() const noexcept { return permissions.absent; }
 
 void file_info_t::update(const file_info_t &other) noexcept {
     using hashes_t = std::set<utils::bytes_view_t, utils::bytes_comparator_t>;
@@ -682,10 +676,8 @@ bool file_info_t::identical_by_content_to(const proto::FileInfo &file,
             return false;
         }
     }
-    if (!has_no_permissions()) {
-        if (proto::get_permissions(file) != get_permissions()) {
-            return false;
-        }
+    if (!comparator.equal(permissions, proto::get_permissions(file))) {
+        return false;
     }
 
     if (sz) {

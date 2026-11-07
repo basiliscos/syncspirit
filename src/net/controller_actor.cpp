@@ -628,15 +628,15 @@ void controller_actor_t::io_advance(model::advance_action_t action, model::file_
     auto target = std::string(peer_file.get_link_target());
     auto deleted = peer_file.is_deleted();
     auto perms = peer_file.get_permissions();
-    bool no_permissions = !utils::platform_t::permissions_supported(path) ||
-                          peer_folder.get_folder()->are_permissions_ignored() || peer_file.has_no_permissions();
+    if (peer_folder.get_folder()->are_permissions_ignored()) {
+        perms.absent = true;
+    }
 
     auto context = fs::payload::extendended_context_prt_t{};
     context.reset(new file_context_t(peer_file, peer_folder, action));
     auto folder_id = std::string(peer_folder.get_folder()->get_id());
-    auto payload =
-        fs::payload::remote_copy_t(std::move(context), std::move(folder_id), path.detach(), conflict_path.detach(),
-                                   type, size, perms, modified, target, deleted, no_permissions);
+    auto payload = fs::payload::remote_copy_t(std::move(context), std::move(folder_id), path.detach(),
+                                              conflict_path.detach(), type, size, perms, modified, target, deleted);
     ctx.push(std::move(payload));
 }
 
@@ -714,14 +714,15 @@ void controller_actor_t::io_finish_file(model::file_info_t *local_file, model::f
         conflict_path = peer_folder.get_folder()->get_path() / local_file->make_conflicting_name(allocator);
     }
     auto perms = peer_file.get_permissions();
-    bool no_permissions = !utils::platform_t::permissions_supported(path) ||
-                          peer_folder.get_folder()->are_permissions_ignored() || peer_file.has_no_permissions();
+    if (peer_folder.get_folder()->are_permissions_ignored()) {
+        perms.absent = true;
+    }
 
     auto context = fs::payload::extendended_context_prt_t{};
     context.reset(new file_context_t(peer_file, peer_folder, action));
     auto folder_id = std::string(peer_folder.get_folder()->get_id());
     auto payload = fs::payload::finish_file_t(std::move(context), std::move(folder_id), path.detach(),
-                                              conflict_path.detach(), file_size, modified_s, perms, no_permissions);
+                                              conflict_path.detach(), file_size, modified_s, perms);
     ctx.push(std::move(payload));
 }
 
@@ -732,11 +733,12 @@ void controller_actor_t::io_update_meta(model::file_info_t &peer_file, model::fo
     auto context = fs::payload::extendended_context_prt_t{};
     context.reset(new file_context_t(peer_file, peer_folder, action));
     auto folder_id = std::string(peer_folder.get_folder()->get_id());
-    bool no_permissions = !utils::platform_t::permissions_supported(path) ||
-                          peer_folder.get_folder()->are_permissions_ignored() || peer_file.has_no_permissions();
-    auto payload =
-        fs::payload::update_meta_t(std::move(context), std::move(folder_id), path.detach(),
-                                   peer_file.get_modification().seconds, peer_file.get_permissions(), no_permissions);
+    auto perms = peer_file.get_permissions();
+    if (peer_folder.get_folder()->are_permissions_ignored()) {
+        perms.absent = true;
+    }
+    auto payload = fs::payload::update_meta_t(std::move(context), std::move(folder_id), path.detach(),
+                                              peer_file.get_modification(), perms);
     ctx.push(std::move(payload));
 }
 
@@ -1496,12 +1498,12 @@ auto controller_actor_t::compare_with_local(model::file_info_t &peer_file, model
         using O = utils::metadata_comparator_t::ordening_t;
         auto &local_ts = local_file.get_modification();
         auto &peer_ts = local_file.get_modification();
-        auto ordering = local_folder.get_metadata_comparator().compare(local_ts, peer_ts);
+        auto &comparator = local_folder.get_metadata_comparator();
+        auto ordering = comparator.compare(local_ts, peer_ts);
         if (ordering != O::equivalent) {
             return LD::meta;
         }
-        auto perms_differ = (!local_file.has_no_permissions() && !peer_file.has_no_permissions() &&
-                             local_file.get_permissions() != peer_file.get_permissions());
+        auto perms_differ = !comparator.equal(local_file.get_permissions(), peer_file.get_permissions());
         return perms_differ ? LD::meta : LD::version;
     };
 
