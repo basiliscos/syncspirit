@@ -77,7 +77,7 @@ struct chain_builder_t {
 
 struct fixture_t {
 
-    fixture_t() noexcept : path_guard{unique_path()} {}
+    fixture_t() noexcept : path_guard{unique_path()}, metadata_comparator(1, 0) {}
 
     virtual configure_callback_t configure() noexcept {
         return [&](r::plugin::plugin_base_t &plugin) {
@@ -127,8 +127,9 @@ struct fixture_t {
         auto buffer = std::array<std::byte, 1024 * 32>();
         auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
         auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-
-        main(path_guard.get_view(allocator));
+        auto path_view = path_guard.get_view(allocator);
+        metadata_comparator = fs::get_comparator(path_view);
+        main(path_view);
 
         sup->shutdown();
         sup->do_process();
@@ -225,6 +226,7 @@ struct fixture_t {
     fs::updates_mediator_ptr_t updates_mediator;
     fs::watched_folders_ptr_t watched_folders;
     test::path_guard_t path_guard;
+    model::metadata_comparator_t metadata_comparator;
     r::system_context_t ctx;
     io_commands_t_ptr_t reply;
     std::string folder_id = "1234-5678";
@@ -619,7 +621,7 @@ void test_update_meta() {
             SECTION("file") {
                 write_file(path, "12345");
                 update_meta(path, modified, perms, no_perms).check_success();
-                CHECK(last_write_time(path) == modified);
+                CHECK(metadata_comparator.equal({last_write_time(path), 0}, {modified, 0}));
 #ifndef SYNCSPIRIT_WIN
                 CHECK(permissions(path) == perms);
 #endif
@@ -630,7 +632,7 @@ void test_update_meta() {
             SECTION("dir") {
                 create_directories(path);
                 update_meta(path, modified, perms, no_perms).check_success();
-                CHECK(last_write_time(path) == modified);
+                CHECK(metadata_comparator.equal({last_write_time(path), 0}, {modified, 0}));
                 CHECK(permissions(path) == perms);
             }
 #endif

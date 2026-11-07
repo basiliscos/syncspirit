@@ -6,6 +6,8 @@
 #include <boost/outcome.hpp>
 #include <cstdint>
 #include "syncspirit-export.h"
+#include "model/misc/metadata_comparator.h"
+#include "utils/path.h"
 
 namespace syncspirit {
 namespace fs {
@@ -18,6 +20,7 @@ struct block_division_t {
 };
 
 SYNCSPIRIT_API block_division_t get_block_size(int64_t file_size, int32_t prev_size) noexcept;
+SYNCSPIRIT_API model::metadata_comparator_t get_comparator(const utils::poly_path_view_t &path) noexcept;
 
 SYNCSPIRIT_API extern const std::size_t block_sizes_sz;
 SYNCSPIRIT_API extern const std::int32_t *block_sizes;
