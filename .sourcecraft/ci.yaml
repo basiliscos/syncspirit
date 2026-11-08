@@ -156,14 +156,14 @@ tasks:
           - apt install -y cmake python3-venv pkgconf
           - pip install conan
           - conan profile detect
-          # - echo "going to install custom b2/5.6.1"
-          # - conan install -r conancenter --tool-requires=b2/5.6.1 -o "&:use_cxx_env=True" --build="&"
-          - git clone https://github.com/bfgroup/b2.git
-          - cd b2
-          - git checkout 5.5.3
-          - ./bootstrap.sh
-          - ./b2 install --prefix=$HOME/b2
-          - cd ..
+          - echo "going to install custom b2/5.6.1"
+          - conan install -r conancenter --tool-requires=b2/5.6.1 -o "&:use_cxx_env=True" --build="&"
+          # - git clone https://github.com/bfgroup/b2.git
+          # - cd b2
+          # - git checkout 5.5.3
+          # - ./bootstrap.sh
+          # - ./b2 install --prefix=$HOME/b2
+          # - cd ..
           - b2 --version
           # - wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
           - wget https://mirror.yandex.ru/mirrors/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
