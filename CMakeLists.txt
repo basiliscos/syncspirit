@@ -181,6 +181,7 @@ add_library(syncspirit_core
     src/model/diff/local/scan_start.cpp
     src/model/diff/local/synchronization_finish.cpp
     src/model/diff/local/synchronization_start.cpp
+    src/model/diff/local/update_metadata.cpp
     src/model/diff/modify/add_blocks.cpp
     src/model/diff/modify/add_ignored_device.cpp
     src/model/diff/modify/add_pending_device.cpp

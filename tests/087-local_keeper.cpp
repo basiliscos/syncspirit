@@ -86,6 +86,7 @@ struct my_supervisort_t : supervisor_t {
     void on_model_update(model::message::model_update_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::advance::local_update_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::local::file_availability_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::local::update_metadata_t &, void *) noexcept override;
 };
 
 struct fixture_t {
@@ -130,6 +131,7 @@ struct fixture_t {
 
     virtual void on_diff(const model::diff::advance::local_update_t &) noexcept {}
     virtual void on_diff(const model::diff::local::file_availability_t &) noexcept {}
+    virtual void on_diff(const model::diff::local::update_metadata_t &) noexcept { ++metadata_comparator_updates; }
     virtual void on_model_update(model::message::model_update_t &) noexcept {}
 
     void run() noexcept {
@@ -234,6 +236,7 @@ struct fixture_t {
     device_ptr_t my_device;
     test::path_guard_t path_guard;
     utils::metadata_comparator_t metadata_comparator;
+    std::size_t metadata_comparator_updates{0};
     target_ptr_t target;
     updates_mediator_ptr_t mediator;
     model::folder_ptr_t folder;
@@ -253,6 +256,12 @@ auto my_supervisort_t::operator()(const model::diff::advance::local_update_t &di
 }
 
 auto my_supervisort_t::operator()(const model::diff::local::file_availability_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    fixture->on_diff(diff);
+    return parent_t::operator()(diff, custom);
+}
+
+auto my_supervisort_t::operator()(const model::diff::local::update_metadata_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     fixture->on_diff(diff);
     return parent_t::operator()(diff, custom);
@@ -441,6 +450,18 @@ void test_simple() {
     F().run();
 }
 
+void test_startup() {
+    struct F : fixture_t {
+        void main(const utils::allocator_t &allocator) noexcept override {
+            CHECK(metadata_comparator_updates == 0);
+            sup->send<syncspirit::model::payload::local_ready_t>(sup->get_address());
+            sup->do_process();
+            CHECK(metadata_comparator_updates == 1);
+        }
+    };
+    F().run();
+}
+
 void test_create_dir() {
     struct F : fixture_t {
         void main(const utils::allocator_t &allocator) noexcept override {
@@ -452,12 +473,14 @@ void test_create_dir() {
             REQUIRE(!exists(root_path));
 
             SECTION("success") {
+                CHECK(metadata_comparator_updates == 0);
                 builder->upsert_folder(folder_id, root_path.get_full_name()).apply(*sup);
                 CHECK(exists(root_path));
                 auto f = cluster->get_folders().by_id(folder_id);
                 REQUIRE(f);
                 REQUIRE(!f->is_suspended());
                 CHECK(!f->get_scan_finish().is_not_a_date_time());
+                CHECK(metadata_comparator_updates == 1);
             }
             SECTION("fail & suspend") {
                 auto sub_path = root_path / "a" / "dir";
@@ -2292,6 +2315,7 @@ void test_races() {
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
+    REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
     REGISTER_TEST_CASE(test_create_dir, "test_create_dir", "[net]");
     REGISTER_TEST_CASE(test_no_changes, "test_no_changes", "[net]");
     REGISTER_TEST_CASE(test_deleted, "test_deleted", "[net]");
