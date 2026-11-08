@@ -37,6 +37,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto path_quard = unique_path();
     auto root_path = path_quard.get_view(allocator);
+    auto comparator = fs::get_comparator(root_path);
 
     auto slave = fs_slave_t();
     auto context = exec_ctx_t();
@@ -111,52 +112,52 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
             }
         }
 
-#ifndef SYNCSPIRIT_WIN
-        SECTION("dir with a file, dir & symlink") {
-            slave.push(task::scan_dir_t(root_path.detach(), {}, {}, false, true, false));
+        if (comparator.symlinks_supported) {
+            SECTION("dir with a file, dir & symlink") {
+                slave.push(task::scan_dir_t(root_path.detach(), {}, {}, false, true, false));
 
-            auto modified = std::int64_t{1642007468};
-            auto child_1 = root_path / L"a_файл";
-            auto child_2 = root_path / L"b_ссылка";
-            auto child_3 = root_path / L"с_папка";
-            auto link_target = utils::path_t::make_native("/some/where");
+                auto modified = std::int64_t{1642007468};
+                auto child_1 = root_path / L"a_файл";
+                auto child_2 = root_path / L"b_ссылка";
+                auto child_3 = root_path / L"с_папка";
+                auto link_target = utils::path_t::make_native("/some/where");
 
-            write_file(child_1, "abc");
-            last_write_time(child_1, modified);
-            create_symlink(link_target, child_2);
-            create_directories(child_3);
-            last_write_time(child_3, modified);
+                write_file(child_1, "abc");
+                last_write_time(child_1, modified);
+                create_symlink(link_target, child_2);
+                create_directories(child_3);
+                last_write_time(child_3, modified);
 
-            slave.exec(context);
+                slave.exec(context);
 
-            REQUIRE(slave.tasks_out.size() == 1);
-            auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
-            CHECK(!t.ec);
-            CHECK(t.child_infos.size() == 3);
-            {
-                auto &c = t.child_infos[0];
-                CHECK(c.path.get_filename() == child_2.get_filename());
-                CHECK(!c.ec);
-                CHECK(c.file_type == utils::file_type_t::SYMLINK);
-                CHECK(c.target == link_target);
-            }
-            {
-                auto &c = t.child_infos[1];
-                CHECK(c.path.get_filename() == child_1.get_filename());
-                CHECK(!c.ec);
-                CHECK(c.file_type == utils::file_type_t::FILE);
-                CHECK(c.last_write_time == modified);
-                CHECK(c.size == 3);
-            }
-            {
-                auto &c = t.child_infos[2];
-                CHECK(c.path.get_filename() == child_3.get_filename());
-                CHECK(!c.ec);
-                CHECK(c.file_type == utils::file_type_t::DIRECTORY);
-                CHECK(c.last_write_time == modified);
+                REQUIRE(slave.tasks_out.size() == 1);
+                auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
+                CHECK(!t.ec);
+                CHECK(t.child_infos.size() == 3);
+                {
+                    auto &c = t.child_infos[0];
+                    CHECK(c.path.get_filename() == child_2.get_filename());
+                    CHECK(!c.ec);
+                    CHECK(c.file_type == utils::file_type_t::SYMLINK);
+                    CHECK(c.target == link_target);
+                }
+                {
+                    auto &c = t.child_infos[1];
+                    CHECK(c.path.get_filename() == child_1.get_filename());
+                    CHECK(!c.ec);
+                    CHECK(c.file_type == utils::file_type_t::FILE);
+                    CHECK(c.last_write_time == modified);
+                    CHECK(c.size == 3);
+                }
+                {
+                    auto &c = t.child_infos[2];
+                    CHECK(c.path.get_filename() == child_3.get_filename());
+                    CHECK(!c.ec);
+                    CHECK(c.file_type == utils::file_type_t::DIRECTORY);
+                    CHECK(c.last_write_time == modified);
+                }
             }
         }
-#endif
     }
 
 #if 0

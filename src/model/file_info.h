@@ -9,7 +9,10 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include "utils/compact_vector.hpp"
 #include "misc/augmentation.h"
+#include "utils/metadata_comparator.h"
 #include "utils/path.h"
+#include "utils/permissions.h"
+#include "utils/timestamp.h"
 #include "misc/map.hpp"
 #include "misc/uuid.h"
 #include "block_info.h"
@@ -45,7 +48,6 @@ struct SYNCSPIRIT_API file_info_t {
         f_type_link        = 1 << 2,
         f_deleted          = 1 << 3,
         f_invalid          = 1 << 4,
-        f_no_permissions   = 1 << 5,
         f_synchronizing    = 1 << 6,
         f_unreachable      = 1 << 7,
         f_local            = 1 << 8,
@@ -185,9 +187,7 @@ struct SYNCSPIRIT_API file_info_t {
     }
 
     utils::poly_path_view_t get_path(const folder_info_t &, const utils::allocator_t &) const noexcept;
-
-    inline std::int64_t get_modified_s() const noexcept { return modified_s; }
-    inline std::int32_t get_modified_ns() const noexcept { return modified_ns; }
+    inline const utils::timestamp_t &get_modification() const noexcept { return modification; }
     inline std::uint64_t get_modified_by() const noexcept { return modified_by; }
 
     bool is_synchronizing() const noexcept;
@@ -196,7 +196,8 @@ struct SYNCSPIRIT_API file_info_t {
 
     proto::FileInfo get() const noexcept;
     bool identical_to(const proto::FileInfo &file) const noexcept;
-    bool identical_by_content_to(const proto::FileInfo &file) const noexcept;
+    bool identical_by_content_to(const proto::FileInfo &file,
+                                 const utils::metadata_comparator_t &comparator) const noexcept;
 
     static const constexpr auto data_length = uuid_length * 2;
 
@@ -206,8 +207,7 @@ struct SYNCSPIRIT_API file_info_t {
     proto::Index generate() noexcept;
     std::size_t expected_meta_size() const noexcept;
 
-    std::uint32_t get_permissions() const noexcept;
-    bool has_no_permissions() const noexcept;
+    utils::permissions_t get_permissions() const noexcept;
 
     guard_t guard(const model::folder_info_t &folder_info) noexcept;
 
@@ -256,11 +256,10 @@ struct SYNCSPIRIT_API file_info_t {
     unsigned char key[data_length];
     augmentation_ptr_t extension;
     utils::path_ptr_t name;
-    std::int64_t modified_s;
+    utils::timestamp_t modification;
     std::uint64_t modified_by;
     std::int64_t sequence;
-    std::uint32_t permissions;
-    std::uint32_t modified_ns;
+    utils::permissions_t permissions;
 
     content_t content;
     version_t version;

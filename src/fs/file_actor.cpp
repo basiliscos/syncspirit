@@ -294,14 +294,14 @@ void file_actor_t::process(payload::remote_copy_t &cmd, process_context_t &conte
             cmd.result = ec;
             return;
         }
-        set_perms = !cmd.no_permissions && utils::platform_t::permissions_supported(path);
+        set_perms = !cmd.permissions.absent;
     } else if (cmd.type == proto::FileInfoType::DIRECTORY) {
         LOG_DEBUG(log, "creating directory '{}'", path);
         if (auto ec = context.create_directories(path); ec) {
             cmd.result = ec;
             return;
         }
-        set_perms = !cmd.no_permissions && utils::platform_t::permissions_supported(path);
+        set_perms = !cmd.permissions.absent;
     } else if (cmd.type == proto::FileInfoType::SYMLINK) {
         if (utils::platform_t::symlinks_supported()) {
             auto target = utils::make_native_view(cmd.symlink_target, context.allocator);
@@ -323,8 +323,9 @@ void file_actor_t::process(payload::remote_copy_t &cmd, process_context_t &conte
     }
 
     if (set_perms) {
-        if (auto ec = context.set_perms(path, cmd.permissions); ec) {
-            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, path, ec);
+        auto &perms = cmd.permissions.value;
+        if (auto ec = context.set_perms(path, perms); ec) {
+            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", perms, path, ec);
             cmd.result = ec;
             return;
         }
@@ -378,9 +379,10 @@ void file_actor_t::process(payload::finish_file_t &cmd, process_context_t &conte
         return;
     }
 
-    if (!cmd.no_permissions) {
-        if (auto ec = context.set_perms(path, cmd.permissions); ec) {
-            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", cmd.permissions, path, ec);
+    if (!cmd.permissions.absent) {
+        auto &perms = cmd.permissions.value;
+        if (auto ec = context.set_perms(path, perms); ec) {
+            LOG_ERROR(log, "cannot set permissions {:#o} on file: '{}': {}", perms, path, ec);
             cmd.result = ec;
             return;
         }
@@ -437,13 +439,14 @@ void file_actor_t::process(payload::update_meta_t &cmd, process_context_t &conte
 
     auto r = std::error_code();
     auto path = cmd.path.get_view(context.allocator);
-    LOG_DEBUG(log, "Updating metadata of '{}'", path);
+    LOG_DEBUG(log, "Updating metadata of '{}' (has perms: {}, mtime: {})", path, !cmd.permissions.absent,
+              cmd.modification.seconds);
 
-    if (!cmd.no_permissions && utils::platform_t::permissions_supported(path)) {
-        r = context.set_perms(path, cmd.permissions);
+    if (!cmd.permissions.absent) {
+        r = context.set_perms(path, cmd.permissions.value);
     }
     if (!r) {
-        r = context.last_write_time(path, cmd.modification_s);
+        r = context.last_write_time(path, cmd.modification.seconds);
     }
 
     if (r) {

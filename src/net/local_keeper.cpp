@@ -3,12 +3,14 @@
 
 #include "local_keeper.h"
 #include "constants.h"
+#include "fs/utils.h"
 #include "local_keeper/folder_context.h"
 #include "local_keeper/folder_slave.h"
 #include "local_keeper/hash_context.h"
 #include "model/diff/advance/local_update.h"
 #include "model/diff/local/scan_finish.h"
 #include "model/diff/local/scan_start.h"
+#include "model/diff/local/update_metadata.h"
 #include "model/diff/modify/remove_folder.h"
 #include "model/diff/modify/suspend_folder.h"
 #include "model/diff/modify/upsert_folder.h"
@@ -138,6 +140,23 @@ void local_keeper_t::try_start_watching() noexcept {
     }
 }
 
+void local_keeper_t::update_metadata() noexcept {
+    if (cluster) {
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+        auto assembler = model::diff::diff_assember_t(constants::diffs_batch);
+        for (auto &[folder, _] : cluster->get_folders()) {
+            auto &f = *folder;
+            auto comparator = fs::get_comparator(folder->get_path().get_view(allocator));
+            assembler.push_back(new model::diff::local::update_metadata_t(f.get_id(), std::move(comparator)));
+        }
+        if (auto diff = assembler.consume(); diff) {
+            send<model::payload::model_update_t>(coordinator, std::move(diff));
+        }
+    }
+}
+
 void local_keeper_t::on_start() noexcept {
     parent_t::on_start();
     send<model::payload::local_up_t>(coordinator);
@@ -152,6 +171,7 @@ void local_keeper_t::on_local_ready(model::message::local_ready_t &) noexcept {
     if (watcher_addr) {
         send<model::payload::sevice_lock_t>(coordinator, names::watcher);
     }
+    update_metadata();
     try_start_watching();
 }
 
@@ -228,8 +248,19 @@ auto local_keeper_t::operator()(const model::diff::local::scan_start_t &diff, vo
 
 auto local_keeper_t::operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
     -> outcome::result<void> {
+    auto buffer = std::array<std::byte, 1024 * 32>();
+    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto folder_id = db::get_id(diff.db);
     auto folder = cluster->get_folders().by_id(folder_id);
+
+    {
+        auto diff = model::diff::cluster_diff_ptr_t{};
+        auto comparator = fs::get_comparator(folder->get_path().get_view(allocator));
+        diff = new model::diff::local::update_metadata_t(folder_id, std::move(comparator));
+        send<model::payload::model_update_t>(coordinator, std::move(diff));
+    }
+
     if (diff.is_new) {
         auto p = folder->get_path().clone();
         auto create_dir = fs::payload::create_dir_t(std::move(p), folder_id);
@@ -481,11 +512,12 @@ void local_keeper_t::on_changes(model::folder_info_t &local_folder, fs::payload:
         if (file) {
             if (proto::get_deleted(change)) {
                 // migrate relevant metadata
+                auto &mtime = file->get_modification();
                 proto::set_type(change, model::file_info_t::as_type(file->get_type()));
-                proto::set_modified_s(change, file->get_modified_s());
-                proto::set_modified_ns(change, file->get_modified_ns());
+                proto::set_modified_s(change, mtime.seconds);
+                proto::set_modified_ns(change, mtime.ns);
             } else {
-                update = !file->identical_by_content_to(change);
+                update = !file->identical_by_content_to(change, local_folder.get_metadata_comparator());
             }
         } else {
             update = true;

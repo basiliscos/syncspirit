@@ -79,7 +79,7 @@ TEST_CASE("new file diff", "[model]") {
                 REQUIRE(file_my);
                 CHECK(file_my->is_locally_available());
                 CHECK(file_my->get_sequence() == 2);
-                CHECK(file_my->get_modified_s() == 123);
+                CHECK(file_my->get_modification().seconds == 123);
                 CHECK(folder_my->get_max_sequence() == 2);
             }
 

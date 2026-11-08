@@ -8,6 +8,7 @@
 #include "model/folder_info.h"
 #include "model/folder.h"
 #include "utils/bytes.h"
+#include "utils/metadata_comparator.h"
 #include "utils/uri.h"
 #include <boost/asio.hpp>
 #include <boost/nowide/convert.hpp>
@@ -70,6 +71,13 @@ template <typename FormatContext>
 auto fmt::formatter<utils::path_base_t>::format(const utils::path_base_t &path, FormatContext &ctx) const
     -> decltype(ctx.out()) {
     return fmt::format_to(ctx.out(), "{}", path.get_full_name());
+}
+
+template <typename FormatContext>
+auto fmt::formatter<utils::metadata_comparator_t>::format(const utils::metadata_comparator_t &item,
+                                                          FormatContext &ctx) const -> decltype(ctx.out()) {
+    return fmt::format_to(ctx.out(), "precision: {}s, perms: {}, symlinks: {}", item.timestamp_precision_s,
+                          item.permissions_supported ? "+" : "-", item.symlinks_supported ? "+" : "-");
 }
 
 template <typename FormatContext>
@@ -167,6 +175,10 @@ auto fmt::formatter<bytes_t>::format(const bytes_t &bytes, FormatContext &ctx) c
 
 template SYNCSPIRIT_API auto fmt::formatter<utils::path_base_t>::format<ctx_t>(const utils::path_base_t &,
                                                                                ctx_t &ctx) const -> decltype(ctx.out());
+
+template SYNCSPIRIT_API auto
+fmt::formatter<utils::metadata_comparator_t>::format<ctx_t>(const utils::metadata_comparator_t &, ctx_t &ctx) const
+    -> decltype(ctx.out());
 
 template SYNCSPIRIT_API auto fmt::formatter<address_t>::format<ctx_t>(const address_t &, ctx_t &ctx) const
     -> decltype(ctx.out());

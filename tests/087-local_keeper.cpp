@@ -86,13 +86,15 @@ struct my_supervisort_t : supervisor_t {
     void on_model_update(model::message::model_update_t &) noexcept override;
     outcome::result<void> operator()(const model::diff::advance::local_update_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::local::file_availability_t &, void *) noexcept override;
+    outcome::result<void> operator()(const model::diff::local::update_metadata_t &, void *) noexcept override;
 };
 
 struct fixture_t {
     using target_ptr_t = r::intrusive_ptr_t<net::local_keeper_t>;
     using builder_ptr_t = std::unique_ptr<diff_builder_t>;
 
-    fixture_t(bool auto_launch_ = true) noexcept : path_guard{unique_path()}, auto_launch{auto_launch_} {
+    fixture_t(bool auto_launch_ = true) noexcept
+        : path_guard{unique_path()}, auto_launch{auto_launch_}, metadata_comparator(0, true, true) {
         mediator = new fs::updates_mediator_t(pt::microseconds{1});
     }
 
@@ -129,6 +131,7 @@ struct fixture_t {
 
     virtual void on_diff(const model::diff::advance::local_update_t &) noexcept {}
     virtual void on_diff(const model::diff::local::file_availability_t &) noexcept {}
+    virtual void on_diff(const model::diff::local::update_metadata_t &) noexcept { ++metadata_comparator_updates; }
     virtual void on_model_update(model::message::model_update_t &) noexcept {}
 
     void run() noexcept {
@@ -170,6 +173,8 @@ struct fixture_t {
         auto buffer = std::array<std::byte, 1024 * 32>();
         auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
         auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+        auto path_view = path_guard.get_view(allocator);
+        metadata_comparator = fs::get_comparator(path_view);
 
         sup->start();
         sup->do_process();
@@ -181,6 +186,7 @@ struct fixture_t {
 
         folder = cluster->get_folders().by_id(folder_id);
         folder_info = folder->get_folder_infos().by_device(*my_device);
+        folder_info->set_metadata_comparator(metadata_comparator.clone());
         files = &folder_info->get_file_infos();
         folder_info_peer = folder->get_folder_infos().by_device(*peer_device);
         files_peer = &folder_info_peer->get_file_infos();
@@ -229,6 +235,8 @@ struct fixture_t {
     cluster_ptr_t cluster;
     device_ptr_t my_device;
     test::path_guard_t path_guard;
+    utils::metadata_comparator_t metadata_comparator;
+    std::size_t metadata_comparator_updates{0};
     target_ptr_t target;
     updates_mediator_ptr_t mediator;
     model::folder_ptr_t folder;
@@ -248,6 +256,12 @@ auto my_supervisort_t::operator()(const model::diff::advance::local_update_t &di
 }
 
 auto my_supervisort_t::operator()(const model::diff::local::file_availability_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    fixture->on_diff(diff);
+    return parent_t::operator()(diff, custom);
+}
+
+auto my_supervisort_t::operator()(const model::diff::local::update_metadata_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     fixture->on_diff(diff);
     return parent_t::operator()(diff, custom);
@@ -345,40 +359,30 @@ void test_simple() {
                     CHECK(file->get_size() == 0);
                     CHECK(blocks.size() == 0);
                     REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-#ifndef SYNCSPIRIT_WIN
-                    if (ingore_perms) {
-                        CHECK(file->has_no_permissions());
-                        CHECK(file->get_permissions() == 0666);
-                    } else {
-                        CHECK(!file->has_no_permissions());
-                        CHECK(file->get_permissions() == permissions(file_path));
-                    }
-#else
-                    CHECK(file->has_no_permissions());
-                    CHECK(file->get_permissions() == 0666);
-#endif
+                    auto expected_perms = ingore_perms ? 0666 : permissions(file_path);
+                    CHECK(metadata_comparator.equal(file->get_permissions(), expected_perms));
                 }
-#ifndef SYNCSPIRIT_WIN
-                SECTION("new symlink") {
-                    auto file_path = path_guard.get_view(allocator) / "symlink";
-                    auto target = utils::make_native_view("/some/where", allocator);
-                    create_symlink(target, file_path);
-                    REQUIRE(!ec);
-                    builder->scan_start(folder->get_id()).apply(*sup);
+                if (metadata_comparator.symlinks_supported) {
+                    SECTION("new symlink") {
+                        auto file_path = path_guard.get_view(allocator) / "symlink";
+                        auto target = utils::make_native_view("/some/where", allocator);
+                        create_symlink(target, file_path);
+                        REQUIRE(!ec);
+                        builder->scan_start(folder->get_id()).apply(*sup);
 
-                    auto file = files->by_name("symlink");
-                    REQUIRE(file);
-                    CHECK(file->is_locally_available());
-                    CHECK(!file->is_file());
-                    CHECK(file->is_link());
-                    CHECK(file->get_block_size() == 0);
-                    CHECK(file->get_size() == 0);
-                    CHECK(file->get_link_target() == target.get_full_name());
-                    CHECK(file->has_no_permissions());
-                    CHECK(blocks.size() == 0);
-                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                        auto file = files->by_name("symlink");
+                        REQUIRE(file);
+                        CHECK(file->is_locally_available());
+                        CHECK(!file->is_file());
+                        CHECK(file->is_link());
+                        CHECK(file->get_block_size() == 0);
+                        CHECK(file->get_size() == 0);
+                        CHECK(file->get_link_target() == target.get_full_name());
+                        CHECK(file->get_permissions().absent);
+                        CHECK(blocks.size() == 0);
+                        REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                    }
                 }
-#endif
                 SECTION("small non-emtpy file") {
                     auto dir_path = path_guard.get_view(allocator) / L"папка";
                     CHECK(create_directories(dir_path));
@@ -446,6 +450,18 @@ void test_simple() {
     F().run();
 }
 
+void test_startup() {
+    struct F : fixture_t {
+        void main(const utils::allocator_t &allocator) noexcept override {
+            CHECK(metadata_comparator_updates == 0);
+            sup->send<syncspirit::model::payload::local_ready_t>(sup->get_address());
+            sup->do_process();
+            CHECK(metadata_comparator_updates == 1);
+        }
+    };
+    F().run();
+}
+
 void test_create_dir() {
     struct F : fixture_t {
         void main(const utils::allocator_t &allocator) noexcept override {
@@ -457,12 +473,14 @@ void test_create_dir() {
             REQUIRE(!exists(root_path));
 
             SECTION("success") {
+                CHECK(metadata_comparator_updates == 0);
                 builder->upsert_folder(folder_id, root_path.get_full_name()).apply(*sup);
                 CHECK(exists(root_path));
                 auto f = cluster->get_folders().by_id(folder_id);
                 REQUIRE(f);
                 REQUIRE(!f->is_suspended());
                 CHECK(!f->get_scan_finish().is_not_a_date_time());
+                CHECK(metadata_comparator_updates == 1);
             }
             SECTION("fail & suspend") {
                 auto sub_path = root_path / "a" / "dir";
@@ -561,49 +579,49 @@ void test_no_changes() {
                     CHECK(file_1->is_local());
                     REQUIRE(blocks.size() == 1);
 
-#ifndef SYNCSPIRIT_WIN
-                    SECTION("changes on permissions are ignored") {
-                        proto::set_permissions(pr_file, perms - 1);
-                        proto::set_no_permissions(pr_file, true);
-                        builder->local_update(folder_id, pr_file).apply(*sup);
-                        auto seq_1 = file_1->get_sequence();
-                        builder->scan_start(folder_id).apply(*sup);
-                        chmod(path, 0);
-                        REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                        auto seq_2 = file_1->get_sequence();
-                        CHECK(seq_1 == seq_2);
+                    if (metadata_comparator.permissions_supported) {
+                        SECTION("changes on permissions are ignored") {
+                            proto::set_permissions(pr_file, perms - 1);
+                            proto::set_no_permissions(pr_file, true);
+                            builder->local_update(folder_id, pr_file).apply(*sup);
+                            auto seq_1 = file_1->get_sequence();
+                            builder->scan_start(folder_id).apply(*sup);
+                            chmod(path, 0);
+                            REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                            auto seq_2 = file_1->get_sequence();
+                            CHECK(seq_1 == seq_2);
+                        }
                     }
-#endif
                 }
 
-#ifndef SYNCSPIRIT_WIN
-                SECTION("symlink") {
-                    auto file_path = root_path / file_name;
-                    auto target = utils::make_native_view(L"/куда-то/where", allocator);
-                    create_symlink(target, file_path);
-                    auto perms = permissions(file_path);
+                if (metadata_comparator.symlinks_supported) {
+                    SECTION("symlink") {
+                        auto file_path = root_path / file_name;
+                        auto target = utils::make_native_view(L"/куда-то/where", allocator);
+                        create_symlink(target, file_path);
+                        auto perms = permissions(file_path);
 
-                    proto::set_symlink_target(pr_file, target.get_full_name());
-                    proto::set_type(pr_file, proto::FileInfoType::SYMLINK);
-                    proto::set_permissions(pr_file, perms);
+                        proto::set_symlink_target(pr_file, target.get_full_name());
+                        proto::set_type(pr_file, proto::FileInfoType::SYMLINK);
+                        proto::set_permissions(pr_file, perms);
 
-                    builder->local_update(folder_id, pr_file).apply(*sup);
-                    REQUIRE(files->size() == 1);
-                    auto file_1 = files->by_name(file_name.get_full_name());
-                    file_1->mark_local(false);
-                    REQUIRE(file_1->is_link());
-                    REQUIRE(file_1->get_link_target() == target.get_full_name());
-                    CHECK(!file_1->is_local());
+                        builder->local_update(folder_id, pr_file).apply(*sup);
+                        REQUIRE(files->size() == 1);
+                        auto file_1 = files->by_name(file_name.get_full_name());
+                        file_1->mark_local(false);
+                        REQUIRE(file_1->is_link());
+                        REQUIRE(file_1->get_link_target() == target.get_full_name());
+                        CHECK(!file_1->is_local());
 
-                    builder->scan_start(folder_id).apply(*sup);
-                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                    REQUIRE(files->size() == 1);
+                        builder->scan_start(folder_id).apply(*sup);
+                        REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                        REQUIRE(files->size() == 1);
 
-                    auto file_2 = files->by_name(file_name.get_full_name());
-                    CHECK(file_1.get() == file_2.get());
-                    CHECK(file_1->is_local());
+                        auto file_2 = files->by_name(file_name.get_full_name());
+                        CHECK(file_1.get() == file_2.get());
+                        CHECK(file_1->is_local());
+                    }
                 }
-#endif
             }
             SECTION("dir & file") {
                 auto file_name_1 = utils::make_native_view(L"b-dir", allocator);
@@ -943,7 +961,7 @@ void test_changed() {
 
                 SECTION("modification time changed") {
                     proto::set_permissions(pr_file, perms);
-                    proto::set_modified_s(pr_file, modified - 1);
+                    proto::set_modified_s(pr_file, modified - 10);
                 }
                 SECTION("permissions changed") {
                     proto::set_permissions(pr_file, perms - 1);
@@ -969,7 +987,7 @@ void test_changed() {
                 CHECK(file_2->iterate_blocks().next()->get_hash() == hash_1);
                 auto seq_2 = file_2->get_sequence();
 
-                if (!perms_changed || utils::platform_t::permissions_supported(file_path)) {
+                if (!perms_changed || metadata_comparator.permissions_supported) {
                     CHECK(seq_2 > seq_1);
                 } else {
                     CHECK(seq_2 == seq_1);
@@ -993,7 +1011,7 @@ void test_changed() {
 
                 SECTION("modification time changed") {
                     proto::set_permissions(pr_file, perms);
-                    proto::set_modified_s(pr_file, modified - 1);
+                    proto::set_modified_s(pr_file, modified - 10);
                 }
                 SECTION("permissions changed") {
                     proto::set_permissions(pr_file, perms - 1);
@@ -1016,37 +1034,37 @@ void test_changed() {
                 CHECK(file_2->is_local());
                 auto seq_2 = file_2->get_sequence();
 
-                if (perms_changed && utils::platform_t::permissions_supported(file_path)) {
+                if (perms_changed && metadata_comparator.permissions_supported) {
                     CHECK(seq_2 > seq_1);
                 } else {
                     CHECK(seq_2 == seq_1);
                 }
             }
-#ifndef SYNCSPIRIT_WIN
-            SECTION("symlink target changed") {
-                auto file_path = root_path / "symlink";
-                auto target_1 = utils::make_native_view("/some/where", allocator);
-                create_symlink(target_1, file_path, ec);
-                builder->scan_start(folder->get_id()).apply(*sup);
-                REQUIRE(files->size() == 1);
-                auto file_1 = files->by_name(file_path.get_filename());
-                REQUIRE(file_1);
-                auto seq_1 = file_1->get_sequence();
+            if (metadata_comparator.symlinks_supported) {
+                SECTION("symlink target changed") {
+                    auto file_path = root_path / "symlink";
+                    auto target_1 = utils::make_native_view("/some/where", allocator);
+                    create_symlink(target_1, file_path, ec);
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(files->size() == 1);
+                    auto file_1 = files->by_name(file_path.get_filename());
+                    REQUIRE(file_1);
+                    auto seq_1 = file_1->get_sequence();
 
-                builder->scan_start(folder->get_id()).apply(*sup);
-                REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
 
-                remove_all(file_path);
-                auto target_2 = utils::make_native_view("/some/where/2", allocator);
-                create_symlink(target_2, file_path);
-                builder->scan_start(folder->get_id()).apply(*sup);
+                    remove_all(file_path);
+                    auto target_2 = utils::make_native_view("/some/where/2", allocator);
+                    create_symlink(target_2, file_path);
+                    builder->scan_start(folder->get_id()).apply(*sup);
 
-                auto file_2 = files->by_name(file_path.get_filename());
-                REQUIRE(file_2);
-                auto seq_2 = file_2->get_sequence();
-                CHECK(seq_2 > seq_1);
+                    auto file_2 = files->by_name(file_path.get_filename());
+                    REQUIRE(file_2);
+                    auto seq_2 = file_2->get_sequence();
+                    CHECK(seq_2 > seq_1);
+                }
             }
-#endif
             SECTION("append new block") {
                 auto block_sz = fs::block_sizes[0];
                 auto b1 = std::string(block_sz, '0');
@@ -1141,17 +1159,17 @@ void test_type_change() {
                     auto seq_2 = file_2->get_sequence();
                     CHECK(seq_2 > seq_1);
                 }
-#ifndef SYNCSPIRIT_WIN
-                SECTION(" -> symlink") {
-                    create_symlink(utils::make_native_view("/some/where", allocator), file_path);
-                    builder->scan_start(folder->get_id()).apply(*sup);
-                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                    auto file_2 = files->by_name(file_name.get_full_name());
-                    REQUIRE(file_2->is_link());
-                    auto seq_2 = file_2->get_sequence();
-                    CHECK(seq_2 > seq_1);
+                if (metadata_comparator.symlinks_supported) {
+                    SECTION(" -> symlink") {
+                        create_symlink(utils::make_native_view("/some/where", allocator), file_path);
+                        builder->scan_start(folder->get_id()).apply(*sup);
+                        REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                        auto file_2 = files->by_name(file_name.get_full_name());
+                        REQUIRE(file_2->is_link());
+                        auto seq_2 = file_2->get_sequence();
+                        CHECK(seq_2 > seq_1);
+                    }
                 }
-#endif
             }
             SECTION("has been regular file") {
                 proto::set_type(pr_file, proto::FileInfoType::FILE);
@@ -1168,45 +1186,45 @@ void test_type_change() {
                     auto seq_2 = file_2->get_sequence();
                     CHECK(seq_2 > seq_1);
                 }
-#ifndef SYNCSPIRIT_WIN
-                SECTION(" -> symlink") {
-                    create_symlink(utils::make_native_view("/some/where", allocator), file_path);
-                    builder->scan_start(folder->get_id()).apply(*sup);
-                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                    auto file_2 = files->by_name(file_name.get_full_name());
-                    REQUIRE(file_2->is_link());
-                    auto seq_2 = file_2->get_sequence();
-                    CHECK(seq_2 > seq_1);
-                }
-#endif
-            }
-#ifndef SYNCSPIRIT_WIN
-            SECTION("has been symlink") {
-                proto::set_type(pr_file, proto::FileInfoType::SYMLINK);
-                builder->local_update(folder->get_id(), pr_file).apply(*sup);
-                auto file_1 = files->by_name(file_name.get_full_name());
-                REQUIRE(file_1->is_link());
-                auto seq_1 = file_1->get_sequence();
-                SECTION(" -> dir") {
-                    create_directories(file_path);
-                    builder->scan_start(folder->get_id()).apply(*sup);
-                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                    auto file_2 = files->by_name(file_name.get_full_name());
-                    REQUIRE(file_2->is_dir());
-                    auto seq_2 = file_2->get_sequence();
-                    CHECK(seq_2 > seq_1);
-                }
-                SECTION(" -> regular file") {
-                    write_file(file_path, "");
-                    builder->scan_start(folder->get_id()).apply(*sup);
-                    REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
-                    auto file_2 = files->by_name(file_name.get_full_name());
-                    REQUIRE(file_2->is_file());
-                    auto seq_2 = file_2->get_sequence();
-                    CHECK(seq_2 > seq_1);
+                if (metadata_comparator.symlinks_supported) {
+                    SECTION(" -> symlink") {
+                        create_symlink(utils::make_native_view("/some/where", allocator), file_path);
+                        builder->scan_start(folder->get_id()).apply(*sup);
+                        REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                        auto file_2 = files->by_name(file_name.get_full_name());
+                        REQUIRE(file_2->is_link());
+                        auto seq_2 = file_2->get_sequence();
+                        CHECK(seq_2 > seq_1);
+                    }
                 }
             }
-#endif
+            if (metadata_comparator.symlinks_supported) {
+                SECTION("has been symlink") {
+                    proto::set_type(pr_file, proto::FileInfoType::SYMLINK);
+                    builder->local_update(folder->get_id(), pr_file).apply(*sup);
+                    auto file_1 = files->by_name(file_name.get_full_name());
+                    REQUIRE(file_1->is_link());
+                    auto seq_1 = file_1->get_sequence();
+                    SECTION(" -> dir") {
+                        create_directories(file_path);
+                        builder->scan_start(folder->get_id()).apply(*sup);
+                        REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                        auto file_2 = files->by_name(file_name.get_full_name());
+                        REQUIRE(file_2->is_dir());
+                        auto seq_2 = file_2->get_sequence();
+                        CHECK(seq_2 > seq_1);
+                    }
+                    SECTION(" -> regular file") {
+                        write_file(file_path, "");
+                        builder->scan_start(folder->get_id()).apply(*sup);
+                        REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
+                        auto file_2 = files->by_name(file_name.get_full_name());
+                        REQUIRE(file_2->is_file());
+                        auto seq_2 = file_2->get_sequence();
+                        CHECK(seq_2 > seq_1);
+                    }
+                }
+            }
         }
     };
     F().run();
@@ -1372,59 +1390,61 @@ void test_scan_errors() {
 
         void main(const utils::allocator_t &allocator) noexcept override {
             auto root_path = path_guard.get_view(allocator);
-            SECTION("root dir errors") {
-                SECTION("missing root dir") { folder->set_path((root_path / "some-dir").detach()); }
-                SECTION("no permissings to read outer dir") {
-                    folder->set_path((root_path / "some-dir").detach());
-                    chmod(root_path, 0);
-                }
-                builder->scan_start(folder->get_id()).apply(*sup);
-                REQUIRE(folder->is_suspended());
-                REQUIRE(folder->get_suspend_reason().message() != "");
-                CHECK(!folder->is_scanning());
-                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                chmod(root_path, 0777);
-                CHECK(exec_attempts == 1);
-            }
             SECTION("missing start dir (in model)") {
                 builder->scan_start(folder->get_id(), "non-existing-dir").apply(*sup);
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
                 CHECK(exec_attempts == 0);
             }
+            if (metadata_comparator.permissions_supported) {
+                SECTION("root dir errors") {
+                    SECTION("missing root dir") { folder->set_path((root_path / "some-dir").detach()); }
+                    SECTION("no permissions to read outer dir") {
+                        folder->set_path((root_path / "some-dir").detach());
+                        chmod(root_path, 0);
+                    }
+                    builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(folder->is_suspended());
+                    REQUIRE(folder->get_suspend_reason().message() != "");
+                    CHECK(!folder->is_scanning());
+                    CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                    chmod(root_path, 0777);
+                    CHECK(exec_attempts == 1);
+                }
+                SECTION("non-root errors (non-win32)") {
+                    auto dir_path = root_path / "d1" / "d2";
+                    auto d1_path = dir_path.get_parent();
+                    create_directories(dir_path);
+
+                    auto perms = permissions(d1_path);
+                    chmod(d1_path, 0);
+
+                    builder->scan_start(folder->get_id()).apply(*sup);
+
+                    auto ec = sys::error_code{};
+                    create_directories(d1_path / L"авось", ec);
+                    chmod(d1_path, 0777);
+
+                    if (ec) {
+                        REQUIRE(!folder->is_suspended());
+                        CHECK(!folder->is_scanning());
+                        CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                        CHECK(files->size() == 0);
+                    } else {
+                        INFO("Skipping due to unability to prohibit directories creation");
+                    }
+                }
 #ifndef SYNCSPIRIT_WIN
-            SECTION("non-root errors (non-win32)") {
-                auto dir_path = root_path / "d1" / "d2";
-                auto d1_path = dir_path.get_parent();
-                create_directories(dir_path);
-
-                auto perms = permissions(d1_path);
-                chmod(d1_path, 0);
-
-                builder->scan_start(folder->get_id()).apply(*sup);
-
-                auto ec = sys::error_code{};
-                create_directories(d1_path / L"авось", ec);
-                chmod(d1_path, 0777);
-
-                if (ec) {
-                    REQUIRE(!folder->is_suspended());
+                SECTION("non-sync'able entity (named fifo file)") {
+                    auto fifo_path = root_path / "fifo";
+                    REQUIRE(mknod(fifo_path.get_full_name().data(), S_IFIFO | 0666, 0) == 0);
+                    builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!folder->is_scanning());
                     CHECK(folder->get_scan_finish() >= folder->get_scan_start());
                     CHECK(files->size() == 0);
-                } else {
-                    INFO("Skipping due to unability to prohibit directories creation");
                 }
-            }
-            SECTION("non-sync'able entity (named fifo file)") {
-                auto fifo_path = root_path / "fifo";
-                REQUIRE(mknod(fifo_path.get_full_name().data(), S_IFIFO | 0666, 0) == 0);
-                builder->scan_start(folder->get_id()).apply(*sup);
-                CHECK(!folder->is_scanning());
-                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                CHECK(files->size() == 0);
-            }
 #endif
+            }
             SECTION("generic task error") {
                 exec_pool = 1;
                 auto dir_path = root_path / "d1" / "d2";
@@ -1550,49 +1570,49 @@ void test_read_errors() {
 
         void main(const utils::allocator_t &allocator) noexcept override {
             auto root_path = path_guard.get_view(allocator);
-#ifndef SYNCSPIRIT_WIN
-            SECTION("small unknown/new file") {
-                launch_target();
-                auto file_path = root_path / "file.bin";
-                write_file(file_path, "12345");
-                chmod(file_path, 0);
+            if (metadata_comparator.permissions_supported) {
+                SECTION("small unknown/new file") {
+                    launch_target();
+                    auto file_path = root_path / "file.bin";
+                    write_file(file_path, "12345");
+                    chmod(file_path, 0);
 
-                if (read_file(file_path) == "") {
-                    builder->scan_start(folder->get_id()).apply(*sup);
-                    CHECK(!folder->is_scanning());
-                    CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                    CHECK(files->size() == 0);
+                    if (read_file(file_path) == "") {
+                        builder->scan_start(folder->get_id()).apply(*sup);
+                        CHECK(!folder->is_scanning());
+                        CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                        CHECK(files->size() == 0);
+                    }
                 }
-            }
-            SECTION("small known file") {
-                launch_target();
-                auto file_path = root_path / "file.bin";
-                write_file(file_path, "12345");
+                SECTION("small known file") {
+                    launch_target();
+                    auto file_path = root_path / "file.bin";
+                    write_file(file_path, "12345");
 
-                builder->scan_start(folder->get_id()).apply(*sup);
-                CHECK(!folder->is_scanning());
-                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                REQUIRE(files->size() == 1);
-
-                auto file_1 = *files->begin();
-                CHECK(!file_1->is_unreachable());
-                CHECK(file_1->is_locally_available());
-
-                auto max_seq = folder_info->get_max_sequence();
-
-                chmod(file_path, 0);
-                if (read_file(file_path) == "") {
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!folder->is_scanning());
                     CHECK(folder->get_scan_finish() >= folder->get_scan_start());
                     REQUIRE(files->size() == 1);
 
-                    CHECK(file_1->is_unreachable());
-                    CHECK(!file_1->is_locally_available());
-                    CHECK(folder_info->get_max_sequence() == max_seq);
+                    auto file_1 = *files->begin();
+                    CHECK(!file_1->is_unreachable());
+                    CHECK(file_1->is_locally_available());
+
+                    auto max_seq = folder_info->get_max_sequence();
+
+                    chmod(file_path, 0);
+                    if (read_file(file_path) == "") {
+                        builder->scan_start(folder->get_id()).apply(*sup);
+                        CHECK(!folder->is_scanning());
+                        CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                        REQUIRE(files->size() == 1);
+
+                        CHECK(file_1->is_unreachable());
+                        CHECK(!file_1->is_locally_available());
+                        CHECK(folder_info->get_max_sequence() == max_seq);
+                    }
                 }
             }
-#endif
             SECTION("large unknown file") {
                 auto file_path = root_path / "file.bin";
                 auto block_sz = fs::block_sizes[0];
@@ -1649,56 +1669,56 @@ void test_read_errors() {
                 CHECK(files->size() == 0);
                 CHECK(hasher->digested_blocks <= block_index + hash_limit);
             }
-            SECTION("cannot read existing dir") {
-#ifndef SYNCSPIRIT_WIN
-                launch_target();
-                auto dir_path = root_path / L"папка";
-                auto subdir_path = dir_path / L"подпапка";
-                auto file_path = subdir_path / "файл.bin";
-                create_directories(subdir_path);
-                write_file(file_path, "12345");
-                builder->scan_start(folder->get_id()).apply(*sup);
-                CHECK(!folder->is_scanning());
-                CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                CHECK(files->size() == 3);
-
-                auto file_1 = files->by_name(narrow(L"папка"));
-                auto file_2 = files->by_name(narrow(L"папка/подпапка"));
-                auto file_3 = files->by_name(narrow(L"папка/подпапка/файл.bin"));
-                REQUIRE(file_1);
-                REQUIRE(file_2);
-                REQUIRE(file_3);
-
-                auto max_seq = folder_info->get_max_sequence();
-
-                auto perms = permissions(dir_path);
-                chmod(dir_path, 0);
-
-                auto ec = sys::error_code{};
-                create_directories(dir_path / L"авось", ec);
-                if (ec) {
+            if (metadata_comparator.permissions_supported) {
+                SECTION("cannot read existing dir") {
+                    launch_target();
+                    auto dir_path = root_path / L"папка";
+                    auto subdir_path = dir_path / L"подпапка";
+                    auto file_path = subdir_path / "файл.bin";
+                    create_directories(subdir_path);
+                    write_file(file_path, "12345");
                     builder->scan_start(folder->get_id()).apply(*sup);
-                    chmod(dir_path, perms);
-
                     CHECK(!folder->is_scanning());
                     CHECK(folder->get_scan_finish() >= folder->get_scan_start());
                     CHECK(files->size() == 3);
-                    CHECK(folder_info->get_max_sequence() == max_seq);
 
-                    CHECK(file_1->is_unreachable());
-                    CHECK(file_2->is_unreachable());
-                    CHECK(file_3->is_unreachable());
+                    auto file_1 = files->by_name(narrow(L"папка"));
+                    auto file_2 = files->by_name(narrow(L"папка/подпапка"));
+                    auto file_3 = files->by_name(narrow(L"папка/подпапка/файл.bin"));
+                    REQUIRE(file_1);
+                    REQUIRE(file_2);
+                    REQUIRE(file_3);
 
-                    builder->scan_start(folder->get_id()).apply(*sup);
-                    CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                    CHECK(files->size() == 3);
-                    CHECK(folder_info->get_max_sequence() == max_seq);
+                    auto max_seq = folder_info->get_max_sequence();
 
-                    CHECK(!file_1->is_unreachable());
-                    CHECK(!file_2->is_unreachable());
-                    CHECK(!file_3->is_unreachable());
+                    auto perms = permissions(dir_path);
+                    chmod(dir_path, 0);
+
+                    auto ec = sys::error_code{};
+                    create_directories(dir_path / L"авось", ec);
+                    if (ec) {
+                        builder->scan_start(folder->get_id()).apply(*sup);
+                        chmod(dir_path, perms);
+
+                        CHECK(!folder->is_scanning());
+                        CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                        CHECK(files->size() == 3);
+                        CHECK(folder_info->get_max_sequence() == max_seq);
+
+                        CHECK(file_1->is_unreachable());
+                        CHECK(file_2->is_unreachable());
+                        CHECK(file_3->is_unreachable());
+
+                        builder->scan_start(folder->get_id()).apply(*sup);
+                        CHECK(folder->get_scan_finish() >= folder->get_scan_start());
+                        CHECK(files->size() == 3);
+                        CHECK(folder_info->get_max_sequence() == max_seq);
+
+                        CHECK(!file_1->is_unreachable());
+                        CHECK(!file_2->is_unreachable());
+                        CHECK(!file_3->is_unreachable());
+                    }
                 }
-#endif
             }
         }
         std::uint32_t exec_pool = 10;
@@ -1772,7 +1792,7 @@ void test_incomplete() {
             auto &counter = proto::add_counters(v);
             proto::set_id(counter, 55);
             proto::set_value(counter, 2);
-            proto::set_modified_s(pr_file, 12345);
+            proto::set_modified_s(pr_file, 1234567890);
 
             auto data_1 = as_owned_bytes("12345");
             auto data_2 = as_owned_bytes("67890");
@@ -1823,29 +1843,29 @@ void test_incomplete() {
 
                     CHECK(files->size() == 0);
                 }
-#ifndef SYNCSPIRIT_WIN
-                SECTION("cannot read tmp file") {
-                    write_file(path, "12345");
-                    last_write_time(path, m_time);
-                    auto perms = permissions(path);
+                if (metadata_comparator.permissions_supported) {
+                    SECTION("cannot read tmp file") {
+                        write_file(path, "12345");
+                        last_write_time(path, m_time);
+                        auto perms = permissions(path);
 
-                    proto::add_blocks(pr_file, b_1);
-                    proto::set_size(pr_file, data_1.size());
-                    proto::set_permissions(pr_file, perms);
-                    proto::set_modified_s(pr_file, last_write_time(path));
+                        proto::add_blocks(pr_file, b_1);
+                        proto::set_size(pr_file, data_1.size());
+                        proto::set_permissions(pr_file, perms);
+                        proto::set_modified_s(pr_file, last_write_time(path));
 
-                    builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
+                        builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
-                    chmod(path, 0);
-                    if (read_file(path) == "") {
-                        builder->scan_start(folder->get_id()).apply(*sup);
-                        CHECK(files->size() == 0);
-                    } else {
-                        builder->scan_start(folder->get_id()).apply(*sup);
-                        should_not_exist = false;
+                        chmod(path, 0);
+                        if (read_file(path) == "") {
+                            builder->scan_start(folder->get_id()).apply(*sup);
+                            CHECK(files->size() == 0);
+                        } else {
+                            builder->scan_start(folder->get_id()).apply(*sup);
+                            should_not_exist = false;
+                        }
                     }
                 }
-#endif
                 SECTION("local version is better than remote (local file does exists)") {
                     write_file(path, "1234");
                     last_write_time(path, m_time);
@@ -1880,6 +1900,7 @@ void test_incomplete() {
                 proto::add_blocks(pr_file, b_1);
                 proto::add_blocks(pr_file, b_2);
                 proto::set_size(pr_file, data_1.size() + data_2.size());
+                proto::set_no_permissions(pr_file, !metadata_comparator.permissions_supported);
 
                 auto model_path = root_path / file_name;
                 SECTION("all blocks match => rename & add into model") {
@@ -2044,7 +2065,7 @@ void test_importing() {
         void main(const utils::allocator_t &allocator) noexcept override {
             auto root_path = path_guard.get_view(allocator);
             auto peer_short_id = my_device->device_id().get_uint();
-            auto modified_s = std::int64_t{12345};
+            auto modified_s = std::int64_t{1234567890};
             auto sha256 = peer_device->device_id().get_sha256();
             SECTION("regular file") {
                 auto block_sz = fs::block_sizes[0];
@@ -2294,6 +2315,7 @@ void test_races() {
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
+    REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
     REGISTER_TEST_CASE(test_create_dir, "test_create_dir", "[net]");
     REGISTER_TEST_CASE(test_no_changes, "test_no_changes", "[net]");
     REGISTER_TEST_CASE(test_deleted, "test_deleted", "[net]");

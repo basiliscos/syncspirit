@@ -43,7 +43,9 @@ static constexpr auto default_perms = std::uint32_t{0123};
 
 #ifndef SYNCSPIRIT_WIN
 static constexpr auto expected_perms = std::uint32_t{0123};
+static constexpr auto permissions_supported = true;
 #else
+static constexpr auto permissions_supported = false;
 static constexpr auto expected_perms = std::uint32_t{0666};
 #endif
 
@@ -98,7 +100,9 @@ struct fixture_t {
     using unwatch_folder_msg_t = r::intrusive_ptr_t<fs::message::unwatch_folder_t>;
     using create_dir_msg_t = r::intrusive_ptr_t<fs::message::create_dir_t>;
 
-    fixture_t() noexcept { log = utils::get_logger("fixture", true); }
+    fixture_t() noexcept : metadata_comparator(0, permissions_supported, true) {
+        log = utils::get_logger("fixture", true);
+    }
 
     virtual std::uint32_t get_hash_limit() { return 1; }
 
@@ -210,6 +214,7 @@ struct fixture_t {
     device_ptr_t local_device;
     device_ptr_t peer_device;
     utils::logger_t log;
+    utils::metadata_comparator_t metadata_comparator;
     target_ptr_t target;
     model::sequencer_ptr_t sequencer;
     watch_folder_msg_t watch_folder_msg;
@@ -509,10 +514,8 @@ void test_trivial_changes() {
                 CHECK(files_local->size() == 1);
                 auto f = files_local->by_name(file_name);
                 REQUIRE(f);
-#ifndef SYNCSPIRIT_WIN
-                CHECK(f->get_permissions() == expected_perms);
-#endif
-                CHECK(f->get_modified_s() == 12345);
+                CHECK(metadata_comparator.equal(f->get_permissions(), expected_perms));
+                CHECK(f->get_modification().seconds == 12345);
                 CHECK(f->get_size() == 0);
                 if (file_type == FT::DIRECTORY) {
                     CHECK(f->is_dir());
@@ -530,25 +533,27 @@ void test_trivial_changes() {
                 builder->local_update(folder_id, file).apply(*sup);
 
                 auto f = files_local->by_name(file_name);
-                CHECK(f->get_permissions() == 0123);
+                CHECK(metadata_comparator.equal(f->get_permissions(), 0123));
                 REQUIRE(f);
 
                 auto file_seq = f->get_sequence();
                 auto folder_seq = folder_local->get_max_sequence();
                 auto update_type = fs::update_type_t::meta;
 
-                SECTION("update metadata") {
-                    proto::set_permissions(file, 0777);
-                    update_type = fs::update_type_t::meta;
-                    mk_update(file, update_type, false);
-                    CHECK(f->get_permissions() == 0777);
-                    CHECK(!f->is_deleted());
+                if (metadata_comparator.permissions_supported) {
+                    SECTION("update metadata") {
+                        proto::set_permissions(file, 0777);
+                        update_type = fs::update_type_t::meta;
+                        mk_update(file, update_type, false);
+                        CHECK(metadata_comparator.equal(f->get_permissions(), 0777));
+                        CHECK(!f->is_deleted());
+                    }
                 }
                 SECTION("delete file") {
                     proto::set_deleted(file, true);
                     update_type = fs::update_type_t::deleted;
                     mk_update(file, update_type, false);
-                    CHECK(f->get_permissions() == 0123);
+                    CHECK(metadata_comparator.equal(f->get_permissions(), 0123));
                     CHECK(f->is_deleted());
                 }
                 auto file_seq_2 = f->get_sequence();
@@ -759,8 +764,8 @@ void test_hashing() {
 
             auto f = files_local->by_name(file_name);
             REQUIRE(f);
-            CHECK(f->get_permissions() == expected_perms);
-            CHECK(f->get_modified_s() == 12345);
+            CHECK(metadata_comparator.equal(f->get_permissions(), expected_perms));
+            CHECK(f->get_modification().seconds == 12345);
             CHECK(f->get_size() == 5);
             CHECK(f->is_file());
         }
@@ -2038,15 +2043,15 @@ void test_renaming_simple() {
 
                 auto f2 = files_local->by_name(file_name_2);
                 REQUIRE(f2);
-                CHECK(f2->get_permissions() == default_perms);
-                CHECK(f2->get_modified_s() == 12345);
+                CHECK(metadata_comparator.equal(f2->get_permissions(), default_perms));
+                CHECK(f2->get_modification().seconds == 12345);
                 CHECK(!f2->is_deleted());
                 CHECK(model::file_info_t::as_type(f2->get_type()) == file_type);
 
                 auto f1 = files_local->by_name(file_name_1);
                 REQUIRE(f1);
-                CHECK(f1->get_permissions() == default_perms);
-                CHECK(f1->get_modified_s() == 12345);
+                CHECK(metadata_comparator.equal(f1->get_permissions(), default_perms));
+                CHECK(f1->get_modification().seconds == 12345);
                 CHECK(f1->is_deleted());
             }
 
@@ -2075,8 +2080,8 @@ void test_renaming_simple() {
 
                 auto f2 = files_local->by_name(file_name_2);
                 REQUIRE(f2);
-                CHECK(f2->get_permissions() == default_perms);
-                CHECK(f2->get_modified_s() == 12345);
+                CHECK(metadata_comparator.equal(f2->get_permissions(), default_perms));
+                CHECK(f2->get_modification().seconds == 12345);
                 CHECK(!f2->is_deleted());
                 CHECK(model::file_info_t::as_type(f2->get_type()) == FT::FILE);
                 CHECK(f2->get_block_size() == 5);
@@ -2085,8 +2090,8 @@ void test_renaming_simple() {
 
                 auto f1 = files_local->by_name(file_name_1);
                 REQUIRE(f1);
-                CHECK(f1->get_permissions() == default_perms);
-                CHECK(f1->get_modified_s() == 12345);
+                CHECK(metadata_comparator.equal(f1->get_permissions(), default_perms));
+                CHECK(f1->get_modification().seconds == 12345);
                 CHECK(f1->is_deleted());
                 CHECK(blocks.size() == 1);
             }
@@ -2689,8 +2694,8 @@ void test_renaming_to_ignored() {
 
             auto f = files_local->by_name("valuable.bin");
             REQUIRE(f);
-            CHECK(f->get_permissions() == default_perms);
-            CHECK(f->get_modified_s() == 12345);
+            CHECK(metadata_comparator.equal(f->get_permissions(), default_perms));
+            CHECK(f->get_modification().seconds == 12345);
             CHECK(f->is_deleted());
             CHECK(cluster->get_blocks().size() == 0);
         }

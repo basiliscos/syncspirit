@@ -55,7 +55,9 @@ struct fixture_t {
     using change_message_ptr_t = r::intrusive_ptr_t<fs::message::folder_changes_t>;
     using change_messages_t = std::deque<change_message_ptr_t>;
 
-    fixture_t() noexcept : path_guard{unique_path()} { log = utils::get_logger("fixture", true); }
+    fixture_t() noexcept : path_guard{unique_path()}, metadata_comparator{0, true, true} {
+        log = utils::get_logger("fixture", true);
+    }
 
     virtual void create_updates_mediator() { updates_mediator = new fs::updates_mediator_t(retension_timeout * 2); }
 
@@ -100,6 +102,7 @@ struct fixture_t {
         auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
         auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
         auto root_path = path_guard.get_view(allocator);
+        metadata_comparator = fs::get_comparator(root_path);
 
         auto back_addr = sup->get_address();
         sup->route<fs::payload::watch_folder_t>(watcher_actor->get_address(), back_addr, root_path.detach(), folder_id);
@@ -141,11 +144,11 @@ struct fixture_t {
         auto type = proto::FileInfoType::DIRECTORY;
         auto size = 0;
         auto deleted = false;
-        auto perms = 0666;
+        auto perms = utils::permissions_t{0666, metadata_comparator.permissions_supported};
         auto target = std::string();
 
         auto payload = fs::payload::remote_copy_t(std::move(context), folder_id, path.detach(), {}, type, size, perms,
-                                                  modified, target, deleted, false);
+                                                  modified, target, deleted);
         auto cmd = fs::payload::io_command_t(std::move(payload));
         auto cmds = fs::payload::io_commands_t{nullptr};
         cmds.commands.emplace_back(std::move(cmd));
@@ -157,6 +160,7 @@ struct fixture_t {
     r::pt::time_duration timeout = r::pt::millisec{10};
     r::pt::time_duration retension_timeout = r::pt::millisec{150};
     test::path_guard_t path_guard;
+    utils::metadata_comparator_t metadata_comparator;
     fs_context_ptr_r fs_context;
     fs::updates_mediator_ptr_t updates_mediator;
     fs::watched_folders_ptr_t watched_folders;
@@ -207,9 +211,9 @@ void test_with_mediator() {
             auto context = fs::payload::extendended_context_prt_t{};
             auto path = root_path / L"файл";
             std::int64_t modified = 1641828421;
-            auto perms = 0666;
+            auto perms = utils::permissions_t{0666, metadata_comparator.permissions_supported};
             auto payload =
-                fs::payload::finish_file_t(std::move(context), folder_id, path.detach(), {}, 5, modified, 0666, true);
+                fs::payload::finish_file_t(std::move(context), folder_id, path.detach(), {}, 5, modified, perms);
             auto cmd = fs::payload::io_command_t(std::move(payload));
             auto cmds = fs::payload::io_commands_t{nullptr};
             cmds.commands.emplace_back(std::move(cmd));
