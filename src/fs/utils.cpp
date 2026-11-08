@@ -90,7 +90,7 @@ utils::metadata_comparator_t get_comparator(const utils::poly_path_view_t &path)
             symlinks_supported = false;
         }
 #elif defined(__unix__)
-        if (std::string_view("msdosfs") == sfs.f_fstypename) {
+        if (std::string_view("msdosfs") == data.f_fstypename) {
             timestamp_precision_s = 1;
             permissions_supported = false;
             symlinks_supported = false;

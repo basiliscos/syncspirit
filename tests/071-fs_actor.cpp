@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
-#include "test-utils.h"
+#include "access.h"
 #include "fs/file_actor.h"
 #include "fs/utils.h"
 #include "fs/platform/context_base.h"
 #include "net/names.h"
+#include "syncspirit-config.h"
+#include "test-utils.h"
 #include "test_supervisor.h"
-#include "access.h"
 #include "utils/error_code.h"
 #include <optional>
 #include <utility>
