@@ -208,7 +208,6 @@ struct SYNCSPIRIT_API file_info_t {
     std::size_t expected_meta_size() const noexcept;
 
     utils::permissions_t get_permissions() const noexcept;
-    bool has_no_permissions() const noexcept;
 
     guard_t guard(const model::folder_info_t &folder_info) noexcept;
 

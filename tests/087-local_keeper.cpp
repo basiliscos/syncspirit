@@ -369,7 +369,7 @@ void test_simple() {
                         CHECK(file->get_block_size() == 0);
                         CHECK(file->get_size() == 0);
                         CHECK(file->get_link_target() == target.get_full_name());
-                        CHECK(file->has_no_permissions());
+                        CHECK(file->get_permissions().absent);
                         CHECK(blocks.size() == 0);
                         REQUIRE(folder->get_scan_finish() >= folder->get_scan_start());
                     }

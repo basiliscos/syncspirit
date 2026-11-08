@@ -529,8 +529,6 @@ std::size_t file_info_t::expected_meta_size() const noexcept {
 
 utils::permissions_t file_info_t::get_permissions() const noexcept { return permissions; }
 
-bool file_info_t::has_no_permissions() const noexcept { return permissions.absent; }
-
 void file_info_t::update(const file_info_t &other) noexcept {
     using hashes_t = std::set<utils::bytes_view_t, utils::bytes_comparator_t>;
 

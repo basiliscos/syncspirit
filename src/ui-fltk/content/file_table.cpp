@@ -131,7 +131,7 @@ file_table_t::file_table_t(presence_item_t &container_, int x, int y, int w, int
     data.push_back({"is_link", make_checkbox(*this, entity.is_link())});
     data.push_back({"is_invalid", make_checkbox(*this, entity.is_invalid())});
     data.push_back({"is_deleted", make_checkbox(*this, entity.is_deleted())});
-    data.push_back({"no_permissions", make_checkbox(*this, entity.has_no_permissions())});
+    data.push_back({"no_permissions", make_checkbox(*this, entity.get_permissions().absent)});
     data.push_back({"symlink_target", symlink_target_cell});
     data.push_back({"entries", entries_cell});
     data.push_back({"entries size", entries_size_cell});
