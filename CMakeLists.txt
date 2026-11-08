@@ -320,7 +320,7 @@ FetchContent_Declare(MDBX
     URL_HASH SHA256=0dd6bf6048d5d208bc20d325cf93c8f88beda95802e9e3aa7958346611c36922
     PATCH_COMMAND ${CMAKE_COMMAND} -E
         chdir ${CMAKE_CURRENT_BINARY_DIR}
-        patch -u _deps/mdbx-src/mdbx.c -i ${CMAKE_CURRENT_SOURCE_DIR}/misc/mdbx-win32.patch
+        patch -u -p0 -i ${CMAKE_CURRENT_SOURCE_DIR}/misc/mdbx.patch
 )
     if (WIN32)
         set(BUILD_SHARED_LIBS true CACHE BOOL "BUILD_SHARED_LIBS")
