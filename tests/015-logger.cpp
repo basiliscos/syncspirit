@@ -31,8 +31,8 @@ static bool _init = []() {
 TEST_CASE("default logger", "[log]") {
     init_root();
     config::log_configs_t cfg{{"default", L::trace, {"stdout"}}};
-    REQUIRE(utils::init_loggers(cfg));
-    auto l = utils::get_logger("default");
+    REQUIRE(utils::init_loggers(cfg, true));
+    auto l = utils::get_logger("default", true);
     CHECK(l);
     CHECK(l->level() == L::trace);
 }
@@ -40,24 +40,24 @@ TEST_CASE("default logger", "[log]") {
 TEST_CASE("hierarchy", "[log]") {
     init_root();
     config::log_configs_t cfg{{"default", L::trace, {"stdout"}}, {"a", L::info, {}}, {"a.b.c", L::warn, {}}};
-    REQUIRE(utils::init_loggers(cfg));
+    REQUIRE(utils::init_loggers(cfg, true));
     SECTION("custom") {
-        auto l = utils::get_logger("a");
+        auto l = utils::get_logger("a", true);
         REQUIRE(l);
         CHECK(l->level() == L::info);
     }
     SECTION("submatch") {
-        auto l = utils::get_logger("a.b");
+        auto l = utils::get_logger("a.b", true);
         REQUIRE(l);
         CHECK(l->level() == L::info);
     }
     SECTION("full match") {
-        auto l = utils::get_logger("a.b.c");
+        auto l = utils::get_logger("a.b.c", true);
         REQUIRE(l);
         CHECK(l->level() == L::warn);
     }
     SECTION("mismatch") {
-        auto l = utils::get_logger("xxx");
+        auto l = utils::get_logger("xxx", true);
         REQUIRE(l);
         CHECK(l->level() == L::trace);
     }
@@ -75,8 +75,8 @@ TEST_CASE("file sink", "[log]") {
     INFO("log_file = " << sink_config);
 
     config::log_configs_t cfg{{"default", L::trace, {sink_config}}};
-    REQUIRE(utils::init_loggers(cfg));
-    auto l = utils::get_logger("default");
+    REQUIRE(utils::init_loggers(cfg, true));
+    auto l = utils::get_logger("default", true);
     l->info("lorem ipsum dolor");
     l->flush();
 

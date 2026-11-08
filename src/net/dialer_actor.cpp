@@ -27,7 +27,7 @@ void dialer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("net.dialer", false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
 }
 

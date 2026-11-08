@@ -5,6 +5,7 @@
 #include "syncspirit-config.h"
 #include "fs/updates_mediator.h"
 #include "fs/fs_proxy.h"
+#include "fs/utils.h"
 #include "utils/format.hpp"
 
 using namespace syncspirit;
@@ -18,6 +19,7 @@ TEST_CASE("block iterator", "[model]") {
 
     auto path_guard = unique_path();
     auto root_view = path_guard.get_view(allocator);
+    auto comparator = fs::get_comparator(root_view);
 
     auto interval = pt::microseconds{1};
     auto mediator = updates_mediator_t(interval, true);
@@ -127,34 +129,37 @@ TEST_CASE("block iterator", "[model]") {
     }
     SECTION("last_write_time") {
         auto path = root_view / L"файлик";
+        auto ts = utils::timestamp_t{1234567890, 0};
         write_file(path, {});
-        auto ec = proxy.last_write_time(path, 123456);
+        auto ec = proxy.last_write_time(path, ts.seconds);
         CHECK(!ec);
         CHECK(mediator.is_masked(path.get_full_name()) == 1);
         CHECK(proxy.mediator_updates == 1);
-        CHECK(last_write_time(path) == 123456);
+        CAPTURE(last_write_time(path));
+        CHECK(comparator.equal(ts, last_write_time(path)));
+        CHECK(comparator.equal(ts, last_write_time(path)));
     }
-    SECTION("set_perms") {
-#ifndef SYNCSPIRIT_WIN
-        auto path = root_view / L"файлик";
-        write_file(path, {});
-        auto ec = proxy.set_perms(path, 0666);
-        CHECK(!ec);
-        CHECK(mediator.is_masked(path.get_full_name()) == 1);
-        CHECK(proxy.mediator_updates == 1);
-        CHECK(permissions(path) == 0666);
-#endif
+    if (comparator.permissions_supported) {
+        SECTION("set_perms") {
+            auto path = root_view / L"файлик";
+            write_file(path, {});
+            auto ec = proxy.set_perms(path, 0666);
+            CHECK(!ec);
+            CHECK(mediator.is_masked(path.get_full_name()) == 1);
+            CHECK(proxy.mediator_updates == 1);
+            CHECK(permissions(path) == 0666);
+        }
     }
-    SECTION("create_link") {
-#ifndef SYNCSPIRIT_WIN
-        auto path = root_view / L"файлик";
-        auto target = root_view / L"bla-bla";
-        auto ec = proxy.create_link(target, path);
-        CHECK(!ec);
-        CHECK(mediator.is_masked(path.get_full_name()) == 1);
-        CHECK(proxy.mediator_updates == 1);
-        CHECK(read_symlink(path) == target.get_full_name());
-#endif
+    if (comparator.symlinks_supported) {
+        SECTION("create_link") {
+            auto path = root_view / L"файлик";
+            auto target = root_view / L"bla-bla";
+            auto ec = proxy.create_link(target, path);
+            CHECK(!ec);
+            CHECK(mediator.is_masked(path.get_full_name()) == 1);
+            CHECK(proxy.mediator_updates == 1);
+            CHECK(read_symlink(path) == target.get_full_name());
+        }
     }
     SECTION("rename") {
         auto path_1 = root_view / L"файлик1";
@@ -169,7 +174,6 @@ TEST_CASE("block iterator", "[model]") {
     }
     SECTION("write") {
         auto path = root_view / L"файл.bin";
-        // bfs::create_directories(path.parent_path());
         auto opt = proxy.open_write(path, 5);
         REQUIRE(opt);
         auto &f = opt.assume_value();

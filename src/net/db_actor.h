@@ -32,6 +32,7 @@ struct SYNCSPIRIT_API db_actor_t final : public model_actor_t<r::actor_base_t>, 
         size_t uncommitted_threshold = {100};
         r::address_ptr_t bouncer_address;
         std::uint_fast32_t max_files_per_diff;
+        bool flush_logs = false;
     };
 
     template <typename Actor> struct config_builder_t : parent_t::template config_builder_t<Actor> {
@@ -53,6 +54,10 @@ struct SYNCSPIRIT_API db_actor_t final : public model_actor_t<r::actor_base_t>, 
         }
         builder_t &&max_files_per_diff(std::uint_fast32_t value) && noexcept {
             base_t::config.max_files_per_diff = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
+        builder_t &&flush_logs(bool value) && noexcept {
+            base_t::config.flush_logs = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
     };
@@ -155,6 +160,7 @@ struct SYNCSPIRIT_API db_actor_t final : public model_actor_t<r::actor_base_t>, 
     transaction_ptr_t txn_holder;
     std::int_fast32_t uncommitted;
     std::uint_fast32_t max_files_per_diff;
+    bool flush_logs = false;
 };
 
 } // namespace net

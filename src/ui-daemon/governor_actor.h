@@ -18,6 +18,7 @@ struct governor_actor_config_t : r::actor_config_t {
     Commands commands;
     model::sequencer_ptr_t sequencer;
     model::cluster_ptr_t cluster;
+    bool flush_logs = false;
 };
 
 template <typename Actor> struct governor_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -35,6 +36,10 @@ template <typename Actor> struct governor_actor_config_builder_t : r::actor_conf
     }
     builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
         parent_t::config.sequencer = std::move(value);
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&flush_logs(bool value) && noexcept {
+        parent_t::config.flush_logs = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -59,6 +64,7 @@ struct governor_actor_t : public r::actor_base_t, private model::diff::cluster_v
     model::cluster_ptr_t cluster;
     utils::logger_t log;
     std::uint32_t inactivity_seconds;
+    bool flush_logs = false;
 
   private:
     using clock_t = r::pt::microsec_clock;

@@ -15,7 +15,7 @@ void cluster_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept 
     parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("net.cluster", false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, config.flush_logs);
     });
 }
 
@@ -37,8 +37,8 @@ auto cluster_supervisor_t::operator()(const model::diff::contact::peer_state_t &
         auto peer = cluster->get_devices().by_sha256(diff.peer_id);
         auto conn_state = diff.state.get_connection_state();
         bool launch_controller = (peer->get_state() == diff.state && diff.state.is_online());
-        LOG_TRACE(log, "visiting peer_state_t, {}, state: {}, has been online: {}, launch controller: {}",
-                  peer->device_id(), (int)conn_state, diff.has_been_online, launch_controller);
+        LOG_TRACE(log, "{} state: {}, has been online: {}, launch controller: {}, fs_addr: {}", peer->device_id(),
+                  (int)conn_state, diff.has_been_online, launch_controller, (void *)fs_address.get());
         if (launch_controller) {
             auto &bep = config.bep_config;
             create_actor<controller_actor_t>()
@@ -54,6 +54,7 @@ auto cluster_supervisor_t::operator()(const model::diff::contact::peer_state_t &
                 .request_pool(bep.rx_buff_size)
                 .hasher_threads(config.hasher_threads)
                 .default_path(config.default_location)
+                .flush_logs(config.flush_logs)
                 .finish();
         }
     }

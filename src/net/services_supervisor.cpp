@@ -29,7 +29,7 @@ void services_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept
     parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("net.services", false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, app_config.flush_logs);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>(
         [&](auto &p) { p.subscribe_actor(&services_supervisor_t::on_local_up); });
@@ -94,7 +94,12 @@ void services_supervisor_t::launch_acceptor() noexcept {
     if (app_config.acceptor_config.enabled) {
         auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
             auto timeout = shutdown_timeout * 9 / 10;
-            return create_actor<acceptor_actor_t>().timeout(timeout).cluster(cluster).spawner_address(spawner).finish();
+            return create_actor<acceptor_actor_t>()
+                .flush_logs(app_config.flush_logs)
+                .timeout(timeout)
+                .cluster(cluster)
+                .spawner_address(spawner)
+                .finish();
         };
         ++counter;
         spawn(factory).restart_period(pt::seconds{5}).restart_policy(r::restart_policy_t::fail_only).spawn();
@@ -107,11 +112,12 @@ void services_supervisor_t::launch_local_discovery() noexcept {
             auto timeout = shutdown_timeout * 9 / 10;
             auto &cfg = app_config.local_announce_config;
             return create_actor<local_discovery_actor_t>()
+                .spawner_address(spawner)
                 .port(cfg.port)
                 .frequency(cfg.frequency)
                 .cluster(cluster)
                 .timeout(timeout)
-                .spawner_address(spawner)
+                .flush_logs(app_config.flush_logs)
                 .finish();
         };
         ++counter;
@@ -140,6 +146,7 @@ void services_supervisor_t::launch_relay() noexcept {
             return create_actor<relay_actor_t>()
                 .timeout(timeout)
                 .relay_config(app_config.relay_config)
+                .flush_logs(app_config.flush_logs)
                 .cluster(cluster)
                 .spawner_address(spawner)
                 .finish();
@@ -155,6 +162,7 @@ void services_supervisor_t::launch_upnp() noexcept {
             ++counter;
             return create_actor<ssdp_actor_t>()
                 .timeout(timeout)
+                .flush_logs(app_config.flush_logs)
                 .upnp_config(app_config.upnp_config)
                 .cluster(cluster)
                 .spawner_address(spawner)
@@ -180,6 +188,7 @@ void services_supervisor_t::launch_resolver() noexcept {
     create_actor<resolver_actor_t>()
         .server_addresses(std::move(server_addresses))
         .random_number(sequencer->next_uint64())
+        .flush_logs(app_config.flush_logs)
         .timeout(timeout)
         .resolve_timeout(io_timeout)
         .escalate_failure()
@@ -192,6 +201,7 @@ void services_supervisor_t::launch_http10() noexcept {
     auto io_timeout = shutdown_timeout * 8 / 10;
     create_actor<http_actor_t>()
         .timeout(timeout)
+        .flush_logs(app_config.flush_logs)
         .request_timeout(io_timeout)
         .resolve_timeout(io_timeout)
         .registry_name(names::http10)
@@ -207,6 +217,7 @@ void services_supervisor_t::launch_global_discovery() noexcept {
         auto io_timeout = shutdown_timeout * 8 / 10;
         create_actor<http_actor_t>()
             .timeout(timeout)
+            .flush_logs(app_config.flush_logs)
             .request_timeout(io_timeout)
             .resolve_timeout(io_timeout)
             .registry_name(names::http11_gda)
@@ -223,6 +234,7 @@ void services_supervisor_t::launch_global_discovery() noexcept {
             return create_actor<global_discovery_actor_t>()
                 .timeout(timeout)
                 .cluster(cluster)
+                .flush_logs(app_config.flush_logs)
                 .ssl_pair(&ssl_pair)
                 .announce_url(gcfg.announce_url)
                 .lookup_url(gcfg.lookup_url)
@@ -242,6 +254,7 @@ void services_supervisor_t::launch_dialer() noexcept {
         ++counter;
         auto timeout = shutdown_timeout * 9 / 10;
         create_actor<dialer_actor_t>()
+            .flush_logs(app_config.flush_logs)
             .timeout(timeout)
             .dialer_config(dcfg)
             .cluster(cluster)
@@ -260,6 +273,7 @@ void services_supervisor_t::launch_peer_supervisor() noexcept {
         .timeout(timeout)
         .bep_config(app_config.bep_config)
         .relay_config(app_config.relay_config)
+        .flush_logs(app_config.flush_logs)
         .escalate_failure()
         .finish();
     ++counter;

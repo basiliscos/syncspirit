@@ -8,13 +8,13 @@
 using namespace syncspirit::hasher;
 static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
 
-hasher_actor_t::hasher_actor_t(config_t &cfg) : r::actor_base_t(cfg), index(cfg.index) {}
+hasher_actor_t::hasher_actor_t(config_t &cfg) : r::actor_base_t(cfg), index(cfg.index), flush_logs{cfg.flush_logs} {}
 
 void hasher_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(fmt::format("hasher-{}", index), false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(identity, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) { p.subscribe_actor(&hasher_actor_t::on_digest); });

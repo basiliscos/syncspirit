@@ -12,6 +12,7 @@
 #include <cstring>
 #include <zlib.h>
 #include <spdlog/spdlog.h>
+#include <boost/nowide/convert.hpp>
 #include <cxxabi.h>
 #include "utils/path_view.hpp"
 #endif
@@ -66,6 +67,11 @@ static void dump_traces(EXCEPTION_POINTERS *ep) {
         return;
     }
 
+    DWORD written = 0;
+    char buff[512];
+    auto out_bytes = snprintf(buff, sizeof(buff), "dump begin\n");
+    WriteFile(file, buff, out_bytes, &written, {});
+
     STACKFRAME64 frame;
     memset(&frame, 0, sizeof(frame));
     frame.AddrPC.Mode = AddrModeFlat;
@@ -73,11 +79,17 @@ static void dump_traces(EXCEPTION_POINTERS *ep) {
     frame.AddrStack.Mode = AddrModeFlat;
 
 #if defined(_M_X64) || defined(__x86_64__)
+    out_bytes = snprintf(buff, sizeof(buff), "architecture: x86_64, Rip: 0x%x, Rbp: 0x%x, Rsp: 0x%x\n", ctx.Rip,
+                         ctx.Rbp, ctx.Rsp);
+    WriteFile(file, buff, out_bytes, &written, {});
     DWORD machine = IMAGE_FILE_MACHINE_AMD64;
     frame.AddrPC.Offset = ctx.Rip;
     frame.AddrFrame.Offset = ctx.Rbp;
     frame.AddrStack.Offset = ctx.Rsp;
 #else
+    out_bytes = snprintf(buff, sizeof(buff), "architecture: i386, Eip: 0x%x, Ebp: 0x%x, Esp: 0x%x\n", ctx.Eip, ctx.Ebp,
+                         ctx.Esp);
+    WriteFile(file, buff, out_bytes, &written, {});
     DWORD machine = IMAGE_FILE_MACHINE_I386;
     frame.AddrPC.Offset = ctx.Eip;
     frame.AddrFrame.Offset = ctx.Ebp;
@@ -85,17 +97,11 @@ static void dump_traces(EXCEPTION_POINTERS *ep) {
 #endif
 
     int frame_idx = 0;
-    DWORD written = 0;
-    char buff[512];
-    auto out_bytes = snprintf(buff, sizeof(buff), "dump begin\n");
-    WriteFile(file, buff, out_bytes, &written, {});
-
     while (true) {
         auto ok = StackWalk64(machine, process, thread, &frame, &ctx, NULL, SymFunctionTableAccess64,
                               SymGetModuleBase64, NULL);
         if (!ok) {
-            DWORD e = GetLastError();
-            out_bytes = snprintf(buff, sizeof(buff), "not ok, code: 0x%08x, stopping\n", e);
+            out_bytes = snprintf(buff, sizeof(buff), "not ok, stopping\n");
             WriteFile(file, buff, out_bytes, &written, {});
             break;
         }
@@ -115,12 +121,16 @@ static void dump_traces(EXCEPTION_POINTERS *ep) {
         auto symbol_name = std::string_view("unknown symbol");
         auto symbol_offset = DWORD64{0};
 
-        auto module_info = IMAGEHLP_MODULE64{};
+        auto module_info = IMAGEHLP_MODULEW64{};
         std::memset(&module_info, 0, sizeof(module_info));
         module_info.SizeOfStruct = sizeof(module_info);
 
-        if (module_base && SymGetModuleInfo64(process, module_base, &module_info)) {
-            module_name = module_info.ModuleName;
+        if (module_base && SymGetModuleInfoW64(process, module_base, &module_info)) {
+            module_name = boost::nowide::narrow(module_info.ModuleName);
+        } else {
+            out_bytes = snprintf(buff, sizeof(buff), "cannot get module name, code: 0x%x, sz1 = %d, sz2 - %d\n",
+                                 GetLastError(), module_info.SizeOfStruct, sizeof(IMAGEHLP_MODULE64));
+            WriteFile(file, buff, out_bytes, &written, {});
         }
 
         if (SymFromAddr(process, frame.AddrPC.Offset, &symbol_offset, sym_info)) {
@@ -361,13 +371,6 @@ bool platform_t::path_supported(const poly_path_view_t &str_path) noexcept {
 #endif
 
     (void)str_path;
-    return true;
-}
-
-bool platform_t::permissions_supported(const path_base_t &) noexcept {
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-    return false;
-#endif
     return true;
 }
 

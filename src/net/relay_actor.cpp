@@ -35,7 +35,8 @@ r::plugin::resource_id_t io_write = 3;
 } // namespace
 
 relay_actor_t::relay_actor_t(config_t &config) noexcept
-    : r::actor_base_t(config), cluster{std::move(config.cluster)}, config{config.config} {
+    : r::actor_base_t(config), cluster{std::move(config.cluster)}, config{config.config},
+      flush_logs{config.flush_logs} {
     http_rx_buff = std::make_shared<payload::http_request_t::rx_buff_t>();
 }
 
@@ -43,7 +44,7 @@ void relay_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("net.relay", false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::http11_relay, http_client, true).link(true);

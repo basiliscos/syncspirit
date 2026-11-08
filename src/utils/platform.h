@@ -22,7 +22,6 @@ struct SYNCSPIRIT_API platform_t {
     static void shutdown() noexcept;
     static bool symlinks_supported() noexcept;
     static bool path_supported(const poly_path_view_t &) noexcept;
-    static bool permissions_supported(const path_base_t &) noexcept;
     static void set_thread_name(std::string_view name) noexcept;
     static poly_path_view_t resources_dir(const allocator_t &allocator, std::error_code &ec,
                                           const char *argv0) noexcept;

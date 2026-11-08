@@ -18,13 +18,13 @@ template <class> inline constexpr bool always_false_v = false;
 
 peer_supervisor_t::peer_supervisor_t(config_t &cfg)
     : parent_t{cfg}, device_name{cfg.device_name}, ssl_pair{*cfg.ssl_pair}, bep_config(cfg.bep_config),
-      relay_config{cfg.relay_config} {}
+      relay_config{cfg.relay_config}, flush_logs{cfg.flush_logs} {}
 
 void peer_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(names::peer_supervisor, false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
         addr_unknown = p.create_address();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>(
@@ -82,6 +82,7 @@ void peer_supervisor_t::on_peer_ready(message::peer_connected_t &msg) noexcept {
         .bep_config(bep_config)
         .coordinator(coordinator)
         .uri(p.uri->clone())
+        .flush_logs(flush_logs)
         .peer_state(p.peer_state.clone())
         .timeout(timeout)
         .cluster(cluster)
@@ -109,6 +110,7 @@ void peer_supervisor_t::on_connect(message::connect_request_t &msg) noexcept {
     auto &p = msg.payload.request_payload;
     auto connect_timeout = r::pt::milliseconds{bep_config.connect_timeout};
     create_actor<initiator_actor_t>()
+        .flush_logs(flush_logs)
         .ssl_pair(&ssl_pair)
         .peer_device_id(p.device_id)
         .uris({p.uri})
@@ -130,6 +132,7 @@ auto peer_supervisor_t::operator()(const model::diff::contact::connect_request_t
 
     auto timeout = r::pt::milliseconds{bep_config.connect_timeout};
     create_actor<initiator_actor_t>()
+        .flush_logs(flush_logs)
         .cluster(cluster)
         .router(*locality_leader)
         .sink(address)
@@ -151,6 +154,7 @@ auto peer_supervisor_t::operator()(const model::diff::contact::relay_connect_req
         auto uri_str = fmt::format("tcp://{}", diff.relay);
         auto uri = utils::parse(uri_str);
         create_actor<initiator_actor_t>()
+            .flush_logs(flush_logs)
             .cluster(cluster)
             .router(*locality_leader)
             .sink(address)

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -18,6 +18,7 @@ struct local_discovery_actor_config_t : r::actor_config_t {
     std::uint16_t port;
     std::uint32_t frequency;
     model::cluster_ptr_t cluster;
+    bool flush_logs = false;
 };
 
 template <typename Actor> struct local_discovery_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -29,14 +30,16 @@ template <typename Actor> struct local_discovery_actor_config_builder_t : r::act
         parent_t::config.port = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&frequency(const std::uint32_t value) && noexcept {
         parent_t::config.frequency = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&flush_logs(bool value) && noexcept {
+        parent_t::config.flush_logs = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -77,6 +80,7 @@ struct SYNCSPIRIT_API local_discovery_actor_t final : public r::actor_base_t {
     std::optional<r::request_id_t> timer_request;
     std::optional<r::request_id_t> endpoint_request;
     model::cluster_ptr_t cluster;
+    bool flush_logs = false;
 };
 
 } // namespace net

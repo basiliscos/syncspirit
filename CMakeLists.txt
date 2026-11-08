@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.19)
-project (syncspirit VERSION 0.4.7)
+project (syncspirit VERSION 0.4.8)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -181,6 +181,7 @@ add_library(syncspirit_core
     src/model/diff/local/scan_start.cpp
     src/model/diff/local/synchronization_finish.cpp
     src/model/diff/local/synchronization_start.cpp
+    src/model/diff/local/update_metadata.cpp
     src/model/diff/modify/add_blocks.cpp
     src/model/diff/modify/add_ignored_device.cpp
     src/model/diff/modify/add_pending_device.cpp
@@ -291,6 +292,7 @@ add_library(syncspirit_core
     src/utils/location.cpp
     src/utils/log.cpp
     src/utils/log-setup.cpp
+    src/utils/metadata_comparator.cpp
     src/utils/network_interface.cpp
     src/utils/path.cpp
     src/utils/path_cache.cpp

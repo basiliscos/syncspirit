@@ -21,13 +21,13 @@
 using namespace syncspirit::fs;
 
 fs_supervisor_t::fs_supervisor_t(config_t &cfg)
-    : parent_t(cfg), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads} {}
+    : parent_t(cfg), fs_config{cfg.fs_config}, hasher_threads{cfg.hasher_threads}, flush_logs{cfg.flush_logs} {}
 
 void fs_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("fs.supervisor", false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
 }
 
@@ -59,11 +59,13 @@ void fs_supervisor_t::launch_children() noexcept {
                        .updates_mediator(updates_mediator)
                        .watched_folders(watched_folders)
                        .fs_config(fs_config)
+                       .flush_logs(flush_logs)
                        .finish()
                        .get();
 
     auto notify_watcher = [watcher](const fs::task::scan_dir_t &scan_dir) { watcher->notify(scan_dir); };
     create_actor<file_actor_t>()
+        .flush_logs(flush_logs)
         .concurrent_hashes(hasher_threads)
         .change_retension(retension_x2)
         .updates_mediator(updates_mediator)

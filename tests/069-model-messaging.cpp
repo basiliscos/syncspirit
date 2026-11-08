@@ -162,7 +162,7 @@ void my_controller_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(names::coordinator, false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, true);
         bouncer = p.create_address();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
@@ -199,7 +199,8 @@ static void model_visit_callback(const model::diff::cluster_diff_t &diff, model:
 
 void my_visitor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { log = utils::get_logger("my-visitor"); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>(
+        [&](auto &p) { log = utils::get_logger("my-visitor", true); });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.register_name(names::db, get_address());
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
@@ -223,7 +224,8 @@ void my_visitor_actor_t::shutdown_start() noexcept {
 
 void my_2nd_visitor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
-    plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) { log = utils::get_logger("my-2nd_visitor"); });
+    plugin.with_casted<r::plugin::address_maker_plugin_t>(
+        [&](auto &p) { log = utils::get_logger("my-2nd_visitor", true); });
 }
 
 void my_2nd_visitor_actor_t::visit(const model::diff::cluster_diff_t &diff,
@@ -241,7 +243,7 @@ auto my_2nd_visitor_actor_t::operator()(const model::diff::modify::add_blocks_t 
 }
 
 struct fixture_t {
-    fixture_t() noexcept { log = utils::get_logger("fixture"); }
+    fixture_t() noexcept { log = utils::get_logger("fixture", true); }
 
     void run() noexcept {
         auto my_hash = "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD";

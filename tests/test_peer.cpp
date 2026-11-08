@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2025-2026 Ivan Baidakou
 
 #include "test_peer.h"
 #include "net/names.h"
@@ -17,7 +17,7 @@ test_peer_t::test_peer_t(config_t &config)
       peer_device{config.peer_device}, cluster{config.cluster}, url(config.url),
       peer_state{model::device_state_t::make_offline()} {
     auto id = fmt::format("test.peer.{}", url.c_str());
-    log = utils::get_logger(id);
+    log = utils::get_logger(id, true);
     assert(cluster);
     assert(peer_device);
     assert(!url.empty());

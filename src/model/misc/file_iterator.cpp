@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "file_iterator.h"
 #include "resolver.h"
@@ -23,9 +23,9 @@ bool file_iterator_t::file_comparator_t::operator()(const file_info_t *l, const 
 
     auto cmp = std::strong_ordering::equal;
     if (pull_order == P::newest) {
-        cmp = r->get_modified_s() <=> l->get_modified_s();
+        cmp = comparator.compare(r->get_modification(), l->get_modification());
     } else if (pull_order == P::oldest) {
-        cmp = l->get_modified_s() <=> r->get_modified_s();
+        cmp = comparator.compare(l->get_modification(), r->get_modification());
     } else if (pull_order == P::smallest) {
         cmp = l->get_size() <=> r->get_size();
     } else if (pull_order == P::largest) {
@@ -73,7 +73,8 @@ auto file_iterator_t::prepare_folder(folder_info_ptr_t peer_folder) noexcept -> 
     auto &local_folder = *folder->get_folder_infos().by_device(*folder->get_cluster()->get_device());
     auto &local_files = local_folder.get_file_infos();
     auto order = folder->get_pull_order();
-    auto set = std::make_unique<queue_t>(file_comparator_t{order});
+    auto &comparator = local_folder.get_metadata_comparator();
+    auto set = std::make_unique<queue_t>(file_comparator_t{order, comparator});
     auto seen_index = std::uint64_t{0};
     auto seen_sequence = std::int64_t{0};
     bool can_receive = folder->get_folder_type() != db::FolderType::send;
@@ -185,7 +186,9 @@ void file_iterator_t::on_upsert(folder_t &folder) noexcept {
                     it.seen_sequence = 0;
                     populate(it);
                 } else if (it.files_queue->key_comp().pull_order != order) {
-                    auto new_set = std::make_unique<queue_t>(file_comparator_t{order});
+                    auto local_folder = folder.get_folder_infos().by_device(*folder.get_cluster()->get_device());
+                    auto &comparator = local_folder->get_metadata_comparator();
+                    auto new_set = std::make_unique<queue_t>(file_comparator_t{order, comparator});
                     for (auto fi : *it.files_queue) {
                         new_set->insert(fi);
                     }

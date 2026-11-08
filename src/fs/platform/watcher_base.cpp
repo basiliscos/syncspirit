@@ -97,11 +97,10 @@ bool FU::update(support::file_update_t &record, folder_update_t *prev) noexcept 
 bool FU::update(support::file_update_t &new_record, it_t it_prev, support::file_updates_t &prev_source) noexcept {
     namespace ut = update_type;
     static constexpr auto CONTENT_LIKE = (ut::CONTENT | ut::CREATED | ut::CREATED_1);
-    auto log = utils::get_logger(actor_identity);
+    auto log = utils::make_logger(actor_identity);
     auto &prev = *it_prev;
     if (prev.update_type == ut::META && new_record.update_type == ut::META) {
         if (prev.prev_path == new_record.path) {
-            auto log = utils::get_logger(actor_identity);
             LOG_DEBUG(log, "collpasing renaming back-n-forth '{}'", new_record.path);
             return false;
         }
@@ -170,7 +169,7 @@ auto FU::make(const utils::path_t &folder_info, watcher_base_t &actor) noexcept 
     auto files = payload::file_changes_t();
     auto &mediator = *actor.updates_mediator;
     files.reserve(updates.size());
-    auto log = utils::get_logger(actor_identity);
+    auto log = utils::make_logger(actor_identity);
     char full_path[SYNCSPIRIT_PATH_MAX];
 
     auto buffer = std::array<std::byte, 1024 * 32>();
@@ -271,9 +270,10 @@ auto FU::make(const utils::path_t &folder_info, watcher_base_t &actor) noexcept 
 }
 
 watcher_base_t::watcher_base_t(config_t &cfg)
-    : parent_t{cfg}, retension(cfg.change_retension), updates_mediator{std::move(cfg.updates_mediator)},
-      watched_folders(cfg.watched_folders), fs_config{cfg.fs_config} {
-    log = utils::get_logger(actor_identity);
+    : parent_t{cfg}, flush_logs{cfg.flush_logs}, retension(cfg.change_retension),
+      updates_mediator{std::move(cfg.updates_mediator)}, watched_folders(cfg.watched_folders),
+      fs_config{cfg.fs_config} {
+    log = utils::get_logger(actor_identity, flush_logs);
     if (!retension.is_positive()) {
         LOG_ERROR(log, "retension interval should be positive");
         throw std::runtime_error("retension interval should be positive");

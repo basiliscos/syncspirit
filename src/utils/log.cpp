@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "log.h"
+#include "log-setup.h"
 
 namespace syncspirit::utils {
 
@@ -45,7 +46,7 @@ std::string_view get_level_string(spdlog::level::level_enum level) noexcept {
     }
 }
 
-logger_t get_logger(std::string_view initial_name) noexcept {
+logger_t get_logger(std::string_view initial_name, bool force_flush) noexcept {
     std::string name(initial_name);
     logger_t result = spdlog::get(name);
     if (result) {
@@ -65,10 +66,16 @@ logger_t get_logger(std::string_view initial_name) noexcept {
 
     auto &sinks = parent->sinks();
     auto log_name = std::string(initial_name);
+    auto level = parent->level();
     result = std::make_shared<spdlog::logger>(log_name, sinks.begin(), sinks.end());
-    result->set_level(parent->level());
+    result->set_level(level);
+    if (force_flush) {
+        result->flush_on(level);
+    };
     spdlog::register_logger(result);
     return result;
 }
+
+logger_t make_logger(std::string_view name) noexcept { return get_logger(name, has_flush_logs()); }
 
 } // namespace syncspirit::utils
