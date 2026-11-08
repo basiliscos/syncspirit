@@ -540,12 +540,14 @@ void test_trivial_changes() {
                 auto folder_seq = folder_local->get_max_sequence();
                 auto update_type = fs::update_type_t::meta;
 
-                SECTION("update metadata") {
-                    proto::set_permissions(file, 0777);
-                    update_type = fs::update_type_t::meta;
-                    mk_update(file, update_type, false);
-                    CHECK(metadata_comparator.equal(f->get_permissions(), 0777));
-                    CHECK(!f->is_deleted());
+                if (metadata_comparator.permissions_supported) {
+                    SECTION("update metadata") {
+                        proto::set_permissions(file, 0777);
+                        update_type = fs::update_type_t::meta;
+                        mk_update(file, update_type, false);
+                        CHECK(metadata_comparator.equal(f->get_permissions(), 0777));
+                        CHECK(!f->is_deleted());
+                    }
                 }
                 SECTION("delete file") {
                     proto::set_deleted(file, true);
