@@ -165,7 +165,8 @@ tasks:
           - ./b2 install --prefix=$HOME/b2
           - cd ..
           - b2 --version
-          - wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
+          # - wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
+          - wget https://mirror.yandex.ru/mirrors/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
           - tar -xf gcc-14.3.0.tar.xz
           - cd gcc-14.3.0
           - ./contrib/download_prerequisites
