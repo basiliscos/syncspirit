@@ -65,7 +65,7 @@ auto make_context(model::folder_info_ptr_t local_folder, const utils::path_base_
                 path = static_cast<model::file_info_t *>(parent)->get_path(*folder_presence, allocator);
             }
         }
-        auto child = presence->get_entity()->get_path()->clone();
+        child = presence->get_entity()->get_path()->clone();
         presence = parent;
     }
     auto stack = local_keeper::stack_t();
@@ -157,12 +157,14 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
     if (type == proto::FileInfoType::DIRECTORY) {
         auto recurse = child_info.recurse || !file;
         auto skip_self_update = child_info.path == local_folder->get_folder()->get_path();
-        if (!skip_self_update) {
-            stack.push_front(child_ready_t(recurse ? child_info.clone() : std::move(child_info)));
-        }
         if (recurse) {
-            stack.push_front(
-                unscanned_dir_t(std::move(child_info), child_info.recurse_children, child_info.requires_refinement));
+            auto recurse_children = child_info.recurse_children;
+            auto requires_refinement = child_info.requires_refinement;
+            auto copy = !skip_self_update ? child_info.clone() : std::move(child_info);
+            stack.push_front(unscanned_dir_t(std::move(copy), recurse_children, requires_refinement));
+        }
+        if (!skip_self_update) {
+            stack.push_front(child_ready_t(std::move(child_info)));
         }
     } else if (type == proto::FileInfoType::SYMLINK) {
         stack.push_front(child_ready_t(std::move(child_info)));
