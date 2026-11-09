@@ -19,8 +19,8 @@ auto update_metadata_t::apply_impl(apply_controller_t &controller, void *custom)
     auto &cluster = controller.get_cluster();
     auto folder = cluster.get_folders().by_id(folder_id);
     if (folder) {
-        for (auto& p: folder->get_presences()) {
-            auto& fi = *static_cast<model::folder_info_t*>(p.get());
+        for (auto &p : folder->get_presences()) {
+            auto &fi = *static_cast<model::folder_info_t *>(p.get());
             fi.set_metadata_comparator(comparator.clone());
             fi.notify_update();
         }

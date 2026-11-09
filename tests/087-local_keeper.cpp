@@ -1356,8 +1356,6 @@ void test_partial_scan() {
     F().run();
 }
 
-#if 0
-
 void test_scan_errors() {
     struct F : fixture_t {
         F() {
@@ -1384,7 +1382,8 @@ void test_scan_errors() {
         void main(const utils::allocator_t &allocator) noexcept override {
             auto root_path = path_guard.get_view(allocator);
             SECTION("missing start dir (in model)") {
-                builder->scan_start(folder->get_id(), "non-existing-dir").apply(*sup);
+                auto path = utils::path_t::make_generic("non-existing-dir");
+                builder->scan_start(folder->get_id(), path.clone()).apply(*sup);
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
                 CHECK(exec_attempts == 0);
@@ -1422,7 +1421,7 @@ void test_scan_errors() {
                         REQUIRE(!folder->is_suspended());
                         CHECK(!folder->is_scanning());
                         CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                        CHECK(files->size() == 0);
+                        CHECK(test::count_children(*local_folder) == 0);
                     } else {
                         INFO("Skipping due to unability to prohibit directories creation");
                     }
@@ -1434,7 +1433,7 @@ void test_scan_errors() {
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!folder->is_scanning());
                     CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                    CHECK(files->size() == 0);
+                    CHECK(test::count_children(*local_folder) == 0);
                 }
 #endif
             }
@@ -1447,7 +1446,7 @@ void test_scan_errors() {
                 builder->scan_start(folder->get_id()).apply(*sup);
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                CHECK(files->size() == 0);
+                CHECK(test::count_children(*local_folder) == 0);
             }
             SECTION("scan dir errors") {
                 int mocked = 0;
@@ -1499,13 +1498,13 @@ void test_scan_errors() {
                 proto::set_id(counter, my_short_id);
                 proto::set_value(counter, 1);
                 builder->local_update(folder->get_id(), pr_dir).apply(*sup);
-                CHECK(files->size() == 1);
-                auto dir_file = *files->begin();
+                REQUIRE(test::count_children(*local_folder) == 1);
+                auto dir_file = *local_folder->get_children().begin();
 
                 SECTION("new file") {
                     do_mock(dir_path);
                     builder->scan_start(folder->get_id()).apply(*sup);
-                    CHECK(files->size() == 1);
+                    CHECK(test::count_children(*local_folder) == 1);
                 }
                 SECTION("existing file") {
                     auto pr_file = proto::FileInfo{};
@@ -1519,13 +1518,15 @@ void test_scan_errors() {
 
                     do_mock(dir_path);
                     builder->scan_start(folder->get_id()).apply(*sup);
-                    CHECK(files->size() == 2);
+                    CHECK(test::count_children(*local_folder) == 2);
 
                     auto file = local_folder->get_by_path("d1/xx");
                     CHECK(file->is_locally_available());
                 }
 
+#if 0
                 CHECK(dir_file->is_locally_available());
+#endif
                 CHECK(mocked == 1);
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
@@ -1538,6 +1539,8 @@ void test_scan_errors() {
     };
     F().run();
 }
+
+#if 0
 
 void test_read_errors() {
     struct F : fixture_t {
@@ -2315,7 +2318,7 @@ int _init() {
     REGISTER_TEST_CASE(test_changed, "test_changed", "[net]");
     REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");
     REGISTER_TEST_CASE(test_resurrection, "test_resurrection", "[net]");
-    // REGISTER_TEST_CASE(test_partial_scan, "test_partial_scan", "[net]");
+    REGISTER_TEST_CASE(test_partial_scan, "test_partial_scan", "[net]");
     // REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
     // REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
     // REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
