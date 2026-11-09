@@ -223,18 +223,14 @@ auto file_info_t::fields_update(const db::FileInfo &source, utils::path_cache_t 
     features = (features & ~LOCAL_FLAGS) | as_flags(db::get_type(source));
     name = path_cache.get_path(db::get_name(source));
     sequence = db::get_sequence(source);
-    permissions = db::get_permissions(source);
-    modified_s = db::get_modified_s(source);
-    modified_ns = db::get_modified_ns(source);
+    permissions = {db::get_permissions(source), db::get_no_permissions(source)};
+    modification = {db::get_modified_s(source), db::get_modified_ns(source)};
     modified_by = db::get_modified_by(source);
     if (db::get_deleted(source)) {
         features |= features_t::deleted;
     }
     if (db::get_invalid(source)) {
         features |= features_t::invalid;
-    }
-    if (db::get_no_permissions(source)) {
-        features |= features_t::no_perms;
     }
     features |= features_t::cluster;
 
@@ -263,18 +259,14 @@ auto file_info_t::fields_update(const proto::FileInfo &source, utils::path_cache
     name = path_cache.get_path(proto::get_name(source));
     sequence = proto::get_sequence(source);
     features = (features & ~LOCAL_FLAGS) | as_flags(proto::get_type(source));
-    permissions = proto::get_permissions(source);
-    modified_s = proto::get_modified_s(source);
-    modified_ns = proto::get_modified_ns(source);
+    permissions = {proto::get_permissions(source), proto::get_no_permissions(source)};
+    modification = {proto::get_modified_s(source), proto::get_modified_ns(source)};
     modified_by = proto::get_modified_by(source);
     if (proto::get_deleted(source)) {
         features |= features_t::deleted;
     }
     if (proto::get_invalid(source)) {
         features |= features_t::invalid;
-    }
-    if (proto::get_no_permissions(source)) {
-        features |= features_t::no_perms;
     }
     features |= features_t::cluster;
 
@@ -308,13 +300,13 @@ db::FileInfo file_info_t::as_db(bool include_blocks) const noexcept {
     db::set_name(r, name->get_full_name());
     db::set_sequence(r, sequence);
     db::set_type(r, as_type(features));
-    db::set_permissions(r, permissions);
-    db::set_modified_s(r, modified_s);
-    db::set_modified_ns(r, modified_ns);
+    db::set_permissions(r, permissions.value);
+    db::set_no_permissions(r, permissions.absent);
+    db::set_modified_s(r, modification.seconds);
+    db::set_modified_ns(r, modification.ns);
     db::set_modified_by(r, modified_by);
     db::set_deleted(r, is_deleted());
     db::set_invalid(r, is_invalid());
-    db::set_no_permissions(r, features & features_t::no_perms);
     db::set_version(r, version.as_proto());
     if (is_file()) {
         db::set_size(r, get_size());
@@ -343,13 +335,13 @@ proto::FileInfo file_info_t::as_proto(bool include_blocks) const noexcept {
     proto::set_name(r, name->get_full_name());
     proto::set_sequence(r, sequence);
     proto::set_type(r, as_type(features));
-    proto::set_permissions(r, permissions);
-    proto::set_modified_s(r, modified_s);
-    proto::set_modified_ns(r, modified_ns);
+    proto::set_permissions(r, permissions.value);
+    proto::set_no_permissions(r, permissions.absent);
+    proto::set_modified_s(r, modification.seconds);
+    proto::set_modified_ns(r, modification.ns);
     proto::set_modified_by(r, modified_by);
     proto::set_deleted(r, is_deleted());
     proto::set_invalid(r, features & features_t::invalid);
-    proto::set_no_permissions(r, features & features_t::no_perms);
     proto::set_version(r, version.as_proto());
 
     if (is_file()) {
@@ -547,9 +539,7 @@ std::size_t file_info_t::expected_meta_size() const noexcept {
     return r;
 }
 
-std::uint32_t file_info_t::get_permissions() const noexcept { return permissions; }
-
-bool file_info_t::has_no_permissions() const noexcept { return features & features_t::no_perms; }
+utils::permissions_t file_info_t::get_permissions() const noexcept { return permissions; }
 
 void file_info_t::update(const file_info_t &other) noexcept {
     using hashes_t = std::set<utils::bytes_view_t, utils::bytes_comparator_t>;
@@ -564,8 +554,7 @@ void file_info_t::update(const file_info_t &other) noexcept {
     assert((this->get_uuid() == other.get_uuid()) || version.identical_to(other.version));
 
     permissions = other.permissions;
-    modified_s = other.modified_s;
-    modified_ns = other.modified_ns;
+    modification = other.modification;
     modified_by = other.modified_by;
     version = other.version;
     sequence = other.sequence;
@@ -634,7 +623,7 @@ utils::poly_path_view_t file_info_t::make_conflicting_name(const utils::allocato
     auto file_name = name->get_filename();
     auto ext = name->get_extension();
     auto stem = file_name.substr(0, file_name.size() - ext.size());
-    auto utc = pt::from_time_t(modified_s);
+    auto utc = pt::from_time_t(modification.seconds);
     auto local = adjustor_t::utc_to_local(utc);
     auto ymd = local.date().year_month_day();
     auto time = local.time_of_day();
@@ -674,17 +663,17 @@ bool file_info_t::identical_to(const proto::FileInfo &file) const noexcept {
     return false;
 }
 
-bool file_info_t::identical_by_content_to(const proto::FileInfo &file) const noexcept {
+bool file_info_t::identical_by_content_to(const proto::FileInfo &file,
+                                          const utils::metadata_comparator_t &comparator) const noexcept {
     assert(proto::get_name(file) == name->get_full_name());
     auto sz = proto::get_size(file);
     auto file_size = get_size();
     if (sz != file_size) {
         return false;
     }
-    auto main_meta_eq = proto::get_type(file) == as_type(features) && proto::get_modified_s(file) == get_modified_s() &&
-                        proto::get_modified_ns(file) == get_modified_ns() && proto::get_deleted(file) == is_deleted() &&
-                        proto::get_invalid(file) == is_invalid();
-
+    auto ts = utils::timestamp_t{proto::get_modified_s(file), proto::get_modified_ns(file)};
+    auto main_meta_eq = proto::get_type(file) == as_type(features) && comparator.equal(modification, ts) &&
+                        proto::get_deleted(file) == is_deleted() && proto::get_invalid(file) == is_invalid();
     if (!main_meta_eq) {
         return false;
     }
@@ -693,10 +682,8 @@ bool file_info_t::identical_by_content_to(const proto::FileInfo &file) const noe
             return false;
         }
     }
-    if (!has_no_permissions()) {
-        if (proto::get_permissions(file) != get_permissions()) {
-            return false;
-        }
+    if (!comparator.equal(permissions, proto::get_permissions(file))) {
+        return false;
     }
 
     if (sz) {
@@ -706,67 +693,5 @@ bool file_info_t::identical_by_content_to(const proto::FileInfo &file) const noe
     }
     return true;
 }
-
-#if 0
-bool file_infos_map_t::put(const model::file_info_ptr_t &item, bool replace) noexcept {
-    bool result = false;
-    auto prev = file_info_ptr_t();
-    {
-        auto &proj = parent_t::template get<0>();
-        auto [it, inserted] = proj.emplace(item);
-        if (!inserted && replace) {
-            prev = *it;
-            proj.replace(it, item);
-            inserted = true;
-        }
-        result = inserted;
-    }
-    {
-        auto &proj = parent_t::template get<1>();
-        auto [it, inserted] = proj.emplace(item);
-        if (!inserted && replace) {
-            proj.replace(it, item);
-            inserted = true;
-        }
-        result = inserted;
-    }
-    {
-        auto &proj = parent_t::template get<1>();
-        auto [it, inserted] = proj.emplace(item);
-        if (!inserted && replace) {
-            proj.replace(it, item);
-            inserted = true;
-        }
-        result = inserted;
-    }
-    return result;
-}
-
-void file_infos_map_t::remove(const model::file_info_ptr_t &item) noexcept {
-    parent_t::template get<0>().erase(file_details::get_name(item));
-    parent_t::template get<1>().erase(item->get_sequence());
-}
-
-file_info_ptr_t file_infos_map_t::by_name(std::string_view name) const noexcept {
-    auto &proj = parent_t::template get<0>();
-    auto it = proj.find(name);
-    return it != proj.end() ? *it : file_info_ptr_t();
-}
-
-file_info_ptr_t file_infos_map_t::by_sequence(std::int64_t sequence) const noexcept {
-    auto &proj = parent_t::template get<1>();
-    auto it = proj.find(sequence);
-    return it != proj.end() ? *it : file_info_ptr_t();
-}
-
-auto file_infos_map_t::sequence_projection() noexcept -> seq_projection_t & { return parent_t::template get<1>(); }
-
-auto file_infos_map_t::range(std::int64_t lower, std::int64_t upper) noexcept -> range_t {
-    auto &proj = sequence_projection();
-    auto begin = proj.lower_bound(lower);
-    auto end = proj.upper_bound(upper);
-    return std::make_pair(begin, end);
-}
-#endif
 
 } // namespace syncspirit::model

@@ -25,7 +25,7 @@ static void async_cb(int fd, void *data, std::uint32_t, const pt::ptime &) {
     ctx->async_flag.store(false, std::memory_order_release);
 }
 
-bsd_backend_t::bsd_backend_t() { log = utils::get_logger("fs.bsd"); }
+bsd_backend_t::bsd_backend_t() { log = utils::make_logger("fs.bsd"); }
 
 auto bsd_backend_t::initialize(int pipe_read_fd, void *platform_context) -> io_guard_holder_t {
     struct pipe_guard_t final : io_guard_t {

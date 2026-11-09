@@ -78,7 +78,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
 
     fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx) {
         test::init_logging();
-        log = utils::get_logger("fixture");
+        log = utils::get_logger("fixture", true);
         relay_config = config::relay_config_t{
             true,
             true,

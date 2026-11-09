@@ -38,6 +38,7 @@ using uri_ptr_t = model::intrusive_ptr_t<uri_t>;
 struct bytes_view_t;
 struct bytes_t;
 
+struct metadata_comparator_t;
 struct path_base_t;
 struct path_t;
 template <typename Allocator> struct path_view_t;
@@ -65,6 +66,15 @@ template <> struct SYNCSPIRIT_API fmt::formatter<std::error_code> {
     constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()) { return ctx.end(); }
     template <typename FormatContext>
     auto format(const std::error_code &ec, FormatContext &ctx) const -> decltype(ctx.out());
+};
+
+template <> struct SYNCSPIRIT_API fmt::formatter<syncspirit::utils::metadata_comparator_t> {
+    using metadata_comparator_t = syncspirit::utils::metadata_comparator_t;
+
+    constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()) { return ctx.end(); }
+
+    template <typename FormatContext>
+    auto format(const metadata_comparator_t &device_id, FormatContext &ctx) const -> decltype(ctx.out());
 };
 
 template <> struct SYNCSPIRIT_API fmt::formatter<boost::system::error_code> {

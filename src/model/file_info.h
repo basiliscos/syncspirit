@@ -9,7 +9,10 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include "utils/compact_vector.hpp"
 #include "misc/augmentation.h"
+#include "utils/metadata_comparator.h"
 #include "utils/path.h"
+#include "utils/permissions.h"
+#include "utils/timestamp.h"
 #include "misc/map.hpp"
 #include "misc/uuid.h"
 #include "presence.h"
@@ -38,7 +41,6 @@ using file_info_ptr_t = intrusive_ptr_t<file_info_t>;
 struct path_guard_t;
 
 struct SYNCSPIRIT_API file_info_t : presence_t {
-
     static constexpr std::uintptr_t LOCAL_MASK = 1 << 0;
     static constexpr std::uintptr_t PTR_MASK = ~LOCAL_MASK;
 
@@ -173,9 +175,7 @@ struct SYNCSPIRIT_API file_info_t : presence_t {
     }
 
     utils::poly_path_view_t get_path(const folder_info_t &, const utils::allocator_t &) const noexcept;
-
-    inline std::int64_t get_modified_s() const noexcept { return modified_s; }
-    inline std::int32_t get_modified_ns() const noexcept { return modified_ns; }
+    inline const utils::timestamp_t &get_modification() const noexcept { return modification; }
     inline std::uint64_t get_modified_by() const noexcept { return modified_by; }
 
     bool is_synchronizing() const noexcept;
@@ -184,7 +184,8 @@ struct SYNCSPIRIT_API file_info_t : presence_t {
 
     proto::FileInfo get() const noexcept;
     bool identical_to(const proto::FileInfo &file) const noexcept;
-    bool identical_by_content_to(const proto::FileInfo &file) const noexcept;
+    bool identical_by_content_to(const proto::FileInfo &file,
+                                 const utils::metadata_comparator_t &comparator) const noexcept;
 
     static const constexpr auto data_length = uuid_length * 2;
 
@@ -194,8 +195,7 @@ struct SYNCSPIRIT_API file_info_t : presence_t {
     proto::Index generate() noexcept;
     std::size_t expected_meta_size() const noexcept;
 
-    std::uint32_t get_permissions() const noexcept;
-    bool has_no_permissions() const noexcept;
+    utils::permissions_t get_permissions() const noexcept;
 
     guard_t guard(const model::folder_info_t &folder_info) noexcept;
 
@@ -235,11 +235,10 @@ struct SYNCSPIRIT_API file_info_t : presence_t {
     unsigned char key[data_length];
     augmentation_ptr_t extension;
     utils::path_ptr_t name;
-    std::int64_t modified_s;
+    utils::timestamp_t modification;
     std::uint64_t modified_by;
     std::int64_t sequence;
-    std::uint32_t permissions;
-    std::uint32_t modified_ns;
+    utils::permissions_t permissions;
 
     content_t content;
     version_t version;
@@ -248,16 +247,6 @@ struct SYNCSPIRIT_API file_info_t : presence_t {
     friend struct blocks_iterator_t;
     friend struct model::blocks_iterator_t;
 };
-
-#if 0
-inline void intrusive_ptr_add_ref(const file_info_t *ptr) noexcept { ptr->refcouner_inc(); }
-
-inline void intrusive_ptr_release(const file_info_t *ptr) noexcept {
-    if (ptr->refcouner_dec() == 0) {
-        delete ptr;
-    }
-}
-#endif
 
 namespace details {
 
@@ -303,41 +292,6 @@ using file_map_base_t = mi::multi_index_container<
 // clang-format on
 
 } // namespace file_details
-
-#if 0
-struct files_map_t : file_details::file_map_base_t {
-    using parent_t = file_details::file_map_base_t;
-    files_map_t() = default;
-    files_map_t(const files_map_t &) = delete;
-
-    bool put(const model::file_info_ptr_t &item, bool replace = true) noexcept {
-        auto [it, inserted] = parent_t::emplace(item);
-        if (!inserted && replace) {
-            return parent_t::replace(it, item);
-        }
-        return inserted;
-    }
-};
-
-struct SYNCSPIRIT_API file_infos_map_t : private file_details::file_map_base_t {
-    using parent_t = file_details::file_map_base_t;
-    using seq_projection_t = std::remove_cv_t<decltype(std::declval<parent_t>().template get<1>())>;
-    using seq_iterator_t = decltype(std::declval<seq_projection_t>().begin());
-    using range_t = std::pair<seq_iterator_t, seq_iterator_t>;
-
-    using parent_t::begin;
-    using parent_t::clear;
-    using parent_t::end;
-    using parent_t::size;
-
-    bool put(const model::file_info_ptr_t &item, bool replace = true) noexcept;
-    void remove(const model::file_info_ptr_t &item) noexcept;
-    file_info_ptr_t by_name(std::string_view name) const noexcept;
-    file_info_ptr_t by_sequence(std::int64_t sequence) const noexcept;
-    seq_projection_t &sequence_projection() noexcept;
-    range_t range(std::int64_t lower, std::int64_t upper) noexcept;
-};
-#endif
 
 using file_infos_set_t = std::unordered_set<file_info_ptr_t>;
 

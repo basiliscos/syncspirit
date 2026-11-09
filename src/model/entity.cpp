@@ -15,6 +15,8 @@ using namespace syncspirit::model;
 
 using F = presence_t::features_t;
 
+static const syncspirit::utils::metadata_comparator_t default_comparator(0, true, true);
+
 entity_t::entity_t(utils::path_ptr_t path_, entity_t *parent_) noexcept
     : parent{parent_}, path(std::move(path_)), best{nullptr}, entities_monitor{nullptr} {}
 
@@ -82,7 +84,7 @@ file_info_t *entity_t::find_best() noexcept {
     ++it;
     while (it != presences.end()) {
         auto other = static_cast<file_info_t *>(it->get());
-        auto r = model::compare(*best, *other);
+        auto r = model::compare(*best, *other, default_comparator);
         ++it;
         if (r < 0) {
             best = other;

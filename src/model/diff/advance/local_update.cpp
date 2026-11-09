@@ -27,10 +27,10 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     assert(proto_name.size());
     auto name = std::pmr::string(proto_name, allocator);
     auto path = utils::make_generic_view(name, allocator);
-    auto local_folder_info = folder->get_folder_info(self);
-    auto local_file = local_folder_info->get_by_path(path);
+    auto local_folder = folder->get_folder_info(self);
+    auto local_file = local_folder->get_by_path(path);
 
-    if (auto original_file = get_original(*folder, device, proto_file_); original_file) {
+    if (auto original_file = get_original(*folder, *local_folder, proto_file_); original_file) {
         initialize(cluster, sequencer, original_file->as_proto(true), name);
     } else {
         proto::set_modified_by(proto_file_, self.device_id().get_uint());
@@ -50,7 +50,7 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     }
 }
 
-auto local_update_t::get_original(const model::folder_t &folder, const model::device_t &self,
+auto local_update_t::get_original(const model::folder_t &folder, const model::folder_info_t &local_folder,
                                   const proto::FileInfo &local_file) const noexcept -> model::file_info_ptr_t {
     auto buffer = std::array<std::byte, 1024 * 32>();
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
@@ -60,23 +60,21 @@ auto local_update_t::get_original(const model::folder_t &folder, const model::de
     auto path = utils::make_generic_view(name, allocator);
     auto local_deleted = proto::get_deleted(local_file);
     auto local_invalid = proto::get_invalid(local_file);
-    auto local_perms = proto::get_permissions(local_file);
-    auto local_no_perms = proto::get_no_permissions(local_file);
+    auto local_perms = utils::permissions_t{proto::get_permissions(local_file), proto::get_no_permissions(local_file)};
     auto local_size = proto::get_size(local_file);
     auto local_type = model::file_info_t::as_flags(proto::get_type(local_file));
+    auto &comparator = local_folder.get_metadata_comparator();
 
     for (auto &p : folder.get_presences()) {
         auto fi = static_cast<model::folder_info_t *>(p.get());
         auto peer_file = model::file_info_ptr_t();
-        if (fi->get_device() != &self) {
+        if (fi->get_device() != local_folder.get_device()) {
             auto candidate = fi->get_by_path(path);
             if (candidate) {
                 if (candidate->get_size() == local_size) {
                     bool matches = local_type == candidate->get_type() && local_deleted == candidate->is_deleted() &&
                                    local_invalid == candidate->is_invalid() &&
-                                   (local_no_perms == candidate->has_no_permissions() ||
-                                    local_perms == candidate->get_permissions());
-
+                                   comparator.equal(candidate->get_permissions(), local_perms);
                     if (matches) {
                         if (candidate->is_file()) {
                             matches = false;
@@ -106,7 +104,7 @@ auto local_update_t::get_original(const model::folder_t &folder, const model::de
             if (!r) {
                 r = std::move(peer_file);
             } else {
-                if (model::compare(*peer_file, *r) > 1) {
+                if (model::compare(*peer_file, *r, comparator) > 1) {
                     r = std::move(peer_file);
                 }
             }

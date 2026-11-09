@@ -44,7 +44,7 @@ void supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(std::string(names::coordinator) + ".test", false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, true);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>(
         [&](auto &p) { p.register_name(names::coordinator, get_address()); });

@@ -30,7 +30,7 @@ linux_backend_t::io_guard_t::~io_guard_t() {
     }
 }
 
-linux_backend_t::linux_backend_t() { log = utils::get_logger("fs.linux"); }
+linux_backend_t::linux_backend_t() { log = utils::make_logger("fs.linux"); }
 
 auto linux_backend_t::initialize(int pipe_read_fd, void *platform_context) -> io_guard_holder_t {
     monitor = epoll_create1(0);

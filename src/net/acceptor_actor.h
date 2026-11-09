@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2024 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #pragma once
 
@@ -15,6 +15,7 @@ namespace net {
 
 struct acceptor_actor_config_t : r::actor_config_t {
     model::cluster_ptr_t cluster;
+    bool flush_logs = false;
 };
 
 template <typename Actor> struct acceptor_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -24,6 +25,10 @@ template <typename Actor> struct acceptor_actor_config_builder_t : r::actor_conf
 
     builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&flush_logs(bool value) && noexcept {
+        parent_t::config.flush_logs = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -43,6 +48,7 @@ struct SYNCSPIRIT_API acceptor_actor_t : public r::actor_base_t {
     void accept_next() noexcept;
     void on_accept(const boost::system::error_code &ec) noexcept;
 
+    bool flush_logs = false;
     utils::logger_t log;
     asio::io_context::strand &strand;
     tcp::endpoint endpoint;

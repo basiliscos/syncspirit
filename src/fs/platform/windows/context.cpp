@@ -25,7 +25,7 @@ guard_t::io_guard_t(io_guard_t &&other) : ctx{nullptr}, close_cb{nullptr}, handl
 }
 guard_t::~io_guard_t() {
     if (handle && ctx && close_cb) {
-        auto log = utils::get_logger("fs");
+        auto log = utils::make_logger("fs");
         LOG_TRACE(log, "removing handle {}", (void *)handle);
         if (!close_cb(handle)) {
             auto ec = std::error_code(::GetLastError(), std::system_category());
@@ -65,7 +65,7 @@ static void async_cb(HANDLE handle, void *data) {
     ctx->notify_flag.store(false);
     if (auto ok = ::ResetEvent(handle); !ok) {
         auto ec = std::error_code(::GetLastError(), std::system_category());
-        auto log = utils::get_logger("fs");
+        auto log = utils::get_logger("fs", true);
         LOG_WARN(log, "cannot reset asyn handle {} : {}", (void *)handle, ec);
     }
 }
@@ -99,7 +99,7 @@ void platform_context_t::notify() noexcept {
 
 auto platform_context_t::register_callback(handle_t handle, io_callback_t callback, void *data,
                                            close_handle_t close_cb) noexcept -> io_guard_t {
-    auto log = utils::get_logger("fs");
+    auto log = utils::get_logger("fs", true);
     if (handle) {
         auto [_, inserted] = io_callbacks.emplace(handle, io_context_t(callback, data));
         if (inserted) {
@@ -107,7 +107,7 @@ auto platform_context_t::register_callback(handle_t handle, io_callback_t callba
             handles.emplace_back(handle);
             return io_guard_t(this, close_cb ? close_cb : close_handle_cb, handle, true);
         } else {
-            auto log = utils::get_logger("fs");
+            auto log = utils::get_logger("fs", true);
             LOG_WARN(log, "callback for the handle is already registered");
         }
     } else {
@@ -136,7 +136,7 @@ bool platform_context_t::poll_events_impl(std::uint32_t timeout_ms) noexcept {
                         auto &ctx = it->second;
                         ctx.cb(h, ctx.data);
                     } else {
-                        auto log = utils::get_logger("fs");
+                        auto log = utils::get_logger("fs", true);
                         LOG_WARN(log, "no callback for the handle {}", (void *)h);
                     }
                 }

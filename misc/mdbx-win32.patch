@@ -1,18 +1,52 @@
---- _deps/mdbx-src/mdbx.c.orig  2026-03-26 22:12:17.007272000 +0300
-+++ _deps/mdbx-src/mdbx.c       2026-03-26 22:08:11.626424000 +0300
-@@ -68,7 +68,7 @@
- #endif /* _NO_CRT_STDIO_INLINE */
-
- #elif !defined(_POSIX_C_SOURCE)
--#define _POSIX_C_SOURCE 200809L
-+//#define _POSIX_C_SOURCE 200809L
- #endif /* Windows */
-
- #ifdef __cplusplus
-@@ -28756,7 +28756,7 @@
+--- _deps/mdbx-src/mdbx.c.orig	2026-11-08 22:09:25.389030688 +0300
++++ _deps/mdbx-src/mdbx.c	2026-11-08 22:01:11.865809342 +0300
+@@ -7940,42 +7940,6 @@
+   out->mi_dxb_fsize = 0;
+   out->mi_dxb_fallocated = 0;
+   out->mi_sys_ioblk = 0;
+-  if (env->dxb_mmap.fd != INVALID_HANDLE_VALUE) {
+-#if IS_WINDOWS
+-    union {
+-      BY_HANDLE_FILE_INFORMATION bh;
+-      FILE_STANDARD_INFO std;
+-#if _WIN32_WINNT >= _WIN32_WINNT_WIN8
+-      FILE_STORAGE_INFO storage;
+-#endif
+-    } sys_finfo;
+-    if (imports.GetFileInformationByHandleEx &&
+-        imports.GetFileInformationByHandleEx(env->dxb_mmap.fd, FileStandardInfo, &sys_finfo.std,
+-                                             sizeof(sys_finfo.std))) {
+-      out->mi_dxb_fsize = sys_finfo.std.EndOfFile.QuadPart;
+-      out->mi_dxb_fallocated = sys_finfo.std.AllocationSize.QuadPart;
+-#if _WIN32_WINNT >= _WIN32_WINNT_WIN8
+-      if (imports.GetFileInformationByHandleEx(env->dxb_mmap.fd, FileStorageInfo, &sys_finfo.storage,
+-                                               sizeof(sys_finfo.storage))) {
+-        out->mi_sys_ioblk = (sys_finfo.storage.FileSystemEffectivePhysicalBytesPerSectorForAtomicity >
+-                             sys_finfo.storage.LogicalBytesPerSector)
+-                                ? sys_finfo.storage.FileSystemEffectivePhysicalBytesPerSectorForAtomicity
+-                                : sys_finfo.storage.LogicalBytesPerSector;
+-      }
+-#endif
+-    } else if (GetFileInformationByHandle(env->dxb_mmap.fd, &sys_finfo.bh)) {
+-      out->mi_dxb_fsize = sys_finfo.bh.nFileSizeLow | (uint64_t)sys_finfo.bh.nFileSizeHigh << 32;
+-    } else
+-      return GetLastError();
+-#else
+-    struct stat sys_fstat;
+-    if (fstat(env->dxb_mmap.fd, &sys_fstat))
+-      return errno;
+-    out->mi_dxb_fsize = sys_fstat.st_size;
+-    out->mi_dxb_fallocated = UINT64_C(512) * sys_fstat.st_blocks;
+-    out->mi_sys_ioblk = sys_fstat.st_blksize;
+-#endif /* !Windows */
+-  }
+   return MDBX_SUCCESS;
+ }
+ 
+@@ -30427,7 +30391,7 @@
      for (ior_item_t *item = ior->pool; item <= ior->last;) {
        if (!HasOverlappedIoCompleted(&item->ov)) {
-         assert(ior->overlapped_fd);
+         ASSERT(ior->overlapped_fd);
 -        CancelIoEx(ior->overlapped_fd, &item->ov);
 +        CancelIo(ior->overlapped_fd);
        }

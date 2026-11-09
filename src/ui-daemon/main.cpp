@@ -271,7 +271,7 @@ int app_main(app_context_t &app_ctx) {
         logger->trace("overriding default log level to {}", value);
         app_ctx.logger->set_level(log_level.value());
     }
-    auto init_result = utils::init_loggers(cfg.log_configs);
+    auto init_result = utils::init_loggers(cfg.log_configs, cfg.flush_logs);
     if (!init_result) {
         logger->error("Loggers initialization failed :: {}", init_result.error());
         return 1;

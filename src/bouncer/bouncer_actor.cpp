@@ -5,11 +5,13 @@
 
 using namespace syncspirit::bouncer;
 
+bouncer_actor_t::bouncer_actor_t(config_t &config) : parent_t(config), flush_logs{config.flush_logs} {}
+
 void bouncer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("cpu.bouncer", false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &) { subscribe(&bouncer_actor_t::on_package); });
 }

@@ -82,6 +82,7 @@ struct SYNCSPIRIT_API local_keeper_t final : public model_actor_t<r::actor_base_
                        lc_context_t &stack_ctx) noexcept;
 
     void try_start_watching() noexcept;
+    void update_metadata() noexcept;
 
     outcome::result<void> operator()(const model::diff::advance::local_update_t &, void *custom) noexcept override;
     outcome::result<void> operator()(const model::diff::local::scan_start_t &, void *custom) noexcept override;

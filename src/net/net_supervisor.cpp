@@ -37,7 +37,7 @@ net_supervisor_t::net_supervisor_t(net_supervisor_t::config_t &cfg)
     auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
     auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
 
-    auto log = utils::get_logger(names::coordinator);
+    auto log = utils::get_logger(names::coordinator, app_config.flush_logs);
     auto cert_file = app_config.cert_file.get_view(allocator);
     auto key_file = app_config.key_file.get_view(allocator);
     auto result = utils::load_pair(cert_file, key_file);
@@ -77,7 +77,7 @@ void net_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(names::coordinator, false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, app_config.flush_logs);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         coordinator = address;
@@ -142,6 +142,7 @@ void net_supervisor_t::launch_early() noexcept {
                   .db_config(app_config.db_config)
                   .cluster(cluster)
                   .max_files_per_diff(constants::diffs_batch)
+                  .flush_logs(app_config.flush_logs)
                   .escalate_failure()
                   .finish()
                   ->get_address();
@@ -151,6 +152,7 @@ void net_supervisor_t::launch_early() noexcept {
         .concurrent_hashes(app_config.hasher_threads)
         .watcher_impl(syncspirit_watcher_impl)
         .sequencer(sequencer)
+        .flush_logs(app_config.flush_logs)
         .escalate_failure()
         .timeout(timeout)
         .finish();
@@ -208,8 +210,11 @@ void net_supervisor_t::on_local_up(model::message::local_up_t &message) noexcept
     if (p.name == names::fs_actor) {
         fs_addr = p.address;
     }
-    LOG_DEBUG(log, "on_local_up, left = {}", local_counter);
+    LOG_DEBUG(log, "on_local_up ({}), left = {}", p.name, local_counter);
     if (local_counter == 0) {
+        if (!app_config.start_offline) {
+            spawn_services();
+        }
         send<model::payload::local_ready_t>(coordinator);
     }
 }
@@ -235,13 +240,10 @@ void net_supervisor_t::on_thread_ready(model::message::thread_ready_t &) noexcep
 void net_supervisor_t::on_ready(message::ready_t &) noexcept {
     LOG_DEBUG(log, "on_ready, counter = {}", local_counter);
     send<model::payload::local_up_t>(coordinator);
-    if (!app_config.start_offline) {
-        spawn_services();
-    }
 }
 
 void net_supervisor_t::spawn_services() noexcept {
-    LOG_TRACE(log, "spawnign services");
+    LOG_TRACE(log, "spawnign services, fs = {}", (void *)fs_addr.get());
     assert(!services_addr);
     auto factory = [this](r::supervisor_t &, const r::address_ptr_t &spawner) -> r::actor_ptr_t {
         auto timeout = shutdown_timeout * 9 / 10;

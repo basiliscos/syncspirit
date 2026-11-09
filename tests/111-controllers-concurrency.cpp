@@ -26,7 +26,7 @@ struct fixture_t {
     using controller_ptr_t = r::intrusive_ptr_t<net::controller_actor_t>;
     using peer_ptr_t = r::intrusive_ptr_t<test_peer_t>;
 
-    fixture_t() noexcept { log = utils::get_logger("fixture"); }
+    fixture_t() noexcept { log = utils::get_logger("fixture", true); }
 
     virtual void run() noexcept {
         auto my_id_str = "KHQNO2S-5QSILRK-YX4JZZ4-7L77APM-QNVGZJT-EKU7IFI-PNEPBMY-4MXFMQD";

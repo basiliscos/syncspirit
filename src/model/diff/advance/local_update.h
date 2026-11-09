@@ -19,7 +19,7 @@ struct SYNCSPIRIT_API local_update_t : advance_t {
     outcome::result<void> visit(cluster_visitor_t &, void *) const noexcept override;
 
   private:
-    model::file_info_ptr_t get_original(const model::folder_t &folder, const model::device_t &self,
+    model::file_info_ptr_t get_original(const model::folder_t &folder, const model::folder_info_t &local_folder,
                                         const proto::FileInfo &local_1file) const noexcept;
 };
 

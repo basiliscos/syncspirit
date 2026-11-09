@@ -40,7 +40,7 @@ struct supervisor_t : ra::supervisor_asio_t {
         r::actor_base_t::configure(plugin);
         plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
             p.set_identity("supervisor", false);
-            log = utils::get_logger(identity);
+            log = utils::get_logger(identity, true);
         });
     }
 
@@ -66,7 +66,7 @@ struct client_actor_t : r::actor_base_t {
         r::actor_base_t::configure(plugin);
         plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
             p.set_identity("client", false);
-            log = utils::get_logger(identity);
+            log = utils::get_logger(identity, true);
         });
         plugin.with_casted<r::plugin::registry_plugin_t>(
             [&](auto &p) { p.discover_name("http", http_client, true).link(true); });
@@ -128,7 +128,7 @@ struct fixture_t {
 
     fixture_t() noexcept : ctx(io_ctx), acceptor(io_ctx), peer_sock(io_ctx) {
         test::init_logging();
-        log = utils::get_logger("fixture");
+        log = utils::get_logger("fixture", true);
     }
 
     void run() noexcept {

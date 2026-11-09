@@ -36,6 +36,7 @@ struct SYNCSPIRIT_API peer_supervisor_t final : public model_actor_t<ra::supervi
         const utils::key_pair_t *ssl_pair;
         config::bep_config_t bep_config;
         config::relay_config_t relay_config;
+        bool flush_logs = false;
     };
 
     template <typename Actor> struct config_builder_t : parent_t::template config_builder_t<Actor> {
@@ -47,19 +48,20 @@ struct SYNCSPIRIT_API peer_supervisor_t final : public model_actor_t<ra::supervi
             base_t::config.device_name = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
-
         builder_t &&ssl_pair(const utils::key_pair_t *value) && noexcept {
             base_t::config.ssl_pair = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
-
         builder_t &&bep_config(const config::bep_config_t &value) && noexcept {
             base_t::config.bep_config = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
-
         builder_t &&relay_config(const config::relay_config_t &value) && noexcept {
             base_t::config.relay_config = value;
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
+        builder_t &&flush_logs(bool value) && noexcept {
+            base_t::config.flush_logs = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
     };
@@ -85,6 +87,7 @@ struct SYNCSPIRIT_API peer_supervisor_t final : public model_actor_t<ra::supervi
     const utils::key_pair_t &ssl_pair;
     config::bep_config_t bep_config;
     config::relay_config_t relay_config;
+    bool flush_logs = false;
 };
 
 } // namespace net

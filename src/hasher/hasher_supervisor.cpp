@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2019-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2019-2026 Ivan Baidakou
 
 #include "hasher_supervisor.h"
 #include "hasher_actor.h"
@@ -7,13 +7,14 @@
 
 using namespace syncspirit::hasher;
 
-hasher_supervisor_t::hasher_supervisor_t(config_t &config) : parent_t(config), index{config.index} {}
+hasher_supervisor_t::hasher_supervisor_t(config_t &config)
+    : parent_t(config), index{config.index}, flush_logs{config.flush_logs} {}
 
 void hasher_supervisor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("hasher.supervisor", false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>(
         [&](auto &p) { p.discover_name(net::names::coordinator, coordinator, true).link(false); });

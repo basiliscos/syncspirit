@@ -125,7 +125,7 @@ app_supervisor_t::app_supervisor_t(config_t &config)
     sequencer = model::make_sequencer(started_at.time_since_epoch().count());
     bouncer = config.bouncer_address;
 
-    log = utils::get_logger("fltk");
+    log = utils::get_logger("fltk", app_config.flush_logs);
 
     auto &allocator = *config.allocator;
     auto res_path = utils::make_empty_view(allocator);

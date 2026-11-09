@@ -56,7 +56,7 @@ file_t &file_t::operator=(file_t &&other) noexcept {
 
 file_t::~file_t() {
     if (backend && file_size) {
-        auto log = utils::get_logger("fs.file");
+        auto log = utils::make_logger("fs.file");
         log->warn("closing file via d-tor '{}'", path);
         backend.reset();
     }

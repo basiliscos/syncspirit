@@ -22,13 +22,13 @@ r::plugin::resource_id_t http_req = 1;
 
 upnp_actor_t::upnp_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, cluster{cfg.cluster}, main_url{cfg.descr_url}, rx_buff_size{cfg.rx_buff_size},
-      external_port(cfg.external_port), debug{cfg.debug} {}
+      external_port(cfg.external_port), debug{cfg.debug}, flush_logs{cfg.flush_logs} {}
 
 void upnp_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("net.upnp", false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
         addr_description = p.create_address();
         addr_external_ip = p.create_address();
         addr_mapping = p.create_address();

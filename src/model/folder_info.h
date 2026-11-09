@@ -87,6 +87,10 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     seen_dirs_t &get_seen_dirs() noexcept { return seen_dirs; }
 
     folder_info_iterator_ptr_t iterate() noexcept;
+    inline const utils::metadata_comparator_t &get_metadata_comparator() const noexcept { return metadata_comparator; }
+    inline void set_metadata_comparator(utils::metadata_comparator_t &&value) noexcept {
+        metadata_comparator = std::move(value);
+    }
 
   private:
     struct path_eq_t {
@@ -111,6 +115,7 @@ struct SYNCSPIRIT_API folder_info_t final : presence_t {
     orphaned_files_t orphaned_files;
     seen_dirs_t seen_dirs;
     file_cache_t file_cache;
+    utils::metadata_comparator_t metadata_comparator;
 };
 
 using folder_info_ptr_t = intrusive_ptr_t<folder_info_t>;

@@ -25,6 +25,10 @@ namespace syncspirit::utils {
 
 const char *log_pattern = "[%Y-%m-%d %H:%M:%S." SECOND_FRACTION "] [%^%L/%t%$] {%n} %v";
 
+static bool global_flush_logs = false;
+
+static auto bootstrap_sink = std::string_view("syncspirit-bootstrap.log");
+
 using sink_option_t = outcome::result<spdlog::sink_ptr>;
 
 static sink_option_t make_sink(std::string_view name) noexcept {
@@ -44,7 +48,7 @@ static sink_option_t make_sink(std::string_view name) noexcept {
     return utils::make_error_code(error_code_t::unknown_sink);
 }
 
-outcome::result<void> init_loggers(const config::log_configs_t &configs) noexcept {
+outcome::result<void> init_loggers(const config::log_configs_t &configs, bool flush_logs) noexcept {
     using sink_map_t = std::unordered_map<std::string, spdlog::sink_ptr>;
     using logger_map_t = std::unordered_map<std::string, std::shared_ptr<spdlog::logger>>;
 
@@ -87,8 +91,8 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs) noexcep
             dist_sink->add_sink(sink);
         }
         prev->set_level(cfg.level);
-        if (cfg.level == spdlog::level::trace) {
-            prev->flush_on(spdlog::level::trace);
+        if (flush_logs) {
+            prev->flush_on(cfg.level);
         }
         root_level = cfg.level;
         logger_map[name] = prev;
@@ -117,6 +121,9 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs) noexcep
         auto logger = std::make_shared<spdlog::logger>(log_name, sinks.begin(), sinks.end());
         auto level = std::max(cfg.level, root_level);
         logger->set_level(level);
+        if (flush_logs) {
+            logger->flush_on(level);
+        }
         logger_map[name] = logger;
     }
 
@@ -129,6 +136,7 @@ outcome::result<void> init_loggers(const config::log_configs_t &configs) noexcep
         }
     }
     spdlog::set_pattern(log_pattern);
+    global_flush_logs = flush_logs;
     return outcome::success();
 }
 
@@ -137,7 +145,7 @@ void finalize_loggers() noexcept {
     spdlog::drop_all();
 }
 
-static auto bootstrap_sink = std::string_view("syncspirit-bootstrap.log");
+bool has_flush_logs() noexcept { return global_flush_logs; }
 
 bootstrap_guard_t::bootstrap_guard_t(dist_sink_t dist_sink_, spdlog::sinks::sink *sink_)
     : dist_sink{dist_sink_}, sink{sink_} {}
@@ -165,6 +173,9 @@ std::pair<dist_sink_t, logger_t> create_root_logger() noexcept {
     auto dist_sink = std::make_shared<spdlog::sinks::dist_sink_mt>();
     auto logger = std::make_shared<spdlog::logger>("", dist_sink);
     logger->set_level(spdlog::level::trace);
+    if (global_flush_logs) {
+        logger->flush_on(spdlog::level::trace);
+    }
     spdlog::drop_all();
     spdlog::set_default_logger(logger);
     spdlog::set_pattern(log_pattern);

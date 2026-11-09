@@ -96,8 +96,12 @@ after the core completion.
 
 # changes
 
-## 0.5.0 (xx-xxx-202x)
-- [core, bugfix] path `contains()` method now works correctly
+## 0.4.8 (xx-Nov-2026)
+ - [core, fs] improve FAT32 filesystems support
+ - [core, fs, bugfix] do not report errors upon successful metadata update
+ - [core, bugfix] fix app crash caused by race condition
+ - [core, bugfix] path `contains()` method now works correctly
+>>>>>>> v0.4.8-dev
 
 ## 0.4.7 (27-Sep-2026)
  - [core, bugfix] allow to specify custom dns servers

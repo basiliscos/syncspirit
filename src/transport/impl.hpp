@@ -116,7 +116,7 @@ template <> struct base_impl_t<ssl_socket_t> {
             ctx.use_private_key(asio::const_buffer(key_data.data(), key_data.size()), ssl::context::asn1);
         }
 
-        auto log = utils::get_logger("transport.tls");
+        auto log = utils::make_logger("transport.tls");
         utils::set_store(log.get(), ctx.native_handle(), source.ssl_verify_store);
 
         if (opt && opt->alpn.size()) {
@@ -154,7 +154,7 @@ template <> struct base_impl_t<ssl_socket_t> {
             me = config.ssl_junction->me;
         }
 
-        log = utils::get_logger("transport.tls");
+        log = utils::make_logger("transport.tls");
         if (config.sni_extension) {
             auto host = config.uri->host();
             log->trace("will will use sni extension (value = '{}')", host);
@@ -337,7 +337,7 @@ template <> struct impl<tcp_socket_t> {
             auto ec = boost::system::error_code();
             sock.cancel(ec);
             if (ec) {
-                utils::get_logger("transport.sock")->error("impl<tcp::socket>::cancel(): {}", ec);
+                utils::make_logger("transport.sock")->error("impl<tcp::socket>::cancel(): {}", ec);
             }
         }
     }

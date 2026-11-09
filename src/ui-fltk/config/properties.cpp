@@ -109,8 +109,9 @@ path_t::path_t(std::string label, std::string explanation, const utils::path_t &
 
 utils::path_t path_t::convert() noexcept { return utils::path_t::make_native(value); }
 
-bool_t::bool_t(bool value, bool default_value, std::string label)
-    : property_t(std::move(label), "", value ? "true" : "", default_value ? "true" : "", property_kind_t::boolean),
+bool_t::bool_t(bool value, bool default_value, std::string label, std::string explanation)
+    : property_t(std::move(label), std::move(explanation), value ? "true" : "", default_value ? "true" : "",
+                 property_kind_t::boolean),
       native_value(value ? 1 : 0) {}
 
 error_ptr_t bool_t::validate_value() noexcept {
@@ -420,11 +421,19 @@ void timeout_t::reflect_to(syncspirit::config::main_t &main) { main.timeout = na
 
 const char *timeout_t::explanation_ = "main actors timeout, milliseconds";
 
-start_offline_t::start_offline_t(bool value, bool default_value) : parent_t(value, default_value, "start offline") {}
+start_offline_t::start_offline_t(bool value, bool default_value)
+    : parent_t(value, default_value, "start offline", explanation_) {}
 
 void start_offline_t::reflect_to(syncspirit::config::main_t &main) { main.start_offline = native_value; }
 
 const char *start_offline_t::explanation_ = "do not connect to any network on startup";
+
+flush_logs_t::flush_logs_t(bool value, bool default_value)
+    : parent_t(value, default_value, "flush logs", explanation_) {}
+
+void flush_logs_t::reflect_to(syncspirit::config::main_t &main) { main.flush_logs = native_value; }
+
+const char *flush_logs_t::explanation_ = "flush log record (affects performance if enabled)";
 
 } // namespace main
 

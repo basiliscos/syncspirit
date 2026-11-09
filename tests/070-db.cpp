@@ -141,7 +141,7 @@ struct fixture_t {
             CHECK(((r == MDBX_RESULT_TRUE) || (r == 0)));
             if (r > 0) {
                 auto ec = db::make_error_code(r);
-                auto log = utils::get_logger("");
+                auto log = utils::get_logger("db", true);
                 LOG_INFO(log, "mdbx_reader_list, error: {}", ec.message());
             }
         }
@@ -1526,7 +1526,7 @@ void test_iterative_application_interrupt() {
                 void configure(r::plugin::plugin_base_t &plugin) noexcept override {
                     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
                         p.set_identity("my.controller", false);
-                        log = utils::get_logger(identity);
+                        log = utils::get_logger(identity, true);
                     });
                     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
                         p.discover_name(net::names::coordinator, coordinator, true)

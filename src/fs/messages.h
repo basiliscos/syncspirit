@@ -8,6 +8,8 @@
 #include "utils/bytes.h"
 #include "utils/error_code.h"
 #include "utils/path.h"
+#include "utils/permissions.h"
+#include "utils/timestamp.h"
 #include "update_type.hpp"
 #include "execution_context.h"
 
@@ -69,20 +71,18 @@ struct remote_copy_t : payload_base_t<void> {
     utils::path_t conflict_path;
     proto::FileInfoType type;
     std::uint64_t size;
-    std::uint32_t permissions;
+    utils::permissions_t permissions;
     std::int64_t modification_s;
     std::string symlink_target;
     bool deleted;
-    bool no_permissions;
 
     inline remote_copy_t(extendended_context_prt_t context_, std::string folder_id_, utils::path_t path_,
                          utils::path_t conflict_path_, proto::FileInfoType type_, std::uint64_t size_,
-                         std::uint32_t permissions_, std::int64_t modification_s_, std::string symlink_target_,
-                         bool deleted_, bool no_permissions_) noexcept
+                         const utils::permissions_t &permissions_, std::int64_t modification_s_,
+                         std::string symlink_target_, bool deleted_) noexcept
         : parent_t(std::move(context_), std::move(folder_id_)), path{std::move(path_)},
           conflict_path{std::move(conflict_path_)}, type{type_}, size{size_}, permissions{permissions_},
-          modification_s{modification_s_}, symlink_target(std::move(symlink_target_)), deleted{deleted_},
-          no_permissions{no_permissions_} {}
+          modification_s{modification_s_}, symlink_target(std::move(symlink_target_)), deleted{deleted_} {}
 
     remote_copy_t(remote_copy_t &&) noexcept = default;
 };
@@ -93,15 +93,14 @@ struct finish_file_t : payload_base_t<void> {
     utils::path_t conflict_path;
     std::uint64_t file_size;
     std::int64_t modification_s;
-    std::uint32_t permissions;
-    bool no_permissions;
+    utils::permissions_t permissions;
 
     inline finish_file_t(extendended_context_prt_t context_, std::string folder_id_, utils::path_t path_,
                          utils::path_t conflict_path_, std::uint64_t file_size_, std::int64_t modification_s_,
-                         std::uint32_t permissions_, bool no_permissions_) noexcept
+                         utils::permissions_t permissions_) noexcept
         : parent_t(std::move(context_), std::move(folder_id_)), path{std::move(path_)},
           conflict_path{std::move(conflict_path_)}, file_size{file_size_}, modification_s{modification_s_},
-          permissions{permissions_}, no_permissions{no_permissions_} {}
+          permissions{permissions_} {}
 
     finish_file_t(const finish_file_t &) = delete;
     finish_file_t(finish_file_t &&) noexcept = default;
@@ -110,14 +109,13 @@ struct finish_file_t : payload_base_t<void> {
 struct update_meta_t : payload_base_t<void> {
     using parent_t = payload_base_t<void>;
     utils::path_t path;
-    std::int64_t modification_s;
-    std::uint32_t permissions;
-    bool no_permissions;
+    utils::timestamp_t modification;
+    utils::permissions_t permissions;
 
     inline update_meta_t(extendended_context_prt_t context_, std::string folder_id_, utils::path_t path_,
-                         std::int64_t modification_s_, std::uint32_t permissions_, bool no_permissions_) noexcept
-        : parent_t(std::move(context_), std::move(folder_id_)), path{std::move(path_)}, modification_s{modification_s_},
-          permissions{permissions_}, no_permissions{no_permissions_} {}
+                         utils::timestamp_t modification_, utils::permissions_t permissions_) noexcept
+        : parent_t(std::move(context_), std::move(folder_id_)), path{std::move(path_)}, modification{modification_},
+          permissions{permissions_} {}
 
     update_meta_t(update_meta_t &&) noexcept = default;
 };

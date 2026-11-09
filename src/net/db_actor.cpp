@@ -99,13 +99,13 @@ db_actor_t::payload::commit_t::~commit_t() {
 
 db_actor_t::db_actor_t(config_t &config)
     : parent_t{config}, env{nullptr}, db_dir{std::move(config.db_dir)}, db_config{config.db_config},
-      max_files_per_diff(config.max_files_per_diff) {
+      max_files_per_diff(config.max_files_per_diff), flush_logs{config.flush_logs} {
     // mdbx_module_handler({}, {}, {});
     // mdbx_setup_debug(MDBX_LOG_TRACE, MDBX_DBG_ASSERT, &_my_log);
     assert(max_files_per_diff);
     auto r = mdbx_env_create(&env);
     if (r != MDBX_SUCCESS) {
-        auto log = utils::get_logger("net.db");
+        auto log = utils::get_logger("net.db", flush_logs);
         LOG_CRITICAL(log, "mdbx environment creation error ({}): {}", r, mdbx_strerror(r));
         throw std::runtime_error(std::string(mdbx_strerror(r)));
     }
@@ -122,7 +122,7 @@ void db_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(names::db, false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
         sink = p.create_address();
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(names::db, get_address()); });

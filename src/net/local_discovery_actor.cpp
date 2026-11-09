@@ -4,7 +4,6 @@
 #include "local_discovery_actor.h"
 #include "names.h"
 #include "proto/bep_support.h"
-#include "utils/error_code.h"
 #include "utils/format.hpp"
 #include "utils/time.h"
 #include "model/diff/contact/update_contact.h"
@@ -30,7 +29,7 @@ r::plugin::resource_id_t timer = 2;
 local_discovery_actor_t::local_discovery_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, frequency{r::pt::milliseconds(cfg.frequency)},
       strand{static_cast<ra::supervisor_asio_t *>(cfg.supervisor)->get_strand()}, broadcast_sock{strand.context()},
-      sock{strand.context()}, port{cfg.port}, cluster{cfg.cluster} {
+      sock{strand.context()}, port{cfg.port}, cluster{cfg.cluster}, flush_logs{cfg.flush_logs} {
     rx_buff.resize(BUFF_SZ);
     tx_buff.resize(BUFF_SZ);
 }
@@ -39,7 +38,7 @@ void local_discovery_actor_t::configure(r::plugin::plugin_base_t &plugin) noexce
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("net.local_discovery", false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>(
         [&](auto &p) { p.discover_name(names::coordinator, coordinator, true).link(false); });

@@ -131,7 +131,7 @@ file_table_t::file_table_t(presence_item_t &container_, int x, int y, int w, int
     data.push_back({"is_link", make_checkbox(*this, entity.is_link())});
     data.push_back({"is_invalid", make_checkbox(*this, entity.is_invalid())});
     data.push_back({"is_deleted", make_checkbox(*this, entity.is_deleted())});
-    data.push_back({"no_permissions", make_checkbox(*this, entity.has_no_permissions())});
+    data.push_back({"no_permissions", make_checkbox(*this, entity.get_permissions().absent)});
     data.push_back({"symlink_target", symlink_target_cell});
     data.push_back({"entries", entries_cell});
     data.push_back({"entries size", entries_size_cell});
@@ -159,7 +159,7 @@ void file_table_t::refresh() {
     auto device = presence->get_device();
     auto &devices = container.supervisor.get_cluster()->get_devices();
     auto data = table_rows_t();
-    auto modified_s = file_info.get_modified_s();
+    auto modified_s = file_info.get_modification().seconds;
     auto modified_date = model::pt::from_time_t(modified_s);
     auto version = file_info.get_version();
     auto &stats = presence->get_stats();
@@ -208,9 +208,9 @@ void file_table_t::refresh() {
 
     block_size_cell->update(std::to_string(file_info.get_block_size()));
     blocks_cell->update(std::to_string(blocks_count));
-    permissions_cell->update(fmt::format("0{:o}", file_info.get_permissions()));
+    permissions_cell->update(fmt::format("0{:o}", file_info.get_permissions().value));
     modified_s_cell->update(fmt::format("{}", modified_s));
-    modified_ns_cell->update(fmt::format("{}", file_info.get_modified_ns()));
+    modified_ns_cell->update(fmt::format("{}", file_info.get_modification().ns));
     symlink_target_cell->update(file_info.get_link_target());
     entries_cell->update(fmt::format("{}", stats.entities));
     entries_size_cell->update(get_file_size(stats.size));

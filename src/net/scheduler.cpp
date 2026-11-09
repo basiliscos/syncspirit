@@ -39,7 +39,7 @@ void scheduler_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     parent_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(net::names::scheduler, false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(net::names::scheduler, address); });
 }

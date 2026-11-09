@@ -42,10 +42,9 @@ struct SYNCSPIRIT_API presence_t : model::augmentable_t {
         ignored          = 1 << 9,
         unreachable      = 1 << 10,
         invalid          = 1 << 11,
-        no_perms         = 1 << 12,
-        synchronizing    = 1 << 13,
-        available        = 1 << 14,
-        normalized       = 1 << 15,
+        synchronizing    = 1 << 12,
+        available        = 1 << 13,
+        normalized       = 1 << 14,
     };
 
     static constexpr std::uint32_t mask = 0xFFFFFFFF;

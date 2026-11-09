@@ -7,7 +7,7 @@
 using namespace syncspirit::fs::platform;
 
 context_base_t::context_base_t(const pt::time_duration &poll_timeout_) noexcept : poll_timeout{poll_timeout_} {
-    log = utils::get_logger("fs");
+    log = utils::make_logger("fs");
     poll_timeout_ms = poll_timeout.total_milliseconds();
     assert(poll_timeout_ms > 0);
 }

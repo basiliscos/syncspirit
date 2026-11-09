@@ -27,6 +27,7 @@
 #include "local/scan_start.h"
 #include "local/synchronization_finish.h"
 #include "local/synchronization_start.h"
+#include "local/update_metadata.h"
 #include "modify/add_blocks.h"
 #include "modify/add_ignored_device.h"
 #include "modify/add_pending_device.h"
@@ -168,6 +169,11 @@ auto cluster_visitor_t::operator()(const local::synchronization_start_t &diff, v
 }
 
 auto cluster_visitor_t::operator()(const local::synchronization_finish_t &diff, void *custom) noexcept
+    -> outcome::result<void> {
+    return diff.visit_next(*this, custom);
+}
+
+auto cluster_visitor_t::operator()(const local::update_metadata_t &diff, void *custom) noexcept
     -> outcome::result<void> {
     return diff.visit_next(*this, custom);
 }
