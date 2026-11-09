@@ -316,15 +316,17 @@ generate_export_header(syncspirit_core
     EXPORT_FILE_NAME include/syncspirit-export.h
 )
 FetchContent_Declare(MDBX
-    URL https://libmdbx.dqdkfa.ru/release/libmdbx-amalgamated-0.14.1.tar.xz
-    URL_HASH SHA256=2edb8b59db5b2b021c7634010f8dbdbbf948eda609942dd300510c6e93bd5d25
+    URL https://libmdbx.dqdkfa.ru/release/libmdbx-amalgamated-0.14.4.tar.xz
+    URL_HASH SHA256=0dd6bf6048d5d208bc20d325cf93c8f88beda95802e9e3aa7958346611c36922
     PATCH_COMMAND ${CMAKE_COMMAND} -E
         chdir ${CMAKE_CURRENT_BINARY_DIR}
-        patch -u _deps/mdbx-src/mdbx.c -i ${CMAKE_CURRENT_SOURCE_DIR}/misc/mdbx-win32.patch
+        patch -u -p0 -i ${CMAKE_CURRENT_SOURCE_DIR}/misc/mdbx.patch
 )
     if (WIN32)
         set(BUILD_SHARED_LIBS true CACHE BOOL "BUILD_SHARED_LIBS")
         set(MDBX_BUILD_SHARED_LIBRARY true CACHE BOOL "MDBX_BUILD_SHARED_LIBRARY")
+        set(MDBX_NATIVE_SEH_DEFAULT false CACHE BOOL "MDBX_NATIVE_SEH_DEFAULT")
+        set(MDBX_NATIVE_SEH false CACHE BOOL "MDBX_NATIVE_SEH")
     else()
         set(BUILD_SHARED_LIBS false CACHE BOOL "BUILD_SHARED_LIBS")
         set(MDBX_BUILD_SHARED_LIBRARY false CACHE BOOL "MDBX_BUILD_SHARED_LIBRARY")
