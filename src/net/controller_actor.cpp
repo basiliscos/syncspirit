@@ -1496,15 +1496,21 @@ auto controller_actor_t::compare_with_local(model::file_info_t &peer_file, model
     using LD = local_difference_t;
     auto compare_meta = [&](model::file_info_t &peer_file, model::file_info_t &local_file) -> local_difference_t {
         using O = utils::metadata_comparator_t::ordening_t;
+        if (peer_file.is_deleted() && !local_file.is_deleted()) {
+            return LD::trivial_io;
+        }
         auto &local_ts = local_file.get_modification();
-        auto &peer_ts = local_file.get_modification();
+        auto &peer_ts = peer_file.get_modification();
         auto &comparator = local_folder.get_metadata_comparator();
         auto ordering = comparator.compare(local_ts, peer_ts);
         if (ordering != O::equivalent) {
             return LD::meta;
         }
         auto perms_differ = !comparator.equal(local_file.get_permissions(), peer_file.get_permissions());
-        return perms_differ ? LD::meta : LD::version;
+        if (perms_differ) {
+            return LD::meta;
+        }
+        return LD::version;
     };
 
     if (peer_file.get_block_size() == 0) {

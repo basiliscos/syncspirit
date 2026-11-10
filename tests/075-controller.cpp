@@ -54,6 +54,14 @@ struct mock_supervisor_t : supervisor_t {
         }
     }
 
+    void process_io(fs::payload::remote_copy_t &req) noexcept override {
+        ++io_copies;
+        if (req.deleted) {
+            ++io_removes;
+        }
+        supervisor_t::process_io(req);
+    }
+
     void process_io(fs::payload::append_block_t &req) noexcept override {
         auto copy =
             fs::payload::append_block_t({}, req.folder_id, req.path.clone(), req.data, req.offset, req.file_size);
@@ -98,6 +106,8 @@ struct mock_supervisor_t : supervisor_t {
     appended_blocks_t appended_blocks;
     file_finishes_t file_finishes;
     int bypass_io_messages = -1;
+    int io_copies = 0;
+    int io_removes = 0;
     io_messages_t io_messages;
 };
 
@@ -551,7 +561,7 @@ void test_downloading() {
                 auto &my_index_update = std::get<proto::Index>(*msg);
                 REQUIRE(proto::get_files_size(my_index_update) == 1);
 
-                SECTION("don't redownload file only if metadata has changed") {
+                SECTION("don't redownload file only if version has changed") {
                     auto index_update = proto::IndexUpdate{};
                     proto::set_folder(index_update, proto::get_folder(index));
                     proto::set_sequence(file, 11);
@@ -569,6 +579,27 @@ void test_downloading() {
                     f = *folder_my->get_file_infos().begin();
                     CHECK(f->is_locally_available());
                     CHECK(f->get_sequence() == 2ul);
+                }
+                SECTION("don't download if is deleted, locally rm it") {
+                    auto index_update = proto::IndexUpdate{};
+                    proto::set_folder(index_update, proto::get_folder(index));
+                    proto::set_sequence(file, 11);
+                    proto::set_value(counter, 2);
+                    proto::set_size(file, 0);
+                    proto::set_block_size(file, 0);
+                    proto::set_deleted(file, true);
+                    proto::clear_blocks(file);
+                    proto::add_files(index_update, file);
+
+                    peer_actor->forward(index_update);
+                    sup->do_process();
+                    CHECK(sup->io_copies == 1);
+                    CHECK(sup->io_removes == 1);
+                    CHECK(folder_my->get_max_sequence() == 2ul);
+                    f = *folder_my->get_file_infos().begin();
+                    CHECK(f->is_locally_available());
+                    CHECK(f->get_sequence() == 2ul);
+                    CHECK(f->is_deleted());
                 }
             }
             SECTION("download 2 files") {
