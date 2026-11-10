@@ -297,6 +297,7 @@ add_library(syncspirit_core
     src/utils/uri.cpp
     src/utils/utf8.cpp
     src/model/presence.h
+    src/fs/task/child_info.h
 )
 
 set_source_files_properties(

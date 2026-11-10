@@ -13,8 +13,4 @@ struct child_ready_t : child_info_t {
     blocks_t blocks;
 };
 
-struct undo_child_ready_t {
-    utils::path_t path;
-};
-
 } // namespace syncspirit::net::local_keeper

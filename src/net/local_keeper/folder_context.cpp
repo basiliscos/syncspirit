@@ -142,6 +142,7 @@ int folder_context_t::process(unscanned_dir_t &dir, stack_context_t &ctx) noexce
                               local_folder->get_folder()->is_watched();
         LOG_TRACE(log, "scheduling scan of '{}' (notify: {})", dir.path, notify_watcher);
         auto sub_task = scan_dir_t(std::move(dir.path), std::move(dir.presence), std::move(dir.single_child),
+                                   std::move(*dir.child_ready),
                                    notify_watcher, dir.recurse, dir.requires_refinement);
         push(std::move(sub_task));
         return 0;
@@ -293,19 +294,6 @@ int folder_context_t::process(child_ready_t &info, stack_context_t &ctx) noexcep
         auto data = info.serialize(*local_folder, std::move(info.blocks), ignore_permissions);
         ctx.local_update(std::move(data), folder_id);
     }
-    return 1;
-}
-
-int folder_context_t::process(undo_child_ready_t &info, stack_context_t &ctx) noexcept {
-    for (auto it = stack.begin()++; it != stack.end(); ++it) {
-        if (auto item = std::get_if<child_ready_t>(&*it)) {
-            if (item->path == info.path) {
-                stack.erase(it);
-                return 1;
-            }
-        }
-    }
-    LOG_WARN(log, "cannot undo child ready for {}", info.path);
     return 1;
 }
 
@@ -856,7 +844,6 @@ void folder_context_t::handle_scan_error(fs::task::scan_dir_t &task, stack_conte
             }
         }
     }
-    stack.push_front(undo_child_ready_t(task.path.clone()));
 }
 
 bool folder_context_t::is_done() const noexcept {

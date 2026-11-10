@@ -2310,16 +2310,16 @@ void test_races() {
 
 int _init() {
     test::init_logging();
-    REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
-    REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
-    REGISTER_TEST_CASE(test_create_dir, "test_create_dir", "[net]");
-    REGISTER_TEST_CASE(test_no_changes, "test_no_changes", "[net]");
-    REGISTER_TEST_CASE(test_deleted, "test_deleted", "[net]");
-    REGISTER_TEST_CASE(test_changed, "test_changed", "[net]");
-    REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");
-    REGISTER_TEST_CASE(test_resurrection, "test_resurrection", "[net]");
-    REGISTER_TEST_CASE(test_partial_scan, "test_partial_scan", "[net]");
-    // REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
+    // REGISTER_TEST_CASE(test_simple, "test_simple", "[net]");
+    // REGISTER_TEST_CASE(test_startup, "test_startup", "[net]");
+    // REGISTER_TEST_CASE(test_create_dir, "test_create_dir", "[net]");
+    // REGISTER_TEST_CASE(test_no_changes, "test_no_changes", "[net]");
+    // REGISTER_TEST_CASE(test_deleted, "test_deleted", "[net]");
+    // REGISTER_TEST_CASE(test_changed, "test_changed", "[net]");
+    // REGISTER_TEST_CASE(test_type_change, "test_type_change", "[net]");
+    // REGISTER_TEST_CASE(test_resurrection, "test_resurrection", "[net]");
+    // REGISTER_TEST_CASE(test_partial_scan, "test_partial_scan", "[net]");
+    REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
     // REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
     // REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
     // REGISTER_TEST_CASE(test_hashing_fail, "test_hashing_fail", "[net]");

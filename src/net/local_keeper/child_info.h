@@ -4,15 +4,15 @@
 #pragma once
 
 #include "model/folder_info.h"
-#include "fs/task/scan_dir.h"
+#include "fs/task/child_info.h"
 #include "utils/path.h"
 #include <system_error>
 #include <cstdint>
 
 namespace syncspirit::net::local_keeper {
 
-struct child_info_t : fs::task::scan_dir_t::child_info_t {
-    using parent_t = fs::task::scan_dir_t::child_info_t;
+struct child_info_t : fs::task::child_info_t {
+    using parent_t = fs::task::child_info_t;
     using blocks_t = std::vector<proto::BlockInfo>;
     using generation_t = std::uint_fast32_t;
 

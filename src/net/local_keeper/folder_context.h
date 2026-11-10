@@ -45,7 +45,6 @@ struct folder_context_t : boost::intrusive_ref_counter<folder_context_t, boost::
     int process(suspend_scan_t &item, stack_context_t &ctx) noexcept;
     int process(unsuspend_scan_t &, stack_context_t &ctx) noexcept;
     int process(child_ready_t &info, stack_context_t &ctx) noexcept;
-    int process(undo_child_ready_t &info, stack_context_t &ctx) noexcept;
     int process(hash_existing_file_ptr_t &item, stack_context_t &ctx) noexcept;
     int process(hash_new_file_ptr_t &item, stack_context_t &ctx) noexcept;
     int process(hash_incomplete_file_ptr_t &item, stack_context_t &ctx) noexcept;
