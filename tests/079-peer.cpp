@@ -433,7 +433,7 @@ void test_unanswered_pings() {
         int got_ping{0};
 
         void main() noexcept override {
-            create_actor(10);
+            create_actor(100);
             send_and_read_message();
         }
 
@@ -445,9 +445,9 @@ void test_unanswered_pings() {
         }
 
         void on_ping(proto::Ping &) noexcept override {
+            ++got_ping;
             LOG_DEBUG(log, "on_ping");
             read_message();
-            ++got_ping;
             if (got_ping == constants::pings_limit) {
                 sup->do_shutdown();
                 sup->do_process();
