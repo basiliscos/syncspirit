@@ -125,6 +125,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     bool read_hello(proto::message::message_t &&msg, void *) noexcept;
     bool read_controlled(proto::message::message_t &&msg, void *) noexcept;
 
+    void send_ping() noexcept;
     void reset_ping_timer() noexcept;
     void reset_stats_timer() noexcept;
 
@@ -156,12 +157,11 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     std::size_t tx_bytes;
     tx_size_ptr_t tx_bytes_in_progress;
     received_queue_t received_queue;
+    std::uint_fast32_t pings_left{0};
     bool finished = false;
     bool io_error = false;
 
     bool had_writes = false;
-    bool had_reads = false;
-    bool had_ping = false;
 };
 
 } // namespace net
