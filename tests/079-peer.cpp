@@ -620,6 +620,7 @@ void test_cancel_write() {
         }
 
         outcome::result<void> operator()(const model::diff::contact::peer_state_t &diff, void *) noexcept override {
+            LOG_DEBUG(log, "diff, online: {}", diff.state.is_online());
             if (diff.state.is_online()) {
                 seen_online = true;
                 auto coordinator = sup->get_address();
@@ -630,6 +631,7 @@ void test_cancel_write() {
                     auto data = as_owned_bytes(str);
                     sup->send<net::payload::transfer_data_t>(peer_addr, std::move(data));
                 }
+                LOG_DEBUG(log, "sent: {} bytes of payload", length);
 
                 auto ec = r::make_error_code(r::error_code_t::cancelled);
                 auto ee = sup->make_error(ec);
