@@ -1742,8 +1742,6 @@ void test_leaks() {
     };
     F().run();
 }
-#if 0
-
 
 void test_hashing_fail() {
     struct F : fixture_t {
@@ -1762,11 +1760,14 @@ void test_hashing_fail() {
             CHECK(!folder->get_scan_start().is_special());
             CHECK(!folder->get_scan_finish().is_special());
             CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-            CHECK(files->size() == 0);
+            CHECK(test::count_children(*local_folder) == 0);
         }
     };
     F().run();
 }
+
+#if 0
+
 
 void test_incomplete() {
     struct F : fixture_t {
