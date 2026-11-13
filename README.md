@@ -97,6 +97,7 @@ after the core completion.
 # changes
 
 ## 0.4.8 (xx-Nov-2026)
+ - [core, bugfix] requeue downloading of postponed files with duplicate blocks
  - [core, bugfix] respond to ping activity and prevent peer connection close
  - [core, bugfix] rm local file if peer side already deleted it and has more
    recent version
