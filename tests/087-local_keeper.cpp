@@ -1499,7 +1499,7 @@ void test_scan_errors() {
                 proto::set_value(counter, 1);
                 builder->local_update(folder->get_id(), pr_dir).apply(*sup);
                 REQUIRE(test::count_children(*local_folder) == 1);
-                auto dir_file = *local_folder->get_children().begin();
+                auto dir_file = static_cast<model::file_info_t*>(*local_folder->get_children().begin());
 
                 SECTION("new file") {
                     do_mock(dir_path);
@@ -1524,9 +1524,7 @@ void test_scan_errors() {
                     CHECK(file->is_locally_available());
                 }
 
-#if 0
                 CHECK(dir_file->is_locally_available());
-#endif
                 CHECK(mocked == 1);
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
