@@ -1538,8 +1538,6 @@ void test_scan_errors() {
     F().run();
 }
 
-#if 0
-
 void test_read_errors() {
     struct F : fixture_t {
         F() : fixture_t{false} {
@@ -1575,7 +1573,7 @@ void test_read_errors() {
                         builder->scan_start(folder->get_id()).apply(*sup);
                         CHECK(!folder->is_scanning());
                         CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                        CHECK(files->size() == 0);
+                        CHECK(test::count_children(*local_folder) == 0);
                     }
                 }
                 SECTION("small known file") {
@@ -1586,24 +1584,24 @@ void test_read_errors() {
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!folder->is_scanning());
                     CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                    REQUIRE(files->size() == 1);
+                    REQUIRE(test::count_children(*local_folder) == 1);
 
-                    auto file_1 = *files->begin();
+                    auto file_1 = static_cast<model::file_info_t*>(*local_folder->get_children().begin());
                     CHECK(!file_1->is_unreachable());
                     CHECK(file_1->is_locally_available());
 
-                    auto max_seq = folder_info->get_max_sequence();
+                    auto max_seq = local_folder->get_max_sequence();
 
                     chmod(file_path, 0);
                     if (read_file(file_path) == "") {
                         builder->scan_start(folder->get_id()).apply(*sup);
                         CHECK(!folder->is_scanning());
                         CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                        REQUIRE(files->size() == 1);
+                        REQUIRE(test::count_children(*local_folder) == 1);
 
                         CHECK(file_1->is_unreachable());
                         CHECK(!file_1->is_locally_available());
-                        CHECK(folder_info->get_max_sequence() == max_seq);
+                        CHECK(local_folder->get_max_sequence() == max_seq);
                     }
                 }
             }
@@ -1660,7 +1658,7 @@ void test_read_errors() {
                 builder->scan_start(folder->get_id()).apply(*sup);
                 CHECK(!folder->is_scanning());
                 CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                CHECK(files->size() == 0);
+                CHECK(test::count_children(*local_folder) == 0);
                 CHECK(hasher->digested_blocks <= block_index + hash_limit);
             }
             if (metadata_comparator.permissions_supported) {
@@ -1674,16 +1672,16 @@ void test_read_errors() {
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!folder->is_scanning());
                     CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                    CHECK(files->size() == 3);
+                    CHECK(test::count_children(*local_folder) == 3);
 
-                    auto file_1 = files->by_name(narrow(L"папка"));
-                    auto file_2 = files->by_name(narrow(L"папка/подпапка"));
-                    auto file_3 = files->by_name(narrow(L"папка/подпапка/файл.bin"));
+                    auto file_1 = local_folder->get_by_path(utils::path_t::make_generic(L"папка"));
+                    auto file_2 = local_folder->get_by_path(utils::path_t::make_generic(L"папка/подпапка"));
+                    auto file_3 = local_folder->get_by_path(utils::path_t::make_generic(L"папка/подпапка/файл.bin"));
                     REQUIRE(file_1);
                     REQUIRE(file_2);
                     REQUIRE(file_3);
 
-                    auto max_seq = folder_info->get_max_sequence();
+                    auto max_seq = local_folder->get_max_sequence();
 
                     auto perms = permissions(dir_path);
                     chmod(dir_path, 0);
@@ -1696,8 +1694,8 @@ void test_read_errors() {
 
                         CHECK(!folder->is_scanning());
                         CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                        CHECK(files->size() == 3);
-                        CHECK(folder_info->get_max_sequence() == max_seq);
+                        CHECK(test::count_children(*local_folder) == 3);
+                        CHECK(local_folder->get_max_sequence() == max_seq);
 
                         CHECK(file_1->is_unreachable());
                         CHECK(file_2->is_unreachable());
@@ -1705,8 +1703,8 @@ void test_read_errors() {
 
                         builder->scan_start(folder->get_id()).apply(*sup);
                         CHECK(folder->get_scan_finish() >= folder->get_scan_start());
-                        CHECK(files->size() == 3);
-                        CHECK(folder_info->get_max_sequence() == max_seq);
+                        CHECK(test::count_children(*local_folder) == 3);
+                        CHECK(local_folder->get_max_sequence() == max_seq);
 
                         CHECK(!file_1->is_unreachable());
                         CHECK(!file_2->is_unreachable());
@@ -1736,7 +1734,7 @@ void test_leaks() {
 
             target->do_shutdown();
             sup->do_process();
-            CHECK(files->size() == 0);
+            CHECK(test::count_children(*local_folder) == 0);
 
             hasher->process_requests();
             sup->do_process();
@@ -1744,6 +1742,8 @@ void test_leaks() {
     };
     F().run();
 }
+#if 0
+
 
 void test_hashing_fail() {
     struct F : fixture_t {
@@ -2318,8 +2318,8 @@ int _init() {
     REGISTER_TEST_CASE(test_resurrection, "test_resurrection", "[net]");
     REGISTER_TEST_CASE(test_partial_scan, "test_partial_scan", "[net]");
     REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
-    // REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
-    // REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
+    REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
+    REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
     // REGISTER_TEST_CASE(test_hashing_fail, "test_hashing_fail", "[net]");
     // REGISTER_TEST_CASE(test_incomplete, "test_incomplete", "[net]");
     // REGISTER_TEST_CASE(test_traversal, "test_traversal", "[net]");
