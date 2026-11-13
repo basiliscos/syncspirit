@@ -22,7 +22,7 @@ using namespace syncspirit::fs::task;
 // inverse files sorting as files will be inversed again (inderectly) by
 // stack structure
 struct comparator_t {
-    bool operator()(const scan_dir_t::child_info_t &lhs, const scan_dir_t::child_info_t &rhs) const noexcept {
+    bool operator()(const child_info_t &lhs, const child_info_t &rhs) const noexcept {
         auto l_dir = lhs.file_type == utils::file_type_t::DIRECTORY;
         auto r_dir = rhs.file_type == utils::file_type_t::DIRECTORY;
         if (l_dir xor r_dir) {
@@ -34,7 +34,7 @@ struct comparator_t {
 };
 
 scan_dir_t::scan_dir_t(utils::path_t path_, model::presence_ptr_t presence_, utils::path_t single_child_,
-                       child_ready_t child_ready_, bool notify_,
+                       child_ready_ptr_t child_ready_, bool notify_,
                        bool recurse_, bool requires_refinement_) noexcept
     : path{std::move(path_)}, presence{std::move(presence_)},
       ec(utils::make_error_code(utils::error_code_t::no_action)), single_child{std::move(single_child_)},
@@ -99,7 +99,7 @@ bool scan_dir_t::process(fs_slave_t &, execution_context_t &context) noexcept {
                     auto child_path = dir_view / utils::make_native_view(name, context.allocator);
                     auto child_stats = utils::get_stats(child_path, ec);
                     if (!ec && child_stats.supported) {
-                        auto child_info = task::scan_dir_t::child_info_t{};
+                        auto child_info = child_info_t{};
                         child_info.path = child_path.detach();
                         child_info.file_type = child_stats.file_type;
                         child_info.permissions = child_stats.permissions;

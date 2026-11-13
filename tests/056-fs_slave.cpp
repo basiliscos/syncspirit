@@ -44,7 +44,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
 
     SECTION("dir scan") {
         SECTION("empty dir") {
-            slave.push(task::scan_dir_t(root_path.detach(), {}, {}, false, true, false));
+            slave.push(task::scan_dir_t(root_path.detach(), {}, {}, {}, false, true, false));
             CHECK(!slave.exec(context));
             REQUIRE(slave.tasks_out.size() == 1);
             auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
@@ -52,7 +52,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
             CHECK(t.child_infos.size() == 0);
         }
         SECTION("non-existing dir") {
-            slave.push(task::scan_dir_t((root_path / "non-existing").detach(), {}, {}, false, true, false));
+            slave.push(task::scan_dir_t((root_path / "non-existing").detach(), {}, {}, {}, false, true, false));
             slave.exec(context);
             REQUIRE(slave.tasks_out.size() == 1);
             auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
@@ -61,7 +61,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
             CHECK(t.ec == std::errc::no_such_file_or_directory);
         }
         SECTION("not a dir") {
-            slave.push(task::scan_dir_t((root_path / "file").detach(), {}, {}, false, true, false));
+            slave.push(task::scan_dir_t((root_path / "file").detach(), {}, {}, {}, false, true, false));
             write_file(root_path / "file", "");
             slave.exec(context);
             REQUIRE(slave.tasks_out.size() == 1);
@@ -74,7 +74,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
             write_file(root_path / "file-2", "");
 
             SECTION("scan whole dir") {
-                slave.push(task::scan_dir_t(root_path.detach(), {}, {}, false, true, false));
+                slave.push(task::scan_dir_t(root_path.detach(), {}, {}, {}, false, true, false));
                 slave.exec(context);
                 REQUIRE(slave.tasks_out.size() == 1);
                 auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
@@ -84,7 +84,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
             SECTION("scan whole dir with callback") {
                 bool invoked = false;
                 context.scan_dir_callback = [&](auto &) { invoked = true; };
-                slave.push(task::scan_dir_t(root_path.detach(), {}, {}, true, true, false));
+                slave.push(task::scan_dir_t(root_path.detach(), {}, {}, {}, true, true, false));
                 slave.exec(context);
                 REQUIRE(slave.tasks_out.size() == 1);
                 auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
@@ -93,8 +93,8 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
                 CHECK(invoked);
             }
             SECTION("single child scan (1)") {
-                slave.push(
-                    task::scan_dir_t(root_path.detach(), {}, utils::path_t::make_native("file-1"), false, true, false));
+                auto path =  utils::path_t::make_native("file-1");
+                slave.push( task::scan_dir_t(root_path.detach(), {}, path.clone(), {}, false, true, false));
                 slave.exec(context);
                 REQUIRE(slave.tasks_out.size() == 1);
                 auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
@@ -102,8 +102,9 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
                 CHECK(t.child_infos.size() == 1);
             }
             SECTION("single child scan (2)") {
+                auto path = utils::path_t::make_native("file-x");
                 slave.push(
-                    task::scan_dir_t(root_path.detach(), {}, utils::path_t::make_native("file-x"), false, true, false));
+                            task::scan_dir_t(root_path.detach(), {}, path.clone(), {}, false, true, false));
                 slave.exec(context);
                 REQUIRE(slave.tasks_out.size() == 1);
                 auto &t = std::get<task::scan_dir_t>(slave.tasks_out.front());
@@ -114,7 +115,7 @@ TEST_CASE("fs_slave, scan_dir", "[fs]") {
 
         if (comparator.symlinks_supported) {
             SECTION("dir with a file, dir & symlink") {
-                slave.push(task::scan_dir_t(root_path.detach(), {}, {}, false, true, false));
+                slave.push(task::scan_dir_t(root_path.detach(), {}, {}, {}, false, true, false));
 
                 auto modified = std::int64_t{1642007468};
                 auto child_1 = root_path / L"a_файл";

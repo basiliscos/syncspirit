@@ -23,6 +23,22 @@ using namespace syncspirit::fs::task;
 
 namespace syncspirit::net::local_keeper {
 
+struct scan_dir_guard_t {
+    using child_ready_ptr_t = std::unique_ptr<child_ready_t>;
+
+    scan_dir_guard_t(fs::task::scan_dir_t& scan_dir_, stack_t &stack_) noexcept:
+        scan_dir{scan_dir_}, stack{stack_}{}
+
+    ~scan_dir_guard_t() {
+        if (!scan_dir.ec && scan_dir.child_ready) {
+            auto child_ready = child_ready_t(std::move(std::move(*scan_dir.child_ready)));
+            stack.emplace_front(std::move(child_ready));
+        }
+    }
+    fs::task::scan_dir_t& scan_dir;
+    stack_t &stack;
+};
+
 struct rename_context_t final : hasher::payload::extendended_context_t {
     rename_context_t(rehashed_incomplete_t item_) : item(std::move(item_)) {}
     rehashed_incomplete_t item;
@@ -142,7 +158,7 @@ int folder_context_t::process(unscanned_dir_t &dir, stack_context_t &ctx) noexce
                               local_folder->get_folder()->is_watched();
         LOG_TRACE(log, "scheduling scan of '{}' (notify: {})", dir.path, notify_watcher);
         auto sub_task = scan_dir_t(std::move(dir.path), std::move(dir.presence), std::move(dir.single_child),
-                                   std::move(*dir.child_ready),
+                                   std::move(dir.child_ready),
                                    notify_watcher, dir.recurse, dir.requires_refinement);
         push(std::move(sub_task));
         return 0;
@@ -164,9 +180,11 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
             auto copy = !skip_self_update ? child_info.clone() : std::move(child_info);
             stack.push_front(unscanned_dir_t(std::move(copy), recurse_children, requires_refinement));
         }
+#if 0
         if (!skip_self_update) {
             stack.push_front(child_ready_t(std::move(child_info)));
         }
+#endif
     } else if (type == proto::FileInfoType::SYMLINK) {
         stack.push_front(child_ready_t(std::move(child_info)));
     } else {
@@ -572,6 +590,7 @@ void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
 }
 
 void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t &ctx) noexcept {
+    auto guard = scan_dir_guard_t(task, stack);
     using checked_chidren_t = std::pmr::set<std::string_view>;
     --blocked;
     auto it = scan_generation.find(task.path);
@@ -595,12 +614,14 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
             }
         }
     }
+#if 0
     auto it_done = stack.begin();
     if (it_done != stack.end()) {
         if (auto ptr = std::get_if<child_ready_t>(&*it_done); !ptr) {
             it_done = stack.end();
         }
     }
+#endif
 
     if (task.ec) {
         if (task.single_child.empty() || task.ec != std::errc::no_such_file_or_directory) {
@@ -608,7 +629,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
         } else {
             auto path = task.path.get_view(ctx.allocator).get_parent();
             auto child = static_cast<model::file_info_t *>(task.presence.get());
-            auto sub_task = fs::task::scan_dir_t(path.detach(), child->get_parent(), child->get_name()->clone(), false,
+            auto sub_task = fs::task::scan_dir_t(path.detach(), child->get_parent(), child->get_name()->clone(), {}, false,
                                                  false, false);
             push(std::move(sub_task));
             return;
@@ -709,11 +730,12 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
             }
         }
     }
-
+#if 0
     if (it_done != stack.end()) {
         stack.insert(stack.begin(), std::move(*it_done));
         stack.erase(it_done);
     }
+#endif
 }
 
 void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_context_t &ctx) {
