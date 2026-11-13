@@ -1766,9 +1766,6 @@ void test_hashing_fail() {
     F().run();
 }
 
-#if 0
-
-
 void test_incomplete() {
     struct F : fixture_t {
         void main(const utils::allocator_t &allocator) noexcept override {
@@ -1807,7 +1804,7 @@ void test_incomplete() {
                 last_write_time(path, m_time);
                 builder->scan_start(folder->get_id()).apply(*sup);
 
-                CHECK(files->size() == 0);
+                CHECK(test::count_children(*local_folder) == 0);
                 CHECK(!exists(path));
             }
             SECTION("exists only in my model => remove") {
@@ -1819,7 +1816,7 @@ void test_incomplete() {
                     .scan_start(folder->get_id())
                     .apply(*sup);
 
-                CHECK(files->size() == 1);
+                CHECK(test::count_children(*local_folder) == 1);
                 CHECK(!exists(path));
             }
             SECTION("found in peer model, remove") {
@@ -1836,7 +1833,7 @@ void test_incomplete() {
 
                     builder->scan_start(folder->get_id()).apply(*sup);
 
-                    CHECK(files->size() == 0);
+                    CHECK(test::count_children(*local_folder) == 0);
                 }
                 if (metadata_comparator.permissions_supported) {
                     SECTION("cannot read tmp file") {
@@ -1854,7 +1851,7 @@ void test_incomplete() {
                         chmod(path, 0);
                         if (read_file(path) == "") {
                             builder->scan_start(folder->get_id()).apply(*sup);
-                            CHECK(files->size() == 0);
+                            CHECK(test::count_children(*local_folder) == 0);
                         } else {
                             builder->scan_start(folder->get_id()).apply(*sup);
                             should_not_exist = false;
@@ -1877,14 +1874,14 @@ void test_incomplete() {
 
                     builder->local_update(folder->get_id(), pr_file).apply(*sup);
 
-                    REQUIRE(files->size() == 1);
-                    auto seq_1 = folder_info->get_max_sequence();
+                    REQUIRE(test::count_children(*local_folder) == 1);
+                    auto seq_1 = local_folder->get_max_sequence();
 
                     proto::set_value(counter, 1);
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
                     builder->scan_start(folder->get_id()).apply(*sup);
 
-                    auto seq_2 = folder_info->get_max_sequence();
+                    auto seq_2 = local_folder->get_max_sequence();
                     REQUIRE(seq_1 == seq_2);
                 }
                 if (should_not_exist) {
@@ -1906,26 +1903,26 @@ void test_incomplete() {
                     proto::set_permissions(pr_file, perms);
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
-                    auto max_seq = folder_info->get_max_sequence();
+                    auto max_seq = local_folder->get_max_sequence();
                     builder->scan_start(folder->get_id()).apply(*sup);
 
                     CHECK(!exists(path));
                     CHECK(exists(model_path));
                     CHECK(read_file(model_path) == "1234567890");
-                    CHECK(files->size() == 1);
+                    CHECK(test::count_children(*local_folder) == 1);
                     auto f = local_folder->get_by_path(file_name);
                     REQUIRE(f);
                     CHECK(f->get_size() == 10);
                     REQUIRE(f->iterate_blocks().get_total() == 2);
                     CHECK(f->iterate_blocks(0).next()->get_hash() == hash_1);
                     CHECK(f->iterate_blocks(1).next()->get_hash() == hash_2);
-                    CHECK(folder_info->get_max_sequence() == max_seq + 1);
+                    CHECK(local_folder->get_max_sequence() == max_seq + 1);
 
                     builder->scan_start(folder->get_id()).apply(*sup);
                     auto f2 = local_folder->get_by_path(file_name);
-                    CHECK(f2.get() == f.get());
+                    CHECK(f2 == f);
                     REQUIRE(f2->iterate_blocks().get_total() == 2);
-                    CHECK(folder_info->get_max_sequence() == max_seq + 1);
+                    CHECK(local_folder->get_max_sequence() == max_seq + 1);
                 }
                 SECTION("1st block match") {
                     write_file(path, "1234500000");
@@ -1938,9 +1935,9 @@ void test_incomplete() {
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(exists(path));
                     CHECK(!exists(model_path));
-                    CHECK(files->size() == 0);
+                    CHECK(test::count_children(*local_folder) == 0);
 
-                    auto peer_file = folder_info_peer->get_file_infos().by_name(file_name);
+                    auto peer_file = peer_folder->get_by_path(file_name);
                     CHECK(peer_file->iterate_blocks(0).current().first->local_file());
                     CHECK(!peer_file->iterate_blocks(1).current().first->local_file());
                 }
@@ -1955,9 +1952,9 @@ void test_incomplete() {
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(exists(path));
                     CHECK(!exists(model_path));
-                    CHECK(files->size() == 0);
+                    CHECK(test::count_children(*local_folder) == 0);
 
-                    auto peer_file = folder_info_peer->get_file_infos().by_name(file_name);
+                    auto peer_file = peer_folder->get_by_path(file_name);
                     CHECK(!peer_file->iterate_blocks(0).current().first->local_file());
                     CHECK(peer_file->iterate_blocks(1).current().first->local_file());
                 }
@@ -1972,7 +1969,7 @@ void test_incomplete() {
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!exists(path));
                     CHECK(!exists(model_path));
-                    CHECK(files->size() == 0);
+                    CHECK(test::count_children(*local_folder) == 0);
                 }
                 SECTION("synchronization lock => ignored") {
                     write_file(path, "0000000000");
@@ -1981,7 +1978,7 @@ void test_incomplete() {
                     proto::set_permissions(pr_file, perms);
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
-                    auto f = folder_info_peer->get_file_infos().by_name(file_name);
+                    auto f = peer_folder->get_by_path(file_name);
                     REQUIRE(f);
                     f->synchronizing_lock();
 
@@ -1993,7 +1990,7 @@ void test_incomplete() {
                     builder->scan_start(folder->get_id()).apply(*sup);
                     CHECK(!exists(path));
                     CHECK(!exists(model_path));
-                    CHECK(files->size() == 0);
+                    CHECK(test::count_children(*local_folder) == 0);
                 }
             }
 
@@ -2029,7 +2026,7 @@ void test_traversal() {
             write_file(root_path / "d/d1/file_3.bin", "");
 
             builder->scan_start(folder->get_id()).apply(*sup);
-            REQUIRE(files->size() == 11);
+            REQUIRE(test::count_children(*local_folder) == 11);
             REQUIRE(paths.size() == 11);
 
             // clang-format off
@@ -2053,6 +2050,9 @@ void test_traversal() {
     };
     F().run();
 }
+
+#if 0
+
 
 void test_importing() {
     struct F : fixture_t {
@@ -2212,7 +2212,7 @@ void test_importing() {
 
                     builder->scan_start(folder->get_id()).apply(*sup);
 
-                    auto &files_my = folder_info->get_file_infos();
+                    auto &files_my = local_folder->get_file_infos();
                     REQUIRE(files_my.size() == 2);
 
                     auto file_1 = files_my.by_name(dir_path.get_full_name());
@@ -2321,9 +2321,9 @@ int _init() {
     REGISTER_TEST_CASE(test_scan_errors, "test_scan_errors", "[net]");
     REGISTER_TEST_CASE(test_read_errors, "test_read_errors", "[net]");
     REGISTER_TEST_CASE(test_leaks, "test_leaks", "[net]");
-    // REGISTER_TEST_CASE(test_hashing_fail, "test_hashing_fail", "[net]");
-    // REGISTER_TEST_CASE(test_incomplete, "test_incomplete", "[net]");
-    // REGISTER_TEST_CASE(test_traversal, "test_traversal", "[net]");
+    REGISTER_TEST_CASE(test_hashing_fail, "test_hashing_fail", "[net]");
+    REGISTER_TEST_CASE(test_incomplete, "test_incomplete", "[net]");
+    REGISTER_TEST_CASE(test_traversal, "test_traversal", "[net]");
     // REGISTER_TEST_CASE(test_importing, "test_importing", "[net]");
     // REGISTER_TEST_CASE(test_concurrency, "test_concurrency", "[net]");
     // REGISTER_TEST_CASE(test_races, "test_races", "[net]");
