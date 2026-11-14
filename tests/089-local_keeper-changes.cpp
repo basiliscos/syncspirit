@@ -1431,8 +1431,6 @@ void test_read_file_error_recovery() {
     F().run();
 };
 
-#if 0
-
 void test_duplicates() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
@@ -1547,31 +1545,31 @@ void test_multi_folders_update() {
             auto f2 = folders_map.by_id("p2");
             auto f3 = folders_map.by_id("p3");
 
-            auto &f1_files = f1->get_folder_info(*local_device)->get_file_infos();
-            auto f_A = f1_files.by_name("A");
-            auto f_a1 = f1_files.by_name("A/a1");
-            auto f_a2 = f1_files.by_name("A/a2");
-            auto f_a3 = f1_files.by_name("A/a3");
+            auto local_f1 = f1->get_folder_info(*local_device);
+            auto f_A = local_f1->get_by_path("A");
+            auto f_a1 = local_f1->get_by_path("A/a1");
+            auto f_a2 = local_f1->get_by_path("A/a2");
+            auto f_a3 = local_f1->get_by_path("A/a3");
             CHECK(f_A);
             CHECK(f_a1);
             CHECK(f_a2);
             CHECK(f_a3);
 
-            auto &f2_files = f2->get_folder_info(*local_device)->get_file_infos();
-            auto f_B = f2_files.by_name("B");
-            auto f_b1 = f2_files.by_name("B/b1");
-            auto f_b2 = f2_files.by_name("B/b2");
-            auto f_b3 = f2_files.by_name("B/b3");
+            auto local_f2 = f2->get_folder_info(*local_device);
+            auto f_B = local_f2->get_by_path("B");
+            auto f_b1 = local_f2->get_by_path("B/b1");
+            auto f_b2 = local_f2->get_by_path("B/b2");
+            auto f_b3 = local_f2->get_by_path("B/b3");
             CHECK(f_B);
             CHECK(f_b1);
             CHECK(f_b2);
             CHECK(f_b3);
 
-            auto &f3_files = f3->get_folder_info(*local_device)->get_file_infos();
-            auto f_C = f3_files.by_name("C");
-            auto f_c1 = f3_files.by_name("C/c1");
-            auto f_c2 = f3_files.by_name("C/c2");
-            auto f_c3 = f3_files.by_name("C/c3");
+            auto local_f3 = f3->get_folder_info(*local_device);
+            auto f_C = local_f3->get_by_path("C");
+            auto f_c1 = local_f3->get_by_path("C/c1");
+            auto f_c2 = local_f3->get_by_path("C/c2");
+            auto f_c3 = local_f3->get_by_path("C/c3");
             CHECK(f_C);
             CHECK(f_c1);
             CHECK(f_c2);
@@ -1580,6 +1578,8 @@ void test_multi_folders_update() {
     };
     F().run();
 }
+
+#if 0
 
 void test_hierarchy_removal_order() {
     struct F : folder_fixture_t {
@@ -2733,8 +2733,8 @@ int _init() {
     REGISTER_TEST_CASE(test_read_file_errors, "test_read_file_errors", "[fs]");
     REGISTER_TEST_CASE(test_read_file_errors_partial, "test_read_file_errors_partial", "[fs]");
     REGISTER_TEST_CASE(test_read_file_error_recovery, "test_read_file_error_recovery", "[fs]");
-    // REGISTER_TEST_CASE(test_duplicates, "test_duplicates", "[fs]");
-    // REGISTER_TEST_CASE(test_multi_folders_update, "test_multi_folders_update", "[fs]");
+    REGISTER_TEST_CASE(test_duplicates, "test_duplicates", "[fs]");
+    REGISTER_TEST_CASE(test_multi_folders_update, "test_multi_folders_update", "[fs]");
     // REGISTER_TEST_CASE(test_hierarchy_removal_order, "test_hierarchy_removal_order", "[fs]");
     // REGISTER_TEST_CASE(test_hierarchy_update_dirs_only, "test_hierarchy_update_dirs_only", "[fs]");
     // REGISTER_TEST_CASE(test_hierarchy_update_with_content, "test_hierarchy_update_with_content", "[fs]");
