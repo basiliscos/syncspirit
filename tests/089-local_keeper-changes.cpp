@@ -598,8 +598,6 @@ void test_trivial_changes() {
     F().run();
 }
 
-#if 0
-
 void test_ignoring_tmps() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
@@ -647,7 +645,7 @@ void test_ignoring_tmps() {
                 expect_dir_scan({});
                 mk_update(file, UT::content, true);
 
-                auto f = files_local->begin()->get();
+                auto f = static_cast<model::file_info_t*>(*local_folder->get_children().begin());
                 auto sequence = f->get_sequence();
 
                 auto path = fmt::format("/some/path/dir/some-file-name.bin{}", fs::tmp_suffix);
@@ -681,14 +679,14 @@ void test_ignoring_tmps() {
 
                 auto sha256 = peer_device->device_id().get_sha256();
                 builder->share_folder(peer_device->device_id().get_sha256(), folder_id).apply(*sup);
-                auto folder_peer = local_folder->get_folder()->get_folder_info(*peer_device);
-                REQUIRE(folder_peer);
+                auto peer_folder = local_folder->get_folder()->get_folder_info(*peer_device);
+                REQUIRE(peer_folder);
                 auto f = local_folder->get_by_path("dir/some-file-name.bin");
 
                 auto version = f->get_version().as_proto();
                 auto counter = proto::Counter();
                 proto::set_id(counter, peer_device->device_id().get_uint());
-                proto::set_value(counter, 100);
+                proto::set_value(counter, proto::get_value(f->get_version().get_best()) + 1);
                 proto::add_counters(version, counter);
                 proto::set_version(file, version);
                 proto::set_sequence(file, 10);
@@ -697,15 +695,24 @@ void test_ignoring_tmps() {
                 proto::set_hash(block, as_bytes("abc"));
                 proto::set_size(block, 10);
 
+                auto dir = proto::FileInfo{};
+                proto::set_name(dir, "dir");
+                proto::add_counters(proto::get_version(dir), counter);
+                proto::set_sequence(dir, 9);
+                proto::set_type(dir, proto::FileInfoType::DIRECTORY);
+                proto::set_permissions(dir, default_perms);
+
                 builder->configure_cluster(sha256)
-                    .add(sha256, folder_id, folder_peer->get_index(), 10)
+                    .add(sha256, folder_id, peer_folder->get_index(), 10)
                     .finish()
                     .apply(*sup);
-                builder->make_index(sha256, folder_id).add(file, peer_device, false).finish().apply(*sup);
+                builder->make_index(sha256, folder_id)
+                        .add(dir, peer_device, false)
+                        .add(file, peer_device, false).finish().apply(*sup);
 
-                auto peer_file = folder_peer->get_file_infos().begin()->get();
+                auto peer_file = peer_folder->get_by_path(*f->get_name());
                 REQUIRE(peer_file);
-                auto file_guard = peer_file->guard(*folder_peer);
+                auto file_guard = peer_file->guard(*peer_folder);
 
                 auto path_tmp = fmt::format("/some/path/dir/some-file-name.bin{}", fs::tmp_suffix);
                 expect_dir_scan(CB().add(path_tmp, file_type_t::FILE, 10, default_perms)
@@ -726,6 +733,9 @@ void test_ignoring_tmps() {
     };
     F().run();
 }
+
+
+#if 0
 
 void test_hashing() {
     struct F : folder_fixture_t {
@@ -2710,7 +2720,7 @@ int _init() {
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
     REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
     REGISTER_TEST_CASE(test_trivial_changes, "test_trivial_changes", "[fs]");
-    // REGISTER_TEST_CASE(test_ignoring_tmps, "test_ignoring_tmps", "[fs]");
+    REGISTER_TEST_CASE(test_ignoring_tmps, "test_ignoring_tmps", "[fs]");
     // REGISTER_TEST_CASE(test_hashing, "test_hashing", "[fs]");
     // REGISTER_TEST_CASE(test_rescan, "test_rescan", "[fs]");
     // REGISTER_TEST_CASE(test_skip_scan_known, "test_skip_scan_known", "[fs]");

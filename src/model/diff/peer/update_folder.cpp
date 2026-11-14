@@ -124,10 +124,6 @@ using diff_t = diff::cluster_diff_ptr_t;
 static auto construct(sequencer_t &sequencer, folder_info_t *folder_info, syncspirit::utils::bytes_view_t peer_id,
                       update_folder_t::files_t files, update_folder_t::blocks_t new_blocks) -> outcome::result<diff_t> {
     auto folder = folder_info->get_folder();
-    auto buffer = std::array<std::byte, 1024 * 32>();
-    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-
     auto uuids = update_folder_t::uuids_t{};
     uuids.reserve(files.size());
     auto orphaned_candidates = orphaned_blocks_t{};
@@ -142,8 +138,8 @@ static auto construct(sequencer_t &sequencer, folder_info_t *folder_info, syncsp
             white_listed_blocks.emplace(owned_hash);
         }
         auto file_uuid = bu::uuid{};
-        auto path = utils::make_generic_view(proto::get_name(f), allocator);
-        auto prev_file = folder_info->get_by_path(path);
+        auto name = proto::get_name(f);
+        auto prev_file = folder_info->get_by_path(name);
         if (prev_file) {
             assign(file_uuid, prev_file->get_uuid());
             orphaned_candidates.record(*prev_file);
