@@ -1579,8 +1579,6 @@ void test_multi_folders_update() {
     F().run();
 }
 
-#if 0
-
 void test_hierarchy_removal_order() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
@@ -2575,6 +2573,7 @@ void test_not_yet_scanned_parent() {
     F().run();
 }
 
+#if 0
 void test_ignore_files_upon_scan() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
@@ -2735,25 +2734,25 @@ int _init() {
     REGISTER_TEST_CASE(test_read_file_error_recovery, "test_read_file_error_recovery", "[fs]");
     REGISTER_TEST_CASE(test_duplicates, "test_duplicates", "[fs]");
     REGISTER_TEST_CASE(test_multi_folders_update, "test_multi_folders_update", "[fs]");
-    // REGISTER_TEST_CASE(test_hierarchy_removal_order, "test_hierarchy_removal_order", "[fs]");
-    // REGISTER_TEST_CASE(test_hierarchy_update_dirs_only, "test_hierarchy_update_dirs_only", "[fs]");
-    // REGISTER_TEST_CASE(test_hierarchy_update_with_content, "test_hierarchy_update_with_content", "[fs]");
-    // REGISTER_TEST_CASE(test_malformed_hierarchy_update, "test_malformed_hierarchy_update", "[fs]");
-    // REGISTER_TEST_CASE(test_scan_dirs_race_unix, "test_scan_dirs_race_unix", "[fs]");
-    // REGISTER_TEST_CASE(test_scan_dirs_race_unix_2, "test_scan_dirs_race_unix_2", "[fs]");
-    // REGISTER_TEST_CASE(test_scan_dirs_race_win32, "test_scan_dirs_race_win32", "[fs]");
-    // REGISTER_TEST_CASE(test_scan_dirs_race_win32_2, "test_scan_dirs_race_win32_2", "[fs]");
-    // REGISTER_TEST_CASE(test_hashing_race, "test_hashing_race", "[fs]");
-    // REGISTER_TEST_CASE(test_renaming_simple, "test_renaming_simple", "[fs]");
-    // REGISTER_TEST_CASE(test_renaming_hierarchy, "test_renaming_hierarchy", "[fs]");
-    // REGISTER_TEST_CASE(test_renaming_race, "test_renaming_race", "[fs]");
-    // REGISTER_TEST_CASE(test_avoid_dir_rescan, "test_avoid_dir_rescan", "[fs]");
-    // REGISTER_TEST_CASE(test_no_pending_io, "test_no_pending_io", "[fs]");
-    // REGISTER_TEST_CASE(test_double_content_update, "test_double_content_update", "[fs]");
-    // REGISTER_TEST_CASE(test_dir_scan_and_hashing_race, "test_dir_scan_and_hashing_race", "[fs]");
-    // REGISTER_TEST_CASE(test_invalid_utf8_names, "test_invalid_utf8_names", "[fs]");
-    // REGISTER_TEST_CASE(test_rm_folder_on_scan, "test_rm_folder_on_scan", "[fs]");
-    // REGISTER_TEST_CASE(test_not_yet_scanned_parent, "test_not_yet_scanned_parent", "[fs]");
+    REGISTER_TEST_CASE(test_hierarchy_removal_order, "test_hierarchy_removal_order", "[fs]");
+    REGISTER_TEST_CASE(test_hierarchy_update_dirs_only, "test_hierarchy_update_dirs_only", "[fs]");
+    REGISTER_TEST_CASE(test_hierarchy_update_with_content, "test_hierarchy_update_with_content", "[fs]");
+    REGISTER_TEST_CASE(test_malformed_hierarchy_update, "test_malformed_hierarchy_update", "[fs]");
+    REGISTER_TEST_CASE(test_scan_dirs_race_unix, "test_scan_dirs_race_unix", "[fs]");
+    REGISTER_TEST_CASE(test_scan_dirs_race_unix_2, "test_scan_dirs_race_unix_2", "[fs]");
+    REGISTER_TEST_CASE(test_scan_dirs_race_win32, "test_scan_dirs_race_win32", "[fs]");
+    REGISTER_TEST_CASE(test_scan_dirs_race_win32_2, "test_scan_dirs_race_win32_2", "[fs]");
+    REGISTER_TEST_CASE(test_hashing_race, "test_hashing_race", "[fs]");
+    REGISTER_TEST_CASE(test_renaming_simple, "test_renaming_simple", "[fs]");
+    REGISTER_TEST_CASE(test_renaming_hierarchy, "test_renaming_hierarchy", "[fs]");
+    REGISTER_TEST_CASE(test_renaming_race, "test_renaming_race", "[fs]");
+    REGISTER_TEST_CASE(test_avoid_dir_rescan, "test_avoid_dir_rescan", "[fs]");
+    REGISTER_TEST_CASE(test_no_pending_io, "test_no_pending_io", "[fs]");
+    REGISTER_TEST_CASE(test_double_content_update, "test_double_content_update", "[fs]");
+    REGISTER_TEST_CASE(test_dir_scan_and_hashing_race, "test_dir_scan_and_hashing_race", "[fs]");
+    REGISTER_TEST_CASE(test_invalid_utf8_names, "test_invalid_utf8_names", "[fs]");
+    REGISTER_TEST_CASE(test_rm_folder_on_scan, "test_rm_folder_on_scan", "[fs]");
+    REGISTER_TEST_CASE(test_not_yet_scanned_parent, "test_not_yet_scanned_parent", "[fs]");
     // REGISTER_TEST_CASE(test_ignore_files_upon_scan, "test_ignore_files_upon_scan", "[fs]");
     // REGISTER_TEST_CASE(test_prevent_resurrection_of_ignored, "test_prevent_resurrection_of_ignored", "[fs]");
     // REGISTER_TEST_CASE(test_renaming_to_ignored, "test_renaming_to_ignored", "[fs]");
