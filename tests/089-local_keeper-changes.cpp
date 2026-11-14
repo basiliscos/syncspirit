@@ -432,7 +432,7 @@ struct folder_fixture_t : fixture_t {
         builder->upsert_folder(db_folder, 5).apply(*sup);
 
         folder = cluster->get_folders().by_id(folder_id);
-        folder_local = folder->get_folder_info(*local_device);
+        local_folder = folder->get_folder_info(*local_device);
 
         launch_target(impl);
         REQUIRE(watched_ack == watch_folder);
@@ -478,12 +478,10 @@ struct folder_fixture_t : fixture_t {
     std::string folder_id = "1234-5678";
     bool watched_ack = false;
     model::folder_ptr_t folder;
-    model::folder_info_ptr_t folder_local;
+    model::folder_info_ptr_t local_folder;
     hashed_blocks_t hashed_blocks;
     dir_children_t dir_children;
 };
-
-#if 0
 
 void test_trivial_changes() {
     struct F : folder_fixture_t {
@@ -511,8 +509,8 @@ void test_trivial_changes() {
                 }
                 mk_update(file, fs::update_type_t::created, file_type == FT::DIRECTORY);
 
-                CHECK(files_local->size() == 1);
-                auto f = files_local->by_name(file_name);
+                CHECK(test::count_children(*local_folder) == 1);
+                auto f = local_folder->get_by_path(file_name);
                 REQUIRE(f);
                 CHECK(metadata_comparator.equal(f->get_permissions(), expected_perms));
                 CHECK(f->get_modification().seconds == 12345);
@@ -532,12 +530,12 @@ void test_trivial_changes() {
                 proto::set_type(file, FT::FILE);
                 builder->local_update(folder_id, file).apply(*sup);
 
-                auto f = files_local->by_name(file_name);
+                auto f = local_folder->get_by_path(file_name);
                 CHECK(metadata_comparator.equal(f->get_permissions(), 0123));
                 REQUIRE(f);
 
                 auto file_seq = f->get_sequence();
-                auto folder_seq = folder_local->get_max_sequence();
+                auto folder_seq = local_folder->get_max_sequence();
                 auto update_type = fs::update_type_t::meta;
 
                 if (metadata_comparator.permissions_supported) {
@@ -557,20 +555,20 @@ void test_trivial_changes() {
                     CHECK(f->is_deleted());
                 }
                 auto file_seq_2 = f->get_sequence();
-                auto folder_seq_2 = folder_local->get_max_sequence();
+                auto folder_seq_2 = local_folder->get_max_sequence();
                 CHECK(file_seq_2 > file_seq);
                 CHECK(folder_seq_2 > folder_seq);
 
                 mk_update(file, update_type, false);
                 CHECK(f->get_sequence() == file_seq_2);
-                CHECK(folder_local->get_max_sequence() == folder_seq_2);
+                CHECK(local_folder->get_max_sequence() == folder_seq_2);
             }
             SECTION("create & remove a dir") {
                 proto::set_type(file, FT::DIRECTORY);
                 expect_dir_scan({});
                 mk_update(file, fs::update_type_t::created, true);
-                CHECK(files_local->size() == 1);
-                auto f = files_local->by_name(file_name);
+                CHECK(test::count_children(*local_folder) == 1);
+                auto f = local_folder->get_by_path(file_name);
                 REQUIRE(f);
                 CHECK(f->is_dir());
                 auto seq = f->get_sequence();
@@ -586,19 +584,21 @@ void test_trivial_changes() {
                 proto::set_name(file, "dir/sub-dir");
                 proto::set_type(file, FT::DIRECTORY);
                 mk_update(file, fs::update_type_t::created, false);
-                CHECK(files_local->size() == 0);
+                CHECK(test::count_children(*local_folder) == 0);
             }
             SECTION("ignore event with tmp-filename") {
                 proto::set_name(file, "my.syncspirit-tmp");
                 proto::set_type(file, FT::FILE);
                 proto::set_size(file, 5);
                 mk_update(file, fs::update_type_t::created, false);
-                CHECK(files_local->size() == 0);
+                CHECK(test::count_children(*local_folder) == 0);
             }
         }
     };
     F().run();
 }
+
+#if 0
 
 void test_ignoring_tmps() {
     struct F : folder_fixture_t {
@@ -632,7 +632,7 @@ void test_ignoring_tmps() {
 
                 auto update_type = GENERATE(UT::created, UT::content, UT::deleted, UT::meta);
                 mk_update(file, update_type, false);
-                CHECK(files_local->size() == 0);
+                CHECK(test::count_children(*local_folder) == 0);
             }
 
             SECTION("indirect update of tmp") {
@@ -651,11 +651,11 @@ void test_ignoring_tmps() {
                 auto sequence = f->get_sequence();
 
                 auto path = fmt::format("/some/path/dir/some-file-name.bin{}", fs::tmp_suffix);
-                CHECK(files_local->size() == 1);
+                CHECK(test::count_children(*local_folder) == 1);
 
                 expect_dir_scan(CB().add(path, file_type_t::FILE, 5, default_perms, seconds).get());
                 mk_update(file, UT::content, true);
-                CHECK(files_local->size() == 1);
+                CHECK(test::count_children(*local_folder) == 1);
                 CHECK(f->get_sequence() == sequence);
                 CHECK(file_removal_attempts == 0);
             }
@@ -677,13 +677,13 @@ void test_ignoring_tmps() {
                 proto::set_type(file, FT::FILE);
                 builder->local_update(folder_id, file);
 
-                REQUIRE(files_local->size() == 2);
+                REQUIRE(test::count_children(*local_folder) == 2);
 
                 auto sha256 = peer_device->device_id().get_sha256();
                 builder->share_folder(peer_device->device_id().get_sha256(), folder_id).apply(*sup);
-                auto folder_peer = folder_local->get_folder()->get_folder_info(*peer_device);
+                auto folder_peer = local_folder->get_folder()->get_folder_info(*peer_device);
                 REQUIRE(folder_peer);
-                auto f = files_local->by_name("dir/some-file-name.bin");
+                auto f = local_folder->get_by_path("dir/some-file-name.bin");
 
                 auto version = f->get_version().as_proto();
                 auto counter = proto::Counter();
@@ -717,7 +717,7 @@ void test_ignoring_tmps() {
                 proto::set_type(file, FT::DIRECTORY);
                 proto::set_size(file, 0);
                 mk_update(file, UT::content, true);
-                CHECK(files_local->size() == 2);
+                CHECK(test::count_children(*local_folder) == 2);
                 CHECK(f->get_sequence() == sequence);
                 CHECK(file_removal_attempts == 0);
             }
@@ -762,7 +762,7 @@ void test_hashing() {
                 mk_update(pr_file, fs::update_type_t::content, false);
             }
 
-            auto f = files_local->by_name(file_name);
+            auto f = local_folder->get_by_path(file_name);
             REQUIRE(f);
             CHECK(metadata_comparator.equal(f->get_permissions(), expected_perms));
             CHECK(f->get_modification().seconds == 12345);
@@ -798,7 +798,7 @@ void test_rescan() {
             }
             builder->apply(*sup);
             CHECK(sup->file_availabilities == 0);
-            auto sequence = folder_local->get_max_sequence();
+            auto sequence = local_folder->get_max_sequence();
             CHECK(sequence == 3);
 
             auto no_children = child_infos_t{};
@@ -811,8 +811,8 @@ void test_rescan() {
                 expect_dir_scan(std::move(no_children));
                 builder->scan_start(folder_id).apply(*sup);
                 CHECK(sup->file_availabilities == 3);
-                CHECK(folder_local->get_max_sequence() == sequence);
-                CHECK(files_local->size() == 3);
+                CHECK(local_folder->get_max_sequence() == sequence);
+                CHECK(test::count_children(*local_folder) == 3);
                 CHECK(dir_scans == 4);
             }
             SECTION("content update with recurse on") {
@@ -823,8 +823,8 @@ void test_rescan() {
                 proto::set_name(pr_dir, "");
                 mk_update(pr_dir, fs::update_type_t::content, true, true);
                 CHECK(sup->file_availabilities == 0);
-                CHECK(folder_local->get_max_sequence() == sequence);
-                CHECK(files_local->size() == 3);
+                CHECK(local_folder->get_max_sequence() == sequence);
+                CHECK(test::count_children(*local_folder) == 3);
                 CHECK(dir_scans == 1);
             }
         }
@@ -870,19 +870,19 @@ void test_skip_scan_known() {
             proto::set_modified_s(pr_dir, 12346);
             mk_update(pr_dir, fs::update_type_t::content, false);
 
-            CHECK(files_local->size() == 6);
+            CHECK(test::count_children(*local_folder) == 6);
 
-            auto dir_b = files_local->by_name("dir-a/B");
+            auto dir_b = local_folder->get_by_path("dir-a/B");
             REQUIRE(dir_b);
             CHECK(dir_b->is_dir());
             CHECK(dir_b->is_locally_available());
 
-            auto dir_b2 = files_local->by_name("dir-a/B/2");
+            auto dir_b2 = local_folder->get_by_path("dir-a/B/2");
             REQUIRE(dir_b2);
             CHECK(dir_b2->is_dir());
             CHECK(dir_b2->is_locally_available());
 
-            auto dir_c = files_local->by_name("dir-a/C");
+            auto dir_c = local_folder->get_by_path("dir-a/C");
             REQUIRE(dir_c);
             CHECK(dir_c->is_dir());
             CHECK(dir_c->is_locally_available());
@@ -894,7 +894,7 @@ void test_skip_scan_known() {
             expect_dir_scan(std::move(root_dir));
             mk_update(pr_dir, fs::update_type_t::content, false);
 
-            auto dir_c_new = files_local->by_name("dir-a/C");
+            auto dir_c_new = local_folder->get_by_path("dir-a/C");
             REQUIRE(dir_c_new);
             CHECK(dir_c_new->is_dir());
             CHECK(dir_c_new->is_deleted());
@@ -943,22 +943,22 @@ void test_new_dir_refinement() {
 
             mk_update(pr_dir, fs::update_type_t::created, true);
 
-            auto dir_a = files_local->by_name("dir-a");
+            auto dir_a = local_folder->get_by_path("dir-a");
             REQUIRE(dir_a);
             CHECK(dir_a->is_dir());
             CHECK(dir_a->is_locally_available());
 
-            auto dir_b = files_local->by_name("dir-a/dir-b");
+            auto dir_b = local_folder->get_by_path("dir-a/dir-b");
             REQUIRE(dir_b);
             CHECK(dir_b->is_dir());
             CHECK(dir_b->is_locally_available());
 
-            auto dir_c = files_local->by_name("dir-a/dir-b/dir-c");
+            auto dir_c = local_folder->get_by_path("dir-a/dir-b/dir-c");
             REQUIRE(dir_c);
             CHECK(dir_c->is_dir());
             CHECK(dir_c->is_locally_available());
 
-            auto file = files_local->by_name("dir-a/dir-b/file.bin");
+            auto file = local_folder->get_by_path("dir-a/dir-b/file.bin");
             REQUIRE(file);
             CHECK(file->is_file());
             CHECK(file->is_locally_available());
@@ -997,8 +997,8 @@ void test_new_dir_without_refinement() {
 
             mk_update(pr_dir, fs::update_type_t::created, false);
 
-            CHECK(files_local->size() == 1);
-            auto dir_a = files_local->by_name("dir-a");
+            CHECK(test::count_children(*local_folder) == 1);
+            auto dir_a = local_folder->get_by_path("dir-a");
             REQUIRE(dir_a);
             CHECK(dir_a->is_dir());
             CHECK(dir_a->is_locally_available());
@@ -1029,24 +1029,24 @@ void test_remove_dir_refinement() {
                 proto::set_name(pr_dir, name);
                 builder->local_update(folder_id, pr_dir).apply(*sup);
             }
-            REQUIRE(files_local->size() == 3);
-            auto seq = folder_local->get_max_sequence();
+            REQUIRE(test::count_children(*local_folder) == 3);
+            auto seq = local_folder->get_max_sequence();
 
             proto::set_name(pr_dir, "dir");
             mk_update(pr_dir, fs::update_type_t::deleted, true, true);
-            CHECK(folder_local->get_max_sequence() == seq + 3);
+            CHECK(local_folder->get_max_sequence() == seq + 3);
 
-            auto dir = files_local->by_name("dir");
+            auto dir = local_folder->get_by_path("dir");
             REQUIRE(dir);
             CHECK(dir->is_dir());
             CHECK(dir->is_deleted());
 
-            auto sub_dir_1 = files_local->by_name("dir/subdir_1");
+            auto sub_dir_1 = local_folder->get_by_path("dir/subdir_1");
             REQUIRE(sub_dir_1);
             CHECK(sub_dir_1->is_dir());
             CHECK(sub_dir_1->is_deleted());
 
-            auto sub_dir_2 = files_local->by_name("dir/subdir_2");
+            auto sub_dir_2 = local_folder->get_by_path("dir/subdir_2");
             REQUIRE(sub_dir_2);
             CHECK(sub_dir_2->is_dir());
             CHECK(sub_dir_2->is_deleted());
@@ -1107,12 +1107,12 @@ void test_kqueue_changes() {
 
                 mk_update(pr_dir, fs::update_type_t::content, false);
 
-                auto dir_a = files_local->by_name("dir-a");
+                auto dir_a = local_folder->get_by_path("dir-a");
                 REQUIRE(dir_a);
                 CHECK(dir_a->is_dir());
                 CHECK(dir_a->is_locally_available());
 
-                auto dir_b = files_local->by_name("dir-a/dir-b");
+                auto dir_b = local_folder->get_by_path("dir-a/dir-b");
                 REQUIRE(dir_b);
                 CHECK(dir_b->is_dir());
                 CHECK(dir_b->is_locally_available());
@@ -1148,20 +1148,20 @@ void test_dir_scan_errors() {
             SECTION("new dir/update") {
                 mk_update(pr_dir, fs::update_type_t::created, true);
 
-                auto dir_a = files_local->by_name("dir-a");
+                auto dir_a = local_folder->get_by_path("dir-a");
                 REQUIRE(dir_a);
                 CHECK(dir_a->is_dir());
                 CHECK(dir_a->is_locally_available());
 
-                auto dir_A = files_local->by_name("dir-a/A");
+                auto dir_A = local_folder->get_by_path("dir-a/A");
                 REQUIRE(dir_A);
                 CHECK(dir_A->is_dir());
                 CHECK(dir_A->is_locally_available());
 
-                auto dir_B = files_local->by_name("dir-a/B");
+                auto dir_B = local_folder->get_by_path("dir-a/B");
                 CHECK(!dir_B);
 
-                auto dir_C = files_local->by_name("dir-a/C");
+                auto dir_C = local_folder->get_by_path("dir-a/C");
                 REQUIRE(dir_C);
                 CHECK(dir_C->is_dir());
                 CHECK(dir_C->is_locally_available());
@@ -1191,29 +1191,29 @@ void test_dir_scan_errors() {
                 LOG_INFO(log, "triggering scan...");
                 builder->scan_start(folder_id).apply(*sup);
 
-                auto dir_a = files_local->by_name("dir-a");
+                auto dir_a = local_folder->get_by_path("dir-a");
                 REQUIRE(dir_a);
                 CHECK(dir_a->is_dir());
                 CHECK(dir_a->is_locally_available());
 
-                auto dir_A = files_local->by_name("dir-a/A");
+                auto dir_A = local_folder->get_by_path("dir-a/A");
                 REQUIRE(dir_A);
                 CHECK(dir_A->is_dir());
                 CHECK(dir_A->is_locally_available());
 
-                auto dir_B = files_local->by_name("dir-a/B");
+                auto dir_B = local_folder->get_by_path("dir-a/B");
                 REQUIRE(dir_B);
                 CHECK(dir_B->is_dir());
                 CHECK(dir_B->is_locally_available());
                 CHECK(dir_B->is_unreachable());
 
-                auto file_X = files_local->by_name("dir-a/B/x.bin");
+                auto file_X = local_folder->get_by_path("dir-a/B/x.bin");
                 REQUIRE(file_X);
                 CHECK(file_X->is_file());
                 CHECK(!file_X->is_locally_available());
                 CHECK(file_X->is_unreachable());
 
-                auto dir_C = files_local->by_name("dir-a/C");
+                auto dir_C = local_folder->get_by_path("dir-a/C");
                 REQUIRE(dir_C);
                 CHECK(dir_C->is_dir());
                 CHECK(dir_C->is_locally_available());
@@ -1258,7 +1258,7 @@ void test_read_file_errors() {
             expect_dir_scan(std::move(root_dir_children));
             LOG_INFO(log, "triggering scan...");
             builder->scan_start(folder_id).apply(*sup);
-            CHECK(files_local->size() == 0);
+            CHECK(test::count_children(*local_folder) == 0);
         }
 
         std::uint32_t concurrency = 1;
@@ -1322,7 +1322,7 @@ void test_read_file_errors_partial() {
 
             LOG_INFO(log, "triggering scan... concurrency: {}, error_index: {}", concurrency, error_index);
             builder->scan_start(folder_id).apply(*sup);
-            CHECK(files_local->size() == 0);
+            CHECK(test::count_children(*local_folder) == 0);
         }
 
         std::uint32_t concurrency = 1;
@@ -1390,7 +1390,7 @@ void test_read_file_error_recovery() {
             expect_dir_scan(std::move(root_dir_1));
             LOG_INFO(log, "triggering scan...");
             builder->scan_start(folder_id).apply(*sup);
-            CHECK(files_local->size() == 0);
+            CHECK(test::count_children(*local_folder) == 0);
             CHECK(blocks_read == 0);
 
             error_index = 99;
@@ -1408,7 +1408,7 @@ void test_read_file_error_recovery() {
 
             LOG_INFO(log, "triggering scan...");
             builder->scan_start(folder_id).apply(*sup);
-            CHECK(files_local->size() == 1);
+            CHECK(test::count_children(*local_folder) == 1);
             auto file = files_local->begin()->get();
             REQUIRE(file);
             REQUIRE(file->get_size() == block_sz * multiplier);
@@ -1444,16 +1444,16 @@ void test_duplicates() {
             }
             mk_update(file, fs::update_type_t::created, false);
 
-            auto seq = folder_local->get_max_sequence();
+            auto seq = local_folder->get_max_sequence();
             mk_update(file, fs::update_type_t::created, false);
-            CHECK(folder_local->get_max_sequence() == seq);
+            CHECK(local_folder->get_max_sequence() == seq);
 
             proto::set_modified_s(file, 123456);
             mk_update(file, fs::update_type_t::meta, false);
-            CHECK(folder_local->get_max_sequence() == seq + 1);
+            CHECK(local_folder->get_max_sequence() == seq + 1);
 
             mk_update(file, fs::update_type_t::meta, false);
-            CHECK(folder_local->get_max_sequence() == seq + 1);
+            CHECK(local_folder->get_max_sequence() == seq + 1);
         }
     };
     F().run();
@@ -1639,11 +1639,11 @@ void test_hierarchy_update_dirs_only() {
             sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
             sup->do_process();
 
-            CHECK(files_local->size() == 2);
-            auto d = files_local->by_name("dir");
+            CHECK(test::count_children(*local_folder) == 2);
+            auto d = local_folder->get_by_path("dir");
             CHECK(d);
 
-            auto subdir = files_local->by_name("dir/subdir");
+            auto subdir = local_folder->get_by_path("dir/subdir");
             CHECK(subdir);
         }
     };
@@ -1691,11 +1691,11 @@ void test_hierarchy_update_with_content() {
             sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
             sup->do_process();
 
-            CHECK(files_local->size() == 2);
-            auto d = files_local->by_name("dir");
+            CHECK(test::count_children(*local_folder) == 2);
+            auto d = local_folder->get_by_path("dir");
             CHECK(d);
 
-            auto f = files_local->by_name("dir/file.bin");
+            auto f = local_folder->get_by_path("dir/file.bin");
             REQUIRE(f);
             CHECK(f->get_size() == 5);
             CHECK(f->iterate_blocks().get_total() == 1);
@@ -1737,7 +1737,7 @@ void test_malformed_hierarchy_update() {
             sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
             sup->do_process();
 
-            CHECK(files_local->size() == 0);
+            CHECK(test::count_children(*local_folder) == 0);
         }
     };
     F().run();
@@ -1782,8 +1782,8 @@ void test_scan_dirs_race_unix() {
             LOG_INFO(log, "triggering scan...");
             builder->scan_start(folder_id).apply(*sup);
 
-            CHECK(files_local->size() == 9);
-            CHECK(folder_local->get_max_sequence() == 9);
+            CHECK(test::count_children(*local_folder) == 9);
+            CHECK(local_folder->get_max_sequence() == 9);
         }
     };
     F().run();
@@ -1802,7 +1802,7 @@ void test_scan_dirs_race_unix_2() {
             expect_dir_scan({});
             LOG_INFO(log, "triggering scan (1)...");
             builder->scan_start(folder_id).apply(*sup);
-            REQUIRE(files_local->size() == 1);
+            REQUIRE(test::count_children(*local_folder) == 1);
 
             auto pr_dir = proto::FileInfo();
             proto::set_name(pr_dir, "x");
@@ -1826,8 +1826,8 @@ void test_scan_dirs_race_unix_2() {
             LOG_INFO(log, "triggering scan (2)...");
             builder->scan_start(folder_id).apply(*sup);
 
-            CHECK(files_local->size() == 5);
-            CHECK(folder_local->get_max_sequence() == 5);
+            CHECK(test::count_children(*local_folder) == 5);
+            CHECK(local_folder->get_max_sequence() == 5);
         }
     };
     F().run();
@@ -1865,8 +1865,8 @@ void test_scan_dirs_race_win32() {
             LOG_INFO(log, "triggering scan...");
             builder->scan_start(folder_id).apply(*sup);
 
-            CHECK(files_local->size() == 9);
-            CHECK(folder_local->get_max_sequence() == 9);
+            CHECK(test::count_children(*local_folder) == 9);
+            CHECK(local_folder->get_max_sequence() == 9);
         }
     };
     F().run();
@@ -1887,7 +1887,7 @@ void test_scan_dirs_race_win32_2() {
 
             LOG_INFO(log, "triggering scan (1)...");
             builder->scan_start(folder_id).apply(*sup);
-            REQUIRE(files_local->size() == 3);
+            REQUIRE(test::count_children(*local_folder) == 3);
 
             auto pr_dir = proto::FileInfo();
             proto::set_name(pr_dir, "x");
@@ -1909,8 +1909,8 @@ void test_scan_dirs_race_win32_2() {
             LOG_INFO(log, "triggering scan (2)...");
             builder->scan_start(folder_id).apply(*sup);
 
-            CHECK(files_local->size() == 5);
-            CHECK(folder_local->get_max_sequence() == 5);
+            CHECK(test::count_children(*local_folder) == 5);
+            CHECK(local_folder->get_max_sequence() == 5);
         }
     };
     F().run();
@@ -1965,7 +1965,7 @@ void test_hashing_race() {
                 };
 
                 builder->scan_start(folder_id).apply(*sup);
-                CHECK(folder_local->get_max_sequence() == 2);
+                CHECK(local_folder->get_max_sequence() == 2);
             }
             SECTION("update, then scan") {
                 for (std::uint32_t i = 0; i < number; ++i) {
@@ -1980,10 +1980,10 @@ void test_hashing_race() {
                 proto::set_size(pr_file, sz);
                 mk_update(pr_file, fs::update_type_t::content, false, false);
                 builder->scan_start(folder_id).apply(*sup);
-                CHECK(folder_local->get_max_sequence() == 1);
+                CHECK(local_folder->get_max_sequence() == 1);
             }
-            REQUIRE(files_local->size() == 1);
-            auto f = files_local->by_name("file.bin");
+            REQUIRE(test::count_children(*local_folder) == 1);
+            auto f = local_folder->get_by_path("file.bin");
             REQUIRE(f);
             REQUIRE(f->get_size() == sz);
             REQUIRE(f->iterate_blocks().get_total() == number);
@@ -2036,19 +2036,19 @@ void test_renaming_simple() {
 
                 proto::set_name(file, file_name_2);
 
-                auto seq_1 = folder_local->get_max_sequence();
+                auto seq_1 = local_folder->get_max_sequence();
                 make_update_rename(file, file_name_1);
 
-                CHECK(folder_local->get_max_sequence() > seq_1);
+                CHECK(local_folder->get_max_sequence() > seq_1);
 
-                auto f2 = files_local->by_name(file_name_2);
+                auto f2 = local_folder->get_by_path(file_name_2);
                 REQUIRE(f2);
                 CHECK(metadata_comparator.equal(f2->get_permissions(), default_perms));
                 CHECK(f2->get_modification().seconds == 12345);
                 CHECK(!f2->is_deleted());
                 CHECK(model::file_info_t::as_type(f2->get_type()) == file_type);
 
-                auto f1 = files_local->by_name(file_name_1);
+                auto f1 = local_folder->get_by_path(file_name_1);
                 REQUIRE(f1);
                 CHECK(metadata_comparator.equal(f1->get_permissions(), default_perms));
                 CHECK(f1->get_modification().seconds == 12345);
@@ -2073,12 +2073,12 @@ void test_renaming_simple() {
 
                 proto::set_name(file, file_name_2);
 
-                auto seq_1 = folder_local->get_max_sequence();
+                auto seq_1 = local_folder->get_max_sequence();
                 make_update_rename(file, file_name_1);
 
-                CHECK(folder_local->get_max_sequence() > seq_1);
+                CHECK(local_folder->get_max_sequence() > seq_1);
 
-                auto f2 = files_local->by_name(file_name_2);
+                auto f2 = local_folder->get_by_path(file_name_2);
                 REQUIRE(f2);
                 CHECK(metadata_comparator.equal(f2->get_permissions(), default_perms));
                 CHECK(f2->get_modification().seconds == 12345);
@@ -2088,7 +2088,7 @@ void test_renaming_simple() {
                 CHECK(f2->iterate_blocks(0).get_total() == 1);
                 CHECK(f2->iterate_blocks(0).current().first->get_hash() == data_h);
 
-                auto f1 = files_local->by_name(file_name_1);
+                auto f1 = local_folder->get_by_path(file_name_1);
                 REQUIRE(f1);
                 CHECK(metadata_comparator.equal(f1->get_permissions(), default_perms));
                 CHECK(f1->get_modification().seconds == 12345);
@@ -2173,7 +2173,7 @@ void test_renaming_hierarchy() {
             auto ex_names = {L"папка/sd", L"папка/sd/f1.bin", L"папка/sd/f2.bin"};
             for (auto &name_w : ex_names) {
                 auto name = narrow(name_w);
-                auto f = files_local->by_name(name);
+                auto f = local_folder->get_by_path(name);
                 REQUIRE(f);
                 log->debug("f = {}", f->get_name()->get_full_name());
                 CHECK(f->is_deleted());
@@ -2184,7 +2184,7 @@ void test_renaming_hierarchy() {
             for (auto &name_w : exising_names) {
                 auto name = narrow(name_w);
                 log->debug("f = {}", name);
-                auto f = files_local->by_name(name);
+                auto f = local_folder->get_by_path(name);
                 REQUIRE(f);
                 CHECK(!f->is_deleted());
             }
@@ -2214,7 +2214,7 @@ void test_renaming_race() {
                     builder->local_update(folder_id, pr).apply(*sup);
                 }
             }
-            CHECK(folder_local->get_max_sequence() == 3);
+            CHECK(local_folder->get_max_sequence() == 3);
 
             // clang-format off
             auto pairs = {
@@ -2242,11 +2242,11 @@ void test_renaming_race() {
             sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
             sup->do_process();
 
-            CHECK(folder_local->get_max_sequence() == 15);
+            CHECK(local_folder->get_max_sequence() == 15);
             auto deleted = {"dir_a0/b0", "dir_a0/c0", "dir_a0/b1", "dir_a0", "dir_a2/c0", "dir_a2/b1"};
             auto prev_seq = std::int64_t{4};
             for (auto &name : deleted) {
-                auto f = files_local->by_name(name);
+                auto f = local_folder->get_by_path(name);
                 log->debug("f = {}, seq = {}", name, f->get_sequence());
                 REQUIRE(f);
                 CHECK(f->is_deleted());
@@ -2256,7 +2256,7 @@ void test_renaming_race() {
 
             auto existing = {"dir_a2", "dir_a2/b4", "dir_a2/c3"};
             for (auto &name : existing) {
-                auto f = files_local->by_name(name);
+                auto f = local_folder->get_by_path(name);
                 log->debug("f = {}", name);
                 REQUIRE(f);
                 CHECK(!f->is_deleted());
@@ -2306,10 +2306,10 @@ void test_avoid_dir_rescan() {
                 mk_update(file, fs::update_type_t::created, true);
             }
 
-            CHECK(files_local->size() == 2);
-            REQUIRE(files_local->by_name("dir"));
-            REQUIRE(files_local->by_name("dir/a-file"));
-            CHECK(folder_local->get_max_sequence() == 2);
+            CHECK(test::count_children(*local_folder) == 2);
+            REQUIRE(local_folder->get_by_path("dir"));
+            REQUIRE(local_folder->get_by_path("dir/a-file"));
+            CHECK(local_folder->get_max_sequence() == 2);
 
             CHECK(dir_scans == 2);
         }
@@ -2357,9 +2357,9 @@ void test_no_pending_io() {
             sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
             sup->do_process();
 
-            CHECK(files_local->size() == 1);
-            CHECK(folder_local->get_max_sequence() == 1);
-            auto f = files_local->by_name("a-file");
+            CHECK(test::count_children(*local_folder) == 1);
+            CHECK(local_folder->get_max_sequence() == 1);
+            auto f = local_folder->get_by_path("a-file");
             REQUIRE(f);
             CHECK(f->get_size() == 5);
         }
@@ -2406,9 +2406,9 @@ void test_double_content_update() {
             sup->send<fs::payload::folder_changes_t>(addr, std::move(folder_changes));
             sup->do_process();
 
-            CHECK(files_local->size() == 1);
-            CHECK(folder_local->get_max_sequence() == 1);
-            auto f = files_local->by_name("a-file");
+            CHECK(test::count_children(*local_folder) == 1);
+            CHECK(local_folder->get_max_sequence() == 1);
+            auto f = local_folder->get_by_path("a-file");
             REQUIRE(f);
             CHECK(f->get_size() == 5);
         }
@@ -2460,11 +2460,11 @@ void test_dir_scan_and_hashing_race() {
             expect_bytes_hash(as_bytes("12345"));
             mk_update(file, fs::update_type_t::created, true);
 
-            CHECK(files_local->size() == 3);
-            REQUIRE(files_local->by_name("dir"));
-            REQUIRE(files_local->by_name("dir/f1.bin"));
-            REQUIRE(files_local->by_name("dir/f2.bin"));
-            CHECK(folder_local->get_max_sequence() == 3);
+            CHECK(test::count_children(*local_folder) == 3);
+            REQUIRE(local_folder->get_by_path("dir"));
+            REQUIRE(local_folder->get_by_path("dir/f1.bin"));
+            REQUIRE(local_folder->get_by_path("dir/f2.bin"));
+            CHECK(local_folder->get_max_sequence() == 3);
         }
     };
     F().run();
@@ -2489,7 +2489,7 @@ void test_invalid_utf8_names() {
                 proto::set_name(file, invalid_name);
                 proto::set_type(file, FT::FILE);
                 mk_update(file, fs::update_type_t::created, true);
-                CHECK(files_local->size() == 0);
+                CHECK(test::count_children(*local_folder) == 0);
             }
 #ifndef SYNCSPIRIT_WIN
             SECTION("update symlink") {
@@ -2497,12 +2497,12 @@ void test_invalid_utf8_names() {
                 proto::set_symlink_target(file, invalid_name);
                 proto::set_type(file, FT::SYMLINK);
                 mk_update(file, fs::update_type_t::created, true);
-                CHECK(files_local->size() == 0);
+                CHECK(test::count_children(*local_folder) == 0);
             }
             SECTION("in dir content") {
                 expect_dir_scan(CB().add(invalid_name, file_type_t::FILE).get());
                 builder->scan_start(folder_id).apply(*sup);
-                CHECK(files_local->size() == 0);
+                CHECK(test::count_children(*local_folder) == 0);
             }
 #endif
         }
@@ -2519,7 +2519,7 @@ void test_rm_folder_on_scan() {
             auto diff = builder->remove_folder(*folder).extract();
             sup->send<model::payload::model_update_t>(sup->get_address(), std::move(diff));
             folder.reset();
-            folder_local.reset();
+            local_folder.reset();
             parent_t::on_exec(msg);
         }
 
@@ -2549,9 +2549,9 @@ void test_not_yet_scanned_parent() {
             proto::set_modified_s(pr_dir, 12345);
             proto::set_type(pr_dir, proto::FileInfoType::DIRECTORY);
             builder->local_update(folder_id, pr_dir).apply(*sup);
-            REQUIRE(files_local->size() == 1);
+            REQUIRE(test::count_children(*local_folder) == 1);
 
-            auto dir = files_local->by_name("dir");
+            auto dir = local_folder->get_by_path("dir");
             dir->mark_local(false);
 
             auto pr_file = proto::FileInfo();
@@ -2559,7 +2559,7 @@ void test_not_yet_scanned_parent() {
             proto::set_type(pr_file, FT::FILE);
             proto::set_size(pr_file, 5);
             mk_update(pr_file, fs::update_type_t::created, true);
-            CHECK(files_local->size() == 1);
+            CHECK(test::count_children(*local_folder) == 1);
         }
     };
     F().run();
@@ -2577,17 +2577,17 @@ void test_ignore_files_upon_scan() {
             SECTION("not in the model, not accepted") {
                 expect_dir_scan(CB().add("/some/path/my-bbb.txt", file_type_t::FILE).get());
                 builder->scan_start(folder_id).apply(*sup);
-                CHECK(files_local->size() == 0);
+                CHECK(test::count_children(*local_folder) == 0);
 
                 expect_dir_scan(CB().add("/some/path/my-bbb-2.txt", file_type_t::FILE, 10).get());
                 builder->scan_start(folder_id).apply(*sup);
-                CHECK(files_local->size() == 0);
+                CHECK(test::count_children(*local_folder) == 0);
             }
 
             SECTION("not in the model, accepted") {
                 expect_dir_scan(CB().add("/some/path/my-aaa.txt", file_type_t::FILE).get());
                 builder->scan_start(folder_id).apply(*sup);
-                CHECK(files_local->size() == 1);
+                CHECK(test::count_children(*local_folder) == 1);
             }
 
             SECTION("in the model => always updated") {
@@ -2598,7 +2598,7 @@ void test_ignore_files_upon_scan() {
                 proto::set_modified_s(file, 12345);
                 proto::set_type(file, FT::FILE);
                 builder->local_update(folder_id, file).apply(*sup);
-                REQUIRE(files_local->size() == 1);
+                REQUIRE(test::count_children(*local_folder) == 1);
 
                 auto f = (*files_local->begin());
                 auto seq = f->get_sequence();
@@ -2630,7 +2630,7 @@ void test_prevent_resurrection_of_ignored() {
             proto::set_type(file, FT::FILE);
             builder->local_update(folder_id, file).apply(*sup);
 
-            REQUIRE(files_local->size() == 1);
+            REQUIRE(test::count_children(*local_folder) == 1);
             auto f = (*files_local->begin());
             auto seq_1 = f->get_sequence();
 
@@ -2684,15 +2684,15 @@ void test_renaming_to_ignored() {
 
                 builder->local_update(folder_id, file).apply(*sup);
             }
-            REQUIRE(files_local->size() == 1);
+            REQUIRE(test::count_children(*local_folder) == 1);
 
             proto::set_name(file, "ignored.bin");
-            auto seq_1 = folder_local->get_max_sequence();
+            auto seq_1 = local_folder->get_max_sequence();
             make_update_rename(file, "valuable.bin");
-            CHECK(folder_local->get_max_sequence() > seq_1);
-            CHECK(files_local->size() == 1);
+            CHECK(local_folder->get_max_sequence() > seq_1);
+            CHECK(test::count_children(*local_folder) == 1);
 
-            auto f = files_local->by_name("valuable.bin");
+            auto f = local_folder->get_by_path("valuable.bin");
             REQUIRE(f);
             CHECK(metadata_comparator.equal(f->get_permissions(), default_perms));
             CHECK(f->get_modification().seconds == 12345);
@@ -2708,8 +2708,8 @@ void test_renaming_to_ignored() {
 int _init() {
     test::init_logging();
     REGISTER_TEST_CASE(test_just_start, "test_just_start", "[fs]");
-    // REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
-    // REGISTER_TEST_CASE(test_trivial_changes, "test_trivial_changes", "[fs]");
+    REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
+    REGISTER_TEST_CASE(test_trivial_changes, "test_trivial_changes", "[fs]");
     // REGISTER_TEST_CASE(test_ignoring_tmps, "test_ignoring_tmps", "[fs]");
     // REGISTER_TEST_CASE(test_hashing, "test_hashing", "[fs]");
     // REGISTER_TEST_CASE(test_rescan, "test_rescan", "[fs]");
