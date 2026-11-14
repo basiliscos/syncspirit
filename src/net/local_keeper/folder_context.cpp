@@ -177,8 +177,12 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
         if (recurse) {
             auto recurse_children = child_info.recurse_children;
             auto requires_refinement = child_info.requires_refinement;
-            auto copy = !skip_self_update ? child_info.clone() : std::move(child_info);
-            stack.push_front(unscanned_dir_t(std::move(copy), recurse_children, requires_refinement));
+            if (!skip_self_update) {
+                stack.push_front(unscanned_dir_t(std::move(child_info), recurse_children, requires_refinement));
+            } else {
+                stack.push_front(unscanned_dir_t(std::move(child_info.path), std::move(child_info.self),
+                                                 {}, child_info.generation, recurse_children, requires_refinement));
+            }
         }
 #if 0
         if (!skip_self_update) {

@@ -735,8 +735,6 @@ void test_ignoring_tmps() {
 }
 
 
-#if 0
-
 void test_hashing() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
@@ -787,7 +785,7 @@ void test_rescan() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
-        using child_info_t = fs::task::scan_dir_t::child_info_t;
+        using child_info_t = fs::task::child_info_t;
 
         bool process_cmd(fs::task::scan_dir_t &task) noexcept override {
             ++dir_scans;
@@ -844,11 +842,15 @@ void test_rescan() {
     F().run();
 }
 
+#if 0
+
+
+
 void test_skip_scan_known() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
-        using child_info_t = fs::task::scan_dir_t::child_info_t;
+        using child_info_t = fs::task::child_info_t;
 
         bool process_cmd(fs::task::scan_dir_t &task) noexcept override {
             ++dir_scans;
@@ -922,7 +924,7 @@ void test_new_dir_refinement() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
-        using child_info_t = fs::task::scan_dir_t::child_info_t;
+        using child_info_t = fs::task::child_info_t;
 
         bool process_cmd(fs::task::scan_dir_t &task) noexcept override {
             if (task.notify) {
@@ -990,7 +992,7 @@ void test_new_dir_without_refinement() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
-        using child_info_t = fs::task::scan_dir_t::child_info_t;
+        using child_info_t = fs::task::child_info_t;
 
         void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue);
@@ -1021,7 +1023,7 @@ void test_remove_dir_refinement() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
-        using child_info_t = fs::task::scan_dir_t::child_info_t;
+        using child_info_t = fs::task::child_info_t;
 
         void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
@@ -1069,7 +1071,7 @@ void test_scan_notification_unix() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
-        using child_info_t = fs::task::scan_dir_t::child_info_t;
+        using child_info_t = fs::task::child_info_t;
 
         bool process_cmd(fs::task::scan_dir_t &task) noexcept override {
             if (task.notify) {
@@ -1100,7 +1102,7 @@ void test_kqueue_changes() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
-        using child_info_t = fs::task::scan_dir_t::child_info_t;
+        using child_info_t = fs::task::child_info_t;
 
         void main(const utils::allocator_t &) noexcept override {
             auto impl = I::kqueue;
@@ -1136,7 +1138,7 @@ void test_dir_scan_errors() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
-        using child_info_t = fs::task::scan_dir_t::child_info_t;
+        using child_info_t = fs::task::child_info_t;
 
         void main(const utils::allocator_t &) noexcept override {
             auto impl = GENERATE(I::inotify, I::kqueue, I::win32);
@@ -1239,7 +1241,7 @@ void test_read_file_errors() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
-        using child_info_t = fs::task::scan_dir_t::child_info_t;
+        using child_info_t = fs::task::child_info_t;
 
         bool process_cmd(fs::task::segment_iterator_t &task) noexcept override {
             LOG_DEBUG(log, "process_cmd(segment_iterator_t) {}", task.path);
@@ -1280,7 +1282,7 @@ void test_read_file_errors_partial() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
-        using child_info_t = fs::task::scan_dir_t::child_info_t;
+        using child_info_t = fs::task::child_info_t;
 
         bool process_cmd(fs::task::segment_iterator_t &task) noexcept override {
             static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
@@ -1345,7 +1347,7 @@ void test_read_file_error_recovery() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
-        using child_info_t = fs::task::scan_dir_t::child_info_t;
+        using child_info_t = fs::task::child_info_t;
 
         bool process_cmd(fs::task::segment_iterator_t &task) noexcept override {
             static const constexpr size_t SZ = SHA256_DIGEST_LENGTH;
@@ -1473,7 +1475,7 @@ void test_multi_folders_update() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
         using parent_t::parent_t;
-        using child_info_t = fs::task::scan_dir_t::child_info_t;
+        using child_info_t = fs::task::child_info_t;
 
         void main(const utils::allocator_t &) noexcept override {
             auto matcher = db::FileMatcher();
@@ -2721,8 +2723,8 @@ int _init() {
     REGISTER_TEST_CASE(test_watch_unwatch, "test_watch_unwatch", "[fs]");
     REGISTER_TEST_CASE(test_trivial_changes, "test_trivial_changes", "[fs]");
     REGISTER_TEST_CASE(test_ignoring_tmps, "test_ignoring_tmps", "[fs]");
-    // REGISTER_TEST_CASE(test_hashing, "test_hashing", "[fs]");
-    // REGISTER_TEST_CASE(test_rescan, "test_rescan", "[fs]");
+    REGISTER_TEST_CASE(test_hashing, "test_hashing", "[fs]");
+    REGISTER_TEST_CASE(test_rescan, "test_rescan", "[fs]");
     // REGISTER_TEST_CASE(test_skip_scan_known, "test_skip_scan_known", "[fs]");
     // REGISTER_TEST_CASE(test_new_dir_refinement, "test_new_dir_refinement", "[fs]");
     // REGISTER_TEST_CASE(test_new_dir_without_refinement, "test_new_dir_without_refinement", "[fs]");

@@ -67,7 +67,5 @@ std::string_view child_info_t::relative_path(const model::folder_info_t &local_f
 auto child_info_t::fetch_model(const model::folder_info_t &local_folder) const -> const model::file_info_t * {
     auto &folder_path = local_folder.get_folder()->get_path();
     auto path_str = path.relativize(local_folder.get_folder()->get_path());
-    auto &path_cache = local_folder.get_folder()->get_cluster()->get_path_cache();
-    auto path = path_cache.get_path(path_str);
-    return local_folder.get_by_path(*path);
+    return local_folder.get_by_path(path_str);
 }
