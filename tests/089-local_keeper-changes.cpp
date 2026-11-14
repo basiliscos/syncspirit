@@ -2573,7 +2573,6 @@ void test_not_yet_scanned_parent() {
     F().run();
 }
 
-#if 0
 void test_ignore_files_upon_scan() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
@@ -2609,7 +2608,7 @@ void test_ignore_files_upon_scan() {
                 builder->local_update(folder_id, file).apply(*sup);
                 REQUIRE(test::count_children(*local_folder) == 1);
 
-                auto f = (*files_local->begin());
+                auto f = local_folder->get_by_path(file_name);
                 auto seq = f->get_sequence();
                 auto path = fmt::format("/some/path/{}", file_name);
                 expect_dir_scan(CB().add(path, file_type_t::FILE, 0, default_perms, 123456).get());
@@ -2640,7 +2639,7 @@ void test_prevent_resurrection_of_ignored() {
             builder->local_update(folder_id, file).apply(*sup);
 
             REQUIRE(test::count_children(*local_folder) == 1);
-            auto f = (*files_local->begin());
+            auto f = local_folder->get_by_path(proto::get_name(file));
             auto seq_1 = f->get_sequence();
 
             auto path = fmt::format("/some/path/{}", "garbage.bin");
@@ -2711,8 +2710,6 @@ void test_renaming_to_ignored() {
     };
     F().run();
 }
-
-#endif
 
 int _init() {
     test::init_logging();
