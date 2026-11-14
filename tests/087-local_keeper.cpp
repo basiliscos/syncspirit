@@ -2051,9 +2051,6 @@ void test_traversal() {
     F().run();
 }
 
-#if 0
-
-
 void test_importing() {
     struct F : fixture_t {
         void main(const utils::allocator_t &allocator) noexcept override {
@@ -2098,9 +2095,9 @@ void test_importing() {
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
                     builder->scan_start(folder->get_id()).apply(*sup);
-                    REQUIRE(files->size() == 1);
+                    REQUIRE(test::count_children(*local_folder) == 1);
 
-                    auto f = *files->begin();
+                    auto f = static_cast<model::file_info_t*>(*local_folder->get_children().begin());
                     REQUIRE(f);
                     CHECK(f->get_size() == proto::get_size(pr_file));
                     REQUIRE(f->get_version().as_proto() == v);
@@ -2118,7 +2115,7 @@ void test_importing() {
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
                     builder->scan_start(folder->get_id()).apply(*sup);
-                    REQUIRE(files->size() == 1);
+                    REQUIRE(test::count_children(*local_folder) == 1);
 
                     auto f = local_folder->get_by_path(file_name);
                     REQUIRE(f);
@@ -2149,7 +2146,7 @@ void test_importing() {
                 builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
                 builder->scan_start(folder->get_id()).apply(*sup);
-                REQUIRE(files->size() == 1);
+                REQUIRE(test::count_children(*local_folder) == 1);
 
                 auto f = local_folder->get_by_path(file_name);
                 REQUIRE(f);
@@ -2158,7 +2155,8 @@ void test_importing() {
             }
             SECTION("deleted") {
                 SECTION("single deleted file") {
-                    auto path = root_path / L"файл.bin";
+                    auto model_path = utils::path_t::make_generic(L"файл.bin");
+                    auto path = root_path / model_path;
                     auto pr_file = proto::FileInfo();
                     proto::set_name(pr_file, path.get_filename());
                     proto::set_sequence(pr_file, 4);
@@ -2173,11 +2171,9 @@ void test_importing() {
                     builder->make_index(sha256, folder->get_id()).add(pr_file, peer_device).finish().apply(*sup);
 
                     builder->scan_start(folder->get_id()).apply(*sup);
+                    REQUIRE(test::count_children(*local_folder) == 1);
 
-                    auto fi_my = folder->get_folder_info(*my_device);
-                    auto &files_my = fi_my->get_file_infos();
-                    REQUIRE(files_my.size() == 1);
-                    auto file = files_my.by_name(path.get_filename());
+                    auto file = local_folder->get_by_path(path.get_filename());
                     REQUIRE(file->get_version().as_proto() == v);
                     CHECK(!exists(path));
                 }
@@ -2212,12 +2208,11 @@ void test_importing() {
 
                     builder->scan_start(folder->get_id()).apply(*sup);
 
-                    auto &files_my = local_folder->get_file_infos();
-                    REQUIRE(files_my.size() == 2);
+                    REQUIRE(test::count_children(*local_folder) == 2);
 
-                    auto file_1 = files_my.by_name(dir_path.get_full_name());
+                    auto file_1 = local_folder->get_by_path(dir_path);
                     REQUIRE(file_1->get_version().as_proto() == v);
-                    auto file_2 = files_my.by_name(file_path.get_full_name());
+                    auto file_2 = local_folder->get_by_path(file_path);
                     REQUIRE(file_2->get_version().as_proto() == v);
 
                     CHECK(is_empty(root_path));
@@ -2227,6 +2222,8 @@ void test_importing() {
     };
     F().run();
 }
+
+#if 0
 
 void test_concurrency() {
     static constexpr std::uint_fast32_t N = 5;
@@ -2324,7 +2321,7 @@ int _init() {
     REGISTER_TEST_CASE(test_hashing_fail, "test_hashing_fail", "[net]");
     REGISTER_TEST_CASE(test_incomplete, "test_incomplete", "[net]");
     REGISTER_TEST_CASE(test_traversal, "test_traversal", "[net]");
-    // REGISTER_TEST_CASE(test_importing, "test_importing", "[net]");
+    REGISTER_TEST_CASE(test_importing, "test_importing", "[net]");
     // REGISTER_TEST_CASE(test_concurrency, "test_concurrency", "[net]");
     // REGISTER_TEST_CASE(test_races, "test_races", "[net]");
     return 1;
