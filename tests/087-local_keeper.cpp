@@ -1499,7 +1499,7 @@ void test_scan_errors() {
                 proto::set_value(counter, 1);
                 builder->local_update(folder->get_id(), pr_dir).apply(*sup);
                 REQUIRE(test::count_children(*local_folder) == 1);
-                auto dir_file = static_cast<model::file_info_t*>(*local_folder->get_children().begin());
+                auto dir_file = static_cast<model::file_info_t *>(*local_folder->get_children().begin());
 
                 SECTION("new file") {
                     do_mock(dir_path);
@@ -1586,7 +1586,7 @@ void test_read_errors() {
                     CHECK(folder->get_scan_finish() >= folder->get_scan_start());
                     REQUIRE(test::count_children(*local_folder) == 1);
 
-                    auto file_1 = static_cast<model::file_info_t*>(*local_folder->get_children().begin());
+                    auto file_1 = static_cast<model::file_info_t *>(*local_folder->get_children().begin());
                     CHECK(!file_1->is_unreachable());
                     CHECK(file_1->is_locally_available());
 
@@ -2097,7 +2097,7 @@ void test_importing() {
                     builder->scan_start(folder->get_id()).apply(*sup);
                     REQUIRE(test::count_children(*local_folder) == 1);
 
-                    auto f = static_cast<model::file_info_t*>(*local_folder->get_children().begin());
+                    auto f = static_cast<model::file_info_t *>(*local_folder->get_children().begin());
                     REQUIRE(f);
                     CHECK(f->get_size() == proto::get_size(pr_file));
                     REQUIRE(f->get_version().as_proto() == v);

@@ -26,8 +26,7 @@ namespace syncspirit::net::local_keeper {
 struct scan_dir_guard_t {
     using child_ready_ptr_t = std::unique_ptr<child_ready_t>;
 
-    scan_dir_guard_t(fs::task::scan_dir_t& scan_dir_, stack_t &stack_) noexcept:
-        scan_dir{scan_dir_}, stack{stack_}{}
+    scan_dir_guard_t(fs::task::scan_dir_t &scan_dir_, stack_t &stack_) noexcept : scan_dir{scan_dir_}, stack{stack_} {}
 
     ~scan_dir_guard_t() {
         if (!scan_dir.ec && scan_dir.child_ready) {
@@ -35,7 +34,7 @@ struct scan_dir_guard_t {
             stack.emplace_front(std::move(child_ready));
         }
     }
-    fs::task::scan_dir_t& scan_dir;
+    fs::task::scan_dir_t &scan_dir;
     stack_t &stack;
 };
 
@@ -158,8 +157,7 @@ int folder_context_t::process(unscanned_dir_t &dir, stack_context_t &ctx) noexce
                               local_folder->get_folder()->is_watched();
         LOG_TRACE(log, "scheduling scan of '{}' (notify: {})", dir.path, notify_watcher);
         auto sub_task = scan_dir_t(std::move(dir.path), std::move(dir.presence), std::move(dir.single_child),
-                                   std::move(dir.child_ready),
-                                   notify_watcher, dir.recurse, dir.requires_refinement);
+                                   std::move(dir.child_ready), notify_watcher, dir.recurse, dir.requires_refinement);
         push(std::move(sub_task));
         return 0;
     } else {
@@ -180,8 +178,8 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
             if (!skip_self_update) {
                 stack.push_front(unscanned_dir_t(std::move(child_info), recurse_children, requires_refinement));
             } else {
-                stack.push_front(unscanned_dir_t(std::move(child_info.path), std::move(child_info.self),
-                                                 {}, child_info.generation, recurse_children, requires_refinement));
+                stack.push_front(unscanned_dir_t(std::move(child_info.path), std::move(child_info.self), {},
+                                                 child_info.generation, recurse_children, requires_refinement));
             }
         }
 #if 0
@@ -633,8 +631,8 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
         } else {
             auto path = task.path.get_view(ctx.allocator).get_parent();
             auto child = static_cast<model::file_info_t *>(task.presence.get());
-            auto sub_task = fs::task::scan_dir_t(path.detach(), child->get_parent(), child->get_name()->clone(), {}, false,
-                                                 false, false);
+            auto sub_task = fs::task::scan_dir_t(path.detach(), child->get_parent(), child->get_name()->clone(), {},
+                                                 false, false, false);
             push(std::move(sub_task));
             return;
         }

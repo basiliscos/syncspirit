@@ -645,7 +645,7 @@ void test_ignoring_tmps() {
                 expect_dir_scan({});
                 mk_update(file, UT::content, true);
 
-                auto f = static_cast<model::file_info_t*>(*local_folder->get_children().begin());
+                auto f = static_cast<model::file_info_t *>(*local_folder->get_children().begin());
                 auto sequence = f->get_sequence();
 
                 auto path = fmt::format("/some/path/dir/some-file-name.bin{}", fs::tmp_suffix);
@@ -707,8 +707,10 @@ void test_ignoring_tmps() {
                     .finish()
                     .apply(*sup);
                 builder->make_index(sha256, folder_id)
-                        .add(dir, peer_device, false)
-                        .add(file, peer_device, false).finish().apply(*sup);
+                    .add(dir, peer_device, false)
+                    .add(file, peer_device, false)
+                    .finish()
+                    .apply(*sup);
 
                 auto peer_file = peer_folder->get_by_path(*f->get_name());
                 REQUIRE(peer_file);
@@ -733,7 +735,6 @@ void test_ignoring_tmps() {
     };
     F().run();
 }
-
 
 void test_hashing() {
     struct F : folder_fixture_t {
@@ -1417,7 +1418,7 @@ void test_read_file_error_recovery() {
             LOG_INFO(log, "triggering scan...");
             builder->scan_start(folder_id).apply(*sup);
             CHECK(test::count_children(*local_folder) == 1);
-            auto file = static_cast<model::file_info_t*>(*local_folder->get_children().begin());
+            auto file = static_cast<model::file_info_t *>(*local_folder->get_children().begin());
             REQUIRE(file);
             REQUIRE(file->get_size() == block_sz * multiplier);
             REQUIRE(file->iterate_blocks().get_total() == 5);

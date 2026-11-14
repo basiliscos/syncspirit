@@ -20,4 +20,4 @@ struct child_info_t {
     std::error_code ec;
 };
 
-}
+} // namespace syncspirit::fs::task
