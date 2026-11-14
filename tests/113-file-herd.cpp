@@ -22,7 +22,6 @@
 #include "model/diff/modify/upsert_folder.h"
 #include "model/diff/modify/upsert_folder_info.h"
 #include "model/diff/advance/advance.h"
-#include "presentation/folder_entity.h"
 
 using namespace syncspirit;
 using namespace syncspirit::fs;
@@ -88,46 +87,6 @@ struct supervisor_t : fs::fs_supervisor_t, model::diff::apply_controller_t, prot
         auto &item = static_cast<const model::payload::model_subscription_t &>(message.payload);
         auto it = std::find(model_subscribers.begin(), model_subscribers.end(), item);
         model_subscribers.erase(it);
-    }
-
-    outcome::result<void> operator()(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept override {
-        auto folder_id = db::get_id(diff.db);
-        auto folder = cluster->get_folders().by_id(folder_id);
-        if (!folder->get_augmentation()) {
-            auto folder_entity = presentation::folder_entity_ptr_t();
-            folder_entity = new presentation::folder_entity_t(folder);
-            folder->set_augmentation(folder_entity);
-        }
-        return diff.visit_next(*this, custom);
-    }
-
-    outcome::result<void> operator()(const model::diff::modify::upsert_folder_info_t &diff,
-                                     void *custom) noexcept override {
-        auto r = diff.visit_next(*this, custom);
-        auto &folder = *cluster->get_folders().by_id(diff.folder_id);
-        auto &device = *cluster->get_devices().by_sha256(diff.device_id);
-        auto folder_info = folder.is_shared_with(device);
-        if (&device != cluster->get_device()) {
-            auto augmentation = folder.get_augmentation().get();
-            auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
-            folder_entity->on_insert(*folder_info);
-        }
-        return r;
-    }
-
-    outcome::result<void> operator()(const model::diff::advance::advance_t &diff, void *custom) noexcept override {
-        auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto augmentation = folder->get_augmentation().get();
-        auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
-        if (folder_entity) {
-            auto local_fi = folder->get_folder_info(*cluster->get_device());
-            auto file_name = proto::get_name(diff.proto_local);
-            auto local_file = local_fi->get_file_infos().by_name(file_name);
-            if (local_file) {
-                folder_entity->on_insert(*local_file, *local_fi);
-            }
-        }
-        return diff.visit_next(*this, custom);
     }
 
     model_subscribers_t model_subscribers;
@@ -236,7 +195,6 @@ struct fixture_t {
         REQUIRE(folder);
         local_folder = folder->get_folder_info(*local_device);
         REQUIRE(local_folder);
-        local_files = &local_folder->get_file_infos();
 
         main(root_path, allocator);
 
@@ -267,7 +225,6 @@ struct fixture_t {
     utils::logger_t log;
     r::address_ptr_t fs_addr;
     model::folder_info_ptr_t local_folder;
-    model::file_infos_map_t *local_files;
 };
 } // namespace
 
@@ -276,18 +233,18 @@ void test_fs() {
         void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             create_directories(root_path / "a/b/c/d/e");
             await_events(4);
-            REQUIRE(local_files->size() == 5);
-            REQUIRE(local_files->by_name("a"));
-            REQUIRE(local_files->by_name("a/b"));
-            REQUIRE(local_files->by_name("a/b/c"));
-            REQUIRE(local_files->by_name("a/b/c/d"));
-            REQUIRE(local_files->by_name("a/b/c/d/e"));
+            REQUIRE(test::count_children(*local_folder) == 5);
+            REQUIRE(local_folder->get_by_path("a"));
+            REQUIRE(local_folder->get_by_path("a/b"));
+            REQUIRE(local_folder->get_by_path("a/b/c"));
+            REQUIRE(local_folder->get_by_path("a/b/c/d"));
+            REQUIRE(local_folder->get_by_path("a/b/c/d/e"));
 
             create_directories(root_path / L"a/b/c/подпапка");
             write_file(root_path / L"a/b/c/файлик.bin", "12345");
             await_events(4);
-            REQUIRE(local_files->by_name(narrow(L"a/b/c/подпапка")));
-            auto file = local_files->by_name(narrow(L"a/b/c/файлик.bin"));
+            REQUIRE(local_folder->get_by_path(narrow(L"a/b/c/подпапка")));
+            auto file = local_folder->get_by_path(narrow(L"a/b/c/файлик.bin"));
             REQUIRE(file);
             CHECK(file->get_size() == 5);
 
@@ -295,18 +252,18 @@ void test_fs() {
                              "Strategies_v1.0.pdf";
             create_directories(root_path / "a/xx");
             await_events(3);
-            auto dir_1 = local_files->by_name("a/xx");
+            auto dir_1 = local_folder->get_by_path("a/xx");
             REQUIRE(dir_1);
 
             rename(root_path / "a" / "xx", root_path / "a" / long_name);
             await_events(4);
-            auto dir_2 = local_files->by_name(fmt::format("a/{}", long_name));
+            auto dir_2 = local_folder->get_by_path(fmt::format("a/{}", long_name));
             REQUIRE(dir_2);
-            CHECK(local_files->by_name("a/xx")->is_deleted());
+            CHECK(local_folder->get_by_path("a/xx")->is_deleted());
 
             rename(root_path / "a" / long_name, root_path / "a" / "yy");
             await_events(3);
-            auto dir_3 = local_files->by_name("a/yy");
+            auto dir_3 = local_folder->get_by_path("a/yy");
             REQUIRE(dir_3);
 
             rename(root_path / "a" / "b", root_path / "a" / "BB");
@@ -315,7 +272,7 @@ void test_fs() {
                 auto wnames = {L"a/b", L"a/b/c", L"a/b/c/d", L"a/b/c/d/e", L"a/b/c/подпапка", L"a/b/c/файлик.bin"};
                 for (auto &wname : wnames) {
                     auto name = narrow(wname);
-                    auto file = local_files->by_name(name);
+                    auto file = local_folder->get_by_path(name);
                     LOG_INFO(log, "cheking for absence of {}", name);
                     REQUIRE(file);
                     CHECK(file->is_deleted());
@@ -328,7 +285,7 @@ void test_fs() {
                 for (auto &wname : wnames) {
                     auto name = narrow(wname);
                     LOG_INFO(log, "cheking for presence of {}", name);
-                    auto file = local_files->by_name(name);
+                    auto file = local_folder->get_by_path(name);
                     REQUIRE(file);
                     CHECK(!file->is_deleted());
                 }
@@ -337,18 +294,18 @@ void test_fs() {
             create_directories(root_path / "new-dir");
             await_events(2);
 
-            auto dir_4 = local_files->by_name("new-dir");
+            auto dir_4 = local_folder->get_by_path("new-dir");
             REQUIRE(dir_4);
 
             create_directories(root_path / "new-dir" / "sub_dir");
             write_file(root_path / "new-dir" / "f", "12345");
 
             await_events(4);
-            auto dir_4_d = local_files->by_name("new-dir/sub_dir");
+            auto dir_4_d = local_folder->get_by_path("new-dir/sub_dir");
             REQUIRE(dir_4_d);
             REQUIRE(dir_4_d->is_dir());
 
-            auto dir_4_f = local_files->by_name("new-dir/f");
+            auto dir_4_f = local_folder->get_by_path("new-dir/f");
             REQUIRE(dir_4_f);
             REQUIRE(dir_4_f->is_file());
             REQUIRE(dir_4_f->get_size() == 5);
