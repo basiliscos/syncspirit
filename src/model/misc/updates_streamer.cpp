@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2023-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2023-2026 Ivan Baidakou
 
 #include "updates_streamer.h"
 #include <cassert>

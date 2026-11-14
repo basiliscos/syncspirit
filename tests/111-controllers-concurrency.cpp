@@ -230,9 +230,7 @@ void test_concurrent_downloading() {
             }
 
             auto pushed_blocks = size_t{0};
-            // REQUIRE(requested.size() == 2);
             while (pushed_blocks < N) {
-                // for (auto &[peer_actor, queue] : requested) {
                 for (auto &actor : peer_actors) {
                     if (actor->in_requests.size()) {
                         auto &p = actor->in_requests.front();
@@ -245,13 +243,14 @@ void test_concurrent_downloading() {
                         ++requested_blocks_sz[actor.get()];
                     }
                 }
+                log->info("pushed_blocks = {}", pushed_blocks);
                 sup->do_process();
             }
             CHECK(peer_actors[0]->in_requests.empty());
             CHECK(peer_actors[1]->in_requests.empty());
             CHECK(requested_blocks_sz[peer_actors[0].get()] == N / 2);
             CHECK(requested_blocks_sz[peer_actors[1].get()] == N / 2);
-            CHECK(local_folder->get_file_infos().size() == N);
+            CHECK(test::count_children(*local_folder) == N);
 
             int index_updates[2] = {0, 0};
             for (size_t idx = 0; idx < 2; ++idx) {
@@ -261,13 +260,17 @@ void test_concurrent_downloading() {
                         auto peer = peer_devices[idx];
                         auto &file = proto::get_files(*u, 0);
                         auto file_name = proto::get_name(file);
-                        log->debug("{} got index update for '{}'", peer->device_id().get_short(), file_name);
+                        auto total = proto::get_files_size(*u);
+                        log->debug("{} got index update for '{}' (total: {})", peer->device_id().get_short(), file_name,
+                                   total);
                     } else if (auto u = std::get_if<proto::Index>(&m); u) {
                         ++index_updates[idx];
                         auto peer = peer_devices[idx];
                         auto &file = proto::get_files(*u, 0);
                         auto file_name = proto::get_name(file);
-                        log->debug("{} got index for '{}'", peer->device_id().get_short(), file_name);
+                        auto total = proto::get_files_size(*u);
+                        log->debug("{} got index for '{}' (total: {})", peer->device_id().get_short(), file_name,
+                                   total);
                     }
                 }
             }
