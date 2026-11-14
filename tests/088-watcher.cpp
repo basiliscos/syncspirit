@@ -1354,8 +1354,6 @@ void test_create_modify_rename() {
     F().run();
 }
 
-#if 0
-
 #if defined(SYNCSPIRIT_WATCHER_UNIX)
 void test_unix_notification() {
     struct F : fixture_real_t {
@@ -1370,7 +1368,7 @@ void test_unix_notification() {
 
         void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
             using scan_dir_t = fs::task::scan_dir_t;
-            using child_info_t = fs::task::scan_dir_t::child_info_t;
+            using child_info_t = fs::task::child_info_t;
             using child_infos_t = fs::task::scan_dir_t::child_infos_t;
 
             auto folder_id = std::string("my-folder-id");
@@ -1389,7 +1387,7 @@ void test_unix_notification() {
             CHECK(w->path_map.size() == 1);
             CHECK(w->subdir_map.size() == 0);
             SECTION("non-watched dir") {
-                auto task = fs::task::scan_dir_t(utils::path_t::make_native("/some/path"), {}, {}, true, true, false);
+                auto task = fs::task::scan_dir_t(utils::path_t::make_native("/some/path"), {}, {}, {}, true, true, false);
                 add_child(task, "/some/path/a");
                 w->notify(task);
                 CHECK(w->path_map.size() == 1);
@@ -1400,14 +1398,14 @@ void test_unix_notification() {
                 auto ptr = reinterpret_cast<char *>(&invalid);
                 auto invalid_name = std::string_view(ptr, ptr + 1);
 
-                auto task = fs::task::scan_dir_t(root_path.detach(), {}, {}, true, true, false);
+                auto task = fs::task::scan_dir_t(root_path.detach(), {}, {},  {}, true, true, false);
                 add_child(task, invalid_name);
                 w->notify(task);
                 CHECK(w->path_map.size() == 1);
                 CHECK(w->path_to_wd.size() == 1);
             }
             SECTION("non-watched dir of watched parent") {
-                auto task = fs::task::scan_dir_t(root_path.detach(), {}, {}, true, true, false);
+                auto task = fs::task::scan_dir_t(root_path.detach(), {}, {},  {}, true, true, false);
                 auto child_path = root_path / "a";
                 create_directories(child_path);
                 add_child(task, child_path.get_full_name());
@@ -1416,7 +1414,7 @@ void test_unix_notification() {
                 CHECK(w->path_to_wd.size() == 2);
             }
             SECTION("non-watched dir of non-watched parent") {
-                auto task = fs::task::scan_dir_t((root_path / "xx").detach(), {}, {}, true, true, false);
+                auto task = fs::task::scan_dir_t((root_path / "xx").detach(), {}, {},  {}, true, true, false);
                 auto dir_path = root_path / "xx";
                 create_directories(dir_path);
                 add_child(task, (root_path / "xx/yy").get_full_name());
@@ -1434,7 +1432,7 @@ void test_unix_notification() {
                     create_directories(path_c);
                     write_file(path_b, "");
                     create_symlink(utils::make_native_view("/some/where", allocator), path_d);
-                    auto task = fs::task::scan_dir_t(root_path.detach(), {}, {}, true, true, false);
+                    auto task = fs::task::scan_dir_t(root_path.detach(), {}, {},  {}, true, true, false);
                     add_child(task, path_a.get_full_name());
                     add_child(task, path_b.get_full_name(), utils::file_type_t::FILE);
                     add_child(task, path_c.get_full_name());
@@ -1458,7 +1456,7 @@ void test_unix_notification() {
                 create_directories(path_a);
                 create_directories(path_c);
                 write_file(path_b, "");
-                auto task = fs::task::scan_dir_t(sub_dir.detach(), {}, {}, true, true, false);
+                auto task = fs::task::scan_dir_t(sub_dir.detach(), {}, {},  {}, true, true, false);
                 add_child(task, path_a.get_full_name());
                 add_child(task, path_b.get_full_name(), utils::file_type_t::FILE);
                 add_child(task, path_c.get_full_name());
@@ -1474,7 +1472,7 @@ void test_unix_notification() {
             SECTION("tmp-file in a dir") {
                 auto path_tmp = root_path / "my-file.syncspirit-tmp";
                 write_file(path_tmp / "my-file.syncspirit-tmp", "12345");
-                auto task = fs::task::scan_dir_t(root_path.detach(), {}, {}, true, true, false);
+                auto task = fs::task::scan_dir_t(root_path.detach(), {}, {},  {}, true, true, false);
                 add_child(task, path_tmp.get_full_name(), utils::file_type_t::FILE);
                 w->notify(task);
                 CHECK(w->path_map.size() == 1);
@@ -1482,7 +1480,7 @@ void test_unix_notification() {
             }
             SECTION("error in watching") {
                 auto path_x = root_path / "a";
-                auto task = fs::task::scan_dir_t(root_path.detach(), {}, {}, true, true, false);
+                auto task = fs::task::scan_dir_t(root_path.detach(), {}, {},  {}, true, true, false);
                 add_child(task, path_x.get_full_name());
                 w->notify(task);
                 CHECK(w->path_map.size() == 1);
@@ -1662,19 +1660,15 @@ int _init() {
     REGISTER_TEST_CASE(test_hierarchies, "test_hierarchies", "[fs]");
     REGISTER_TEST_CASE(test_create_modify_rename, "test_create_modify_rename", "[fs]");
 #endif
-#if 0
 #ifdef SYNCSPIRIT_WATCHER_UNIX
     REGISTER_TEST_CASE(test_unix_notification, "test_unix_notification", "[fs]");
 #endif
 #ifdef SYNCSPIRIT_WATCHER_KQUEUE
     REGISTER_TEST_CASE(test_kqueue, "test_kqueue", "[fs]");
 #endif
-#endif
     return 1;
 }
 
 static int v = _init();
-
-#endif
 
 TEST_CASE("dummy-test", "test") { CHECK(true); }
