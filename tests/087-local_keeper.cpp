@@ -2223,8 +2223,6 @@ void test_importing() {
     F().run();
 }
 
-#if 0
-
 void test_concurrency() {
     static constexpr std::uint_fast32_t N = 5;
     static constexpr auto M = constants::diffs_batch;
@@ -2263,7 +2261,7 @@ void test_concurrency() {
                 }
             }
             builder->scan_start(folder->get_id()).apply(*sup);
-            REQUIRE(files->size() == 1 + N * (M + 1));
+            REQUIRE(test::count_children(*local_folder) == 1 + N * (M + 1));
 
             interrupts = 0;
             remove_all(root_path / "sub-dir");
@@ -2295,14 +2293,13 @@ void test_races() {
                 target->do_shutdown();
                 sup->do_process();
 
-                CHECK(files->size() == 0);
+                REQUIRE(test::count_children(*local_folder) == 0);
                 CHECK(hasher->digested_blocks == 0);
             }
         }
     };
     F().run();
 }
-#endif
 
 int _init() {
     test::init_logging();
@@ -2322,8 +2319,8 @@ int _init() {
     REGISTER_TEST_CASE(test_incomplete, "test_incomplete", "[net]");
     REGISTER_TEST_CASE(test_traversal, "test_traversal", "[net]");
     REGISTER_TEST_CASE(test_importing, "test_importing", "[net]");
-    // REGISTER_TEST_CASE(test_concurrency, "test_concurrency", "[net]");
-    // REGISTER_TEST_CASE(test_races, "test_races", "[net]");
+    REGISTER_TEST_CASE(test_concurrency, "test_concurrency", "[net]");
+    REGISTER_TEST_CASE(test_races, "test_races", "[net]");
     return 1;
 }
 

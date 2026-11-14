@@ -151,18 +151,13 @@ auto advance_t::apply_impl(apply_controller_t &controller, void *custom) const n
         return r;
     }
 
-    auto buffer = std::array<std::byte, 1024 * 32>();
-    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-
     auto &cluster = controller.get_cluster();
     auto my_device = cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
     auto local_folder = folder->get_folder_info(*my_device);
     auto name = proto::get_name(proto_local);
-    auto path = utils::make_generic_view(name, allocator);
 
-    auto prev_file = local_folder->get_by_path(path);
+    auto prev_file = local_folder->get_by_path(name);
     auto local_file_opt = file_info_t::create(uuid, proto_local, local_folder);
     if (!local_file_opt) {
         return local_file_opt.assume_error();
