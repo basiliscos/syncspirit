@@ -429,7 +429,6 @@ TEST_CASE("resolver, reserved names", "[model]") {
     auto &peer_c1 = proto::add_counters(peer_v);
     proto::set_id(peer_c1, 1);
     proto::set_value(peer_c1, 2);
-
     proto::set_sequence(pr_remote, 2);
 
     SECTION("valid name => copy") {
@@ -463,16 +462,22 @@ TEST_CASE("resolver, reserved names", "[model]") {
         CHECK(action == A::remote_copy);
     }
 #ifdef SYNCSPIRIT_WIN
+    auto pr_dir = pr_remote;
+    proto::set_name(pr_dir, "dir");
+    proto::set_type(pr_dir, proto::FileInfoType::DIRECTORY);
+    auto dir_remote = file_info_t::create(sequencer->next_uuid(), pr_dir, folder_peer).value();
+    folder_peer->add_file(*dir_remote);
+
     SECTION("prohibed char in path (1)") {
-        proto::set_name(pr_remote, "a/|/b.txt");
+        proto::set_name(pr_remote, "b.txt|");
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
         folder_peer->add_file(*file_remote);
         auto action = resolve(*file_remote, file_remote->get_sibling_file(local_device.get()), *folder_local);
         CHECK(action == A::ignore);
     }
     SECTION("prohibed char in path (2)") {
-        auto name = std::string("a/x/b.txt");
-        name[2] = 0;
+        auto name = std::string("bbb.txt");
+        name[1] = 0;
         proto::set_name(pr_remote, name);
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
         folder_peer->add_file(*file_remote);
@@ -514,8 +519,8 @@ TEST_CASE("resolver, reserved names", "[model]") {
         auto action = resolve(*file_remote, file_remote->get_sibling_file(local_device.get()), *folder_local);
         CHECK(action == A::ignore);
     }
-    SECTION("/path/con.txt/tail") {
-        proto::set_name(pr_remote, "/path/con.txt/tail");
+    SECTION("path/con.txt") {
+        proto::set_name(pr_remote, "dir/con.txt");
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
         folder_peer->add_file(*file_remote);
         auto action = resolve(*file_remote, file_remote->get_sibling_file(local_device.get()), *folder_local);
@@ -536,15 +541,22 @@ TEST_CASE("resolver, reserved names", "[model]") {
         auto action = resolve(*file_remote, file_remote->get_sibling_file(local_device.get()), *folder_local);
         CHECK(action == A::ignore);
     }
-    SECTION("/LPt7/tail") {
-        proto::set_name(pr_remote, "/LPt7/tail");
+    SECTION("LPt7") {
+        proto::set_name(pr_remote, "LPt7");
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
         folder_peer->add_file(*file_remote);
         auto action = resolve(*file_remote, file_remote->get_sibling_file(local_device.get()), *folder_local);
         CHECK(action == A::ignore);
     }
-    SECTION("/LPt77/tail") {
-        proto::set_name(pr_remote, "/LPt77/tail");
+    SECTION("dir/LPt7") {
+        proto::set_name(pr_remote, "dir/LPt7");
+        auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
+        folder_peer->add_file(*file_remote);
+        auto action = resolve(*file_remote, file_remote->get_sibling_file(local_device.get()), *folder_local);
+        CHECK(action == A::ignore);
+    }
+    SECTION("LPt77") {
+        proto::set_name(pr_remote, "LPt77");
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
         folder_peer->add_file(*file_remote);
         auto action = resolve(*file_remote, file_remote->get_sibling_file(local_device.get()), *folder_local);
@@ -564,8 +576,8 @@ TEST_CASE("resolver, reserved names", "[model]") {
         auto action = resolve(*file_remote, file_remote->get_sibling_file(local_device.get()), *folder_local);
         CHECK(action == A::ignore);
     }
-    SECTION("p/api.rst") {
-        proto::set_name(pr_remote, "p/api.rst");
+    SECTION("dir/api.rst") {
+        proto::set_name(pr_remote, "dir/api.rst");
         auto file_remote = file_info_t::create(sequencer->next_uuid(), pr_remote, folder_peer).value();
         folder_peer->add_file(*file_remote);
         auto action = resolve(*file_remote, file_remote->get_sibling_file(local_device.get()), *folder_local);

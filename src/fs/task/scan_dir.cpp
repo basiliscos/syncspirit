@@ -59,7 +59,7 @@ bool scan_dir_t::process(fs_slave_t &, execution_context_t &context) noexcept {
                 if (single_child.empty() || single_child == child_name) {
                     swprintf(ptr, L"\\%ls", child_name.data());
                     auto full_name = std::wstring_view(buff, wpath.size() + child_name.size() + 1);
-                    auto child_info = task::scan_dir_t::child_info_t{};
+                    auto child_info = child_info_t{};
                     auto is_dir = child_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
                     auto sz = static_cast<std::int64_t>((child_data.nFileSizeHigh * (MAXDWORD + 1)) +
                                                         child_data.nFileSizeLow);
