@@ -842,10 +842,6 @@ void test_rescan() {
     F().run();
 }
 
-#if 0
-
-
-
 void test_skip_scan_known() {
     struct F : folder_fixture_t {
         using parent_t = folder_fixture_t;
@@ -1421,7 +1417,7 @@ void test_read_file_error_recovery() {
             LOG_INFO(log, "triggering scan...");
             builder->scan_start(folder_id).apply(*sup);
             CHECK(test::count_children(*local_folder) == 1);
-            auto file = files_local->begin()->get();
+            auto file = static_cast<model::file_info_t*>(*local_folder->get_children().begin());
             REQUIRE(file);
             REQUIRE(file->get_size() == block_sz * multiplier);
             REQUIRE(file->iterate_blocks().get_total() == 5);
@@ -1434,6 +1430,8 @@ void test_read_file_error_recovery() {
     };
     F().run();
 };
+
+#if 0
 
 void test_duplicates() {
     struct F : folder_fixture_t {
@@ -2725,16 +2723,16 @@ int _init() {
     REGISTER_TEST_CASE(test_ignoring_tmps, "test_ignoring_tmps", "[fs]");
     REGISTER_TEST_CASE(test_hashing, "test_hashing", "[fs]");
     REGISTER_TEST_CASE(test_rescan, "test_rescan", "[fs]");
-    // REGISTER_TEST_CASE(test_skip_scan_known, "test_skip_scan_known", "[fs]");
-    // REGISTER_TEST_CASE(test_new_dir_refinement, "test_new_dir_refinement", "[fs]");
-    // REGISTER_TEST_CASE(test_new_dir_without_refinement, "test_new_dir_without_refinement", "[fs]");
-    // REGISTER_TEST_CASE(test_remove_dir_refinement, "test_remove_dir_refinement", "[fs]");
-    // REGISTER_TEST_CASE(test_scan_notification_unix, "test_scan_notification_unix", "[fs]");
-    // REGISTER_TEST_CASE(test_kqueue_changes, "test_kqueue_changes", "[fs]");
-    // REGISTER_TEST_CASE(test_dir_scan_errors, "test_dir_scan_errors", "[fs]");
-    // REGISTER_TEST_CASE(test_read_file_errors, "test_read_file_errors", "[fs]");
-    // REGISTER_TEST_CASE(test_read_file_errors_partial, "test_read_file_errors_partial", "[fs]");
-    // REGISTER_TEST_CASE(test_read_file_error_recovery, "test_read_file_error_recovery", "[fs]");
+    REGISTER_TEST_CASE(test_skip_scan_known, "test_skip_scan_known", "[fs]");
+    REGISTER_TEST_CASE(test_new_dir_refinement, "test_new_dir_refinement", "[fs]");
+    REGISTER_TEST_CASE(test_new_dir_without_refinement, "test_new_dir_without_refinement", "[fs]");
+    REGISTER_TEST_CASE(test_remove_dir_refinement, "test_remove_dir_refinement", "[fs]");
+    REGISTER_TEST_CASE(test_scan_notification_unix, "test_scan_notification_unix", "[fs]");
+    REGISTER_TEST_CASE(test_kqueue_changes, "test_kqueue_changes", "[fs]");
+    REGISTER_TEST_CASE(test_dir_scan_errors, "test_dir_scan_errors", "[fs]");
+    REGISTER_TEST_CASE(test_read_file_errors, "test_read_file_errors", "[fs]");
+    REGISTER_TEST_CASE(test_read_file_errors_partial, "test_read_file_errors_partial", "[fs]");
+    REGISTER_TEST_CASE(test_read_file_error_recovery, "test_read_file_error_recovery", "[fs]");
     // REGISTER_TEST_CASE(test_duplicates, "test_duplicates", "[fs]");
     // REGISTER_TEST_CASE(test_multi_folders_update, "test_multi_folders_update", "[fs]");
     // REGISTER_TEST_CASE(test_hierarchy_removal_order, "test_hierarchy_removal_order", "[fs]");
