@@ -17,7 +17,7 @@ remote_win_t::remote_win_t(const cluster_t &cluster, sequencer_t &sequencer, pro
     : advance_t(folder_id_, peer_id_, advance_action_t::resolve_remote_win) {
     auto &self = *cluster.get_device();
     auto folder = cluster.get_folders().by_id(folder_id);
-    auto path = utils::make_generic_view(proto::get_name(proto_file_), allocator);
+    auto path = proto::get_name(proto_file_);
 
     auto local_file = folder->get_folder_info(self)->get_by_path(path);
     auto local_source = local_file->as_proto(true);

@@ -974,16 +974,12 @@ auto db_actor_t::operator()(const model::diff::advance::advance_t &diff, void *c
         return outcome::success();
     }
 
-    auto buffer = std::array<std::byte, 1024 * 32>();
-    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
     auto folder = cluster->get_folders().by_id(diff.folder_id);
     if (folder && !folder->is_suspended()) {
         auto folder_info = folder->get_folder_info(*cluster->get_device());
         if (folder_info) {
             auto name = proto::get_name(diff.proto_local);
-            auto path = utils::make_generic_view(name, allocator);
-            auto file = folder_info->get_by_path(path);
+            auto file = folder_info->get_by_path(name);
             if (file) {
                 auto &txn = *get_txn().assume_value();
 

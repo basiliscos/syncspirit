@@ -62,13 +62,8 @@ void advance_t::initialize(const cluster_t &cluster, sequencer_t &sequencer, pro
     auto folder_id = folder->get_id();
     auto &self = *cluster.get_device();
 
-    auto buffer = std::array<std::byte, 1024 * 32>();
-    auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
-    auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
-
-    auto path = utils::make_generic_view(local_file_name_, allocator);
     auto local_folder_info = folder->get_folder_info(self);
-    auto local_file = local_folder_info->get_by_path(path);
+    auto local_file = local_folder_info->get_by_path(local_file_name_);
 
     auto orphans = orphaned_blocks_t::set_t();
     proto_local = proto_source;

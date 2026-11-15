@@ -26,9 +26,8 @@ local_update_t::local_update_t(const cluster_t &cluster, sequencer_t &sequencer,
     auto proto_name = proto::get_name(proto_file_);
     assert(proto_name.size());
     auto name = std::pmr::string(proto_name, allocator);
-    auto path = utils::make_generic_view(name, allocator);
     auto local_folder = folder->get_folder_info(self);
-    auto local_file = local_folder->get_by_path(path);
+    auto local_file = local_folder->get_by_path(name);
 
     if (auto original_file = get_original(*folder, *local_folder, proto_file_); original_file) {
         initialize(cluster, sequencer, original_file->as_proto(true), name);
