@@ -81,9 +81,6 @@ struct SYNCSPIRIT_API folder_t final : entity_t, folder_data_t {
 
     pt::ptime scan_start;
     pt::ptime scan_finish;
-#if 0
-    folder_infos_map_t folder_infos;
-#endif
     file_matchers_t file_matchers;
     cluster_t *cluster = nullptr;
     unsigned char key[data_length];

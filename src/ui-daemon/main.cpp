@@ -209,9 +209,9 @@ int app_main(app_context_t &app_ctx) {
     } else {
         auto config_default = utils::get_default_config_dir(allocator);
         if (!config_default.empty()) {
-            config_file_path = config_default;
+            config_file_path = std::move(config_default);
         } else {
-            logger->error("cannot determine default config dir", config_default);
+            logger->error("cannot determine default config dir");
             return 1;
         }
     }

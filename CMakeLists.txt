@@ -377,7 +377,7 @@ if (SYNCSPIRIT_BUILD_TESTS)
     add_subdirectory("tests")
 endif()
 
-# add_subdirectory("src/ui-daemon")
+add_subdirectory("src/ui-daemon")
 
 # if (SYNCSPIRIT_FRONTEND_FLTK)
 #     add_subdirectory("src/ui-fltk")

@@ -4,9 +4,6 @@
 #pragma once
 
 #include "hash_base.h"
-#if 0
-#include "presentation/cluster_file_presence.h"
-#endif
 
 namespace syncspirit::net::local_keeper {
 

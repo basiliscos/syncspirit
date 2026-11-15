@@ -182,11 +182,6 @@ int folder_context_t::process(unexamined_t &child_info, stack_context_t &ctx) no
                                                  child_info.generation, recurse_children, requires_refinement));
             }
         }
-#if 0
-        if (!skip_self_update) {
-            stack.push_front(child_ready_t(std::move(child_info)));
-        }
-#endif
     } else if (type == proto::FileInfoType::SYMLINK) {
         stack.push_front(child_ready_t(std::move(child_info)));
     } else {
