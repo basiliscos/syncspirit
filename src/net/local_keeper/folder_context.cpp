@@ -578,6 +578,7 @@ void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
         hash_file.blocks[index] = std::move(bi);
     }
     if (!hash_file.unhashed_blocks) {
+        auto top = stack.empty() ? nullptr : &stack.front();
         auto blocks = std::move(hash_file.blocks);
         auto abort_hashing = hash_file.errored_blocks;
         if (abort_hashing) {
@@ -586,6 +587,16 @@ void folder_context_t::post_process(hash_base_t &hash_file, hasher::message::dig
             stack.push_front(rehashed_incomplete_t(hash_file.clone(), std::move(blocks), hash_file.action));
         } else {
             stack.push_front(child_ready_t(hash_file.clone(), std::move(blocks)));
+        }
+        while (!stack.empty() && &stack.front() != top) {
+            auto it = stack.begin();
+            auto &item = *it;
+            auto r = std::visit([&](auto &item) { return process(item, ctx); }, item);
+            if (r >= 0) {
+                if (!stack.empty()) {
+                    it = stack.erase(it);
+                }
+            }
         }
     }
     ++ctx.hashes_pool;
@@ -616,14 +627,6 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
             }
         }
     }
-#if 0
-    auto it_done = stack.begin();
-    if (it_done != stack.end()) {
-        if (auto ptr = std::get_if<child_ready_t>(&*it_done); !ptr) {
-            it_done = stack.end();
-        }
-    }
-#endif
 
     if (task.ec) {
         if (task.single_child.empty() || task.ec != std::errc::no_such_file_or_directory) {
@@ -732,12 +735,6 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
             }
         }
     }
-#if 0
-    if (it_done != stack.end()) {
-        stack.insert(stack.begin(), std::move(*it_done));
-        stack.erase(it_done);
-    }
-#endif
 }
 
 void folder_context_t::post_process(fs::task::segment_iterator_t &task, stack_context_t &ctx) {

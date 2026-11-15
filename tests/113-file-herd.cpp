@@ -291,6 +291,7 @@ void test_fs() {
                 }
             }
 
+            CHECK("checkpoint-01");
             create_directories(root_path / "new-dir");
             await_events(2);
 
