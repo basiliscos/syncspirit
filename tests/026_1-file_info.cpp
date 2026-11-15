@@ -37,7 +37,6 @@ TEST_CASE("file-info", "[model]") {
     db::set_index_id(db_folder_info, 2);
     db::set_max_sequence(db_folder_info, 3);
     auto folder_info = folder_info_t::create(sequencer->next_uuid(), db_folder_info, my_device, folder).value();
-    folder->get_loader().add(folder_info.get());
 
     proto::FileInfo pr_fi;
     auto name = "a/b.txt";

@@ -28,8 +28,6 @@ entity_t::~entity_t() {
     presences.clear();
 }
 
-auto entity_t::get_loader() noexcept -> bulk_loader_t { return bulk_loader_t(*this); }
-
 void entity_t::clear_children() noexcept {
     for (auto it = children.begin(); it != children.end(); ++it) {
         it->get()->forget_parent();
@@ -142,11 +140,4 @@ bool nc_t::operator()(const entity_ptr_t &lhs, const std::string_view rhs) const
 
 bool nc_t::operator()(const std::string_view lhs, const entity_ptr_t &rhs) const noexcept {
     return lhs < rhs->get_path()->get_filename();
-}
-using bl_t = entity_t::bulk_loader_t;
-
-bl_t &bl_t::add(presence_t *) noexcept { return *this; }
-
-bl_t::~bulk_loader_t() {
-    //
 }

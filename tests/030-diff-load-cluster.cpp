@@ -312,7 +312,6 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
     CHECK(folder_info);
     CHECK(folder_info->get_index() == 2ul);
     CHECK(folder_info->get_max_sequence() == 3ul);
-    folder->get_loader().add(folder_info.get());
 
     SECTION("single file") {
         proto::FileInfo pr_fi;

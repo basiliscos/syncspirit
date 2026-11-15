@@ -64,7 +64,6 @@ auto upsert_folder_info_t::apply_impl(apply_controller_t &controller, void *cust
             return opt.assume_error();
         }
         fi = opt.value().get();
-        folder->get_loader().add(fi);
     }
 
     if (auto iterator = fi->get_device()->get_iterator(); iterator) {
