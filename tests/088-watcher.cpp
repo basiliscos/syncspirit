@@ -1500,7 +1500,7 @@ void test_kqueue() {
         using fixture_real_t::fixture_real_t;
 
         void main(const utils::poly_path_view_t &root_path, const utils::allocator_t &allocator) noexcept override {
-            using child_info_t = fs::task::scan_dir_t::child_info_t;
+            using child_info_t = fs::task::child_info_t;
             using child_infos_t = fs::task::scan_dir_t::child_infos_t;
 
             auto folder_id = std::string("my-folder-id");
