@@ -47,6 +47,8 @@
 #include "utils/path_view.hpp"
 #include <string_view>
 #include <cstring>
+#include <algorithm>
+#include <iterator>
 
 namespace syncspirit::net {
 
@@ -397,6 +399,8 @@ void db_actor_t::on_cluster_load_trigger(message::load_cluster_trigger_t &) noex
     if (files.size()) {
         files_next = files.data();
     }
+    auto unpacked_files = unpacked_files_t();
+    unpacked_files.reserve(files.size());
 
     auto p = payload::partial_load_t{
         std::move(diff),
@@ -406,6 +410,7 @@ void db_actor_t::on_cluster_load_trigger(message::load_cluster_trigger_t &) noex
         blocks_next,
         std::move(files),
         files_next,
+        std::move(unpacked_files),
         std::move(folder_infos_uuids),
         {},
         std::move(txn),
@@ -481,11 +486,9 @@ void db_actor_t::on_patrial_load(partial_load_t &message) noexcept {
         assert(ptr < end);
         auto chunk_end = std::min(ptr + max_files, end);
         auto count = chunk_end - ptr;
-        auto items = load::file_infos_t::container_t();
         LOG_INFO(log, "on_patrial_load, unpacking {} files ({} of {} are done)", count, ptr - begin, p.files.size());
-        items.reserve(count);
         while (ptr != chunk_end) {
-            using item_t = decltype(items)::value_type;
+            using item_t = unpacked_files_t::value_type;
             auto data = ptr->value;
             auto db_fi = db::FileInfo();
             if (auto left = db::decode(ptr->value, db_fi); left) {
@@ -516,20 +519,40 @@ void db_actor_t::on_patrial_load(partial_load_t &message) noexcept {
                     }
                 }
                 if (success) {
-                    items.emplace_back(item_t{key, std::move(db_fi)});
+                    p.unpacked_files.emplace_back(item_t{key, std::move(db_fi)});
                 } else {
                     p.corrupted_files.emplace(utils::bytes_t(key));
                 }
             }
             ++ptr;
         }
-        p.next = p.next->assign_sibling(new load::file_infos_t(std::move(items)));
         if (ptr < end) {
-            p.next = p.next->assign_sibling(new load::interrupt_t());
             p.files_next = ptr;
         } else {
             p.files_next = {};
         }
+    }
+    if (!bounce_again && !p.unpacked_files.empty() && !p.files_next) {
+        LOG_DEBUG(log, "sorting {} unpacked files", p.unpacked_files.size());
+        auto comparator = [](auto &a, auto &b) { return db::get_name(a.second) < db::get_name(b.second); };
+        std::sort(p.unpacked_files.begin(), p.unpacked_files.end(), comparator);
+        auto ptr = p.unpacked_files.data();
+        auto chunks = 0;
+        auto end = ptr + p.unpacked_files.size();
+        for (std::size_t i = 0; i < p.unpacked_files.size(); i += max_files_per_diff) {
+            auto piece_end = std::min(ptr + max_files_per_diff, end);
+            auto items = load::file_infos_t::container_t();
+            items.reserve(piece_end - ptr);
+            std::move(ptr, piece_end, std::back_inserter(items));
+            p.next = p.next->assign_sibling(new load::file_infos_t(std::move(items)));
+            ptr = piece_end;
+            if (ptr < end) {
+                p.next = p.next->assign_sibling(new load::interrupt_t());
+            }
+            ++chunks;
+        }
+        LOG_DEBUG(log, "split {} files into {} chunks ", p.unpacked_files.size(), chunks);
+        p.unpacked_files.clear();
     }
 
     if (bounce_again) {

@@ -4,10 +4,6 @@
 #include "bouncer/messages.hpp"
 #include "constants.h"
 #include "db_actor.h"
-#include "model/diff/advance/advance.h"
-#include "model/diff/modify/upsert_folder.h"
-#include "model/diff/modify/upsert_folder_info.h"
-#include "model/diff/peer/update_folder.h"
 #include "net/names.h"
 #include "net/net_supervisor.h"
 #include "net/local_keeper.h"
@@ -15,8 +11,6 @@
 #include "net/scheduler.h"
 #include "utils/format.hpp"
 #include "utils/path_view.hpp"
-#include "proto/proto-helpers-bep.h"
-#include "proto/proto-helpers-db.h"
 
 #include <ctime>
 
@@ -265,28 +259,34 @@ void net_supervisor_t::spawn_services() noexcept {
 }
 
 void net_supervisor_t::commit_loading() noexcept {
-#if 0
     if (!cluster->is_tainted()) {
-        for (auto &it : cluster->get_folders()) {
-            auto &folder = it.item;
-            auto folder_entity = presentation::folder_entity_ptr_t(new presentation::folder_entity_t(folder));
-            folder->set_augmentation(folder_entity);
-        }
-
         auto &ignored_devices = cluster->get_ignored_devices();
         auto &ignored_folders = cluster->get_ignored_folders();
         auto &pending_folders = cluster->get_pending_folders();
         auto &pending_devices = cluster->get_pending_devices();
         auto &devices = cluster->get_devices();
         auto &folders = cluster->get_folders();
-        size_t files = 0;
+        auto files = size_t{0};
+        auto buffer = std::array<std::byte, 1024 * 32>();
+        auto pool = std::pmr::monotonic_buffer_resource(buffer.data(), buffer.size());
+        auto allocator = std::pmr::polymorphic_allocator<char>(&pool);
+        using queue_t = std::pmr::list<model::presence_t *>;
         for (const auto &it : folders) {
-            auto &folder_info = it.item;
-            if (!folder_info) {
+            auto &folder = it.item;
+            if (!folder) {
                 continue;
             }
-            auto fi = folder_info->get_folder_info(*cluster->get_device());
-            files += fi->get_file_infos().size();
+            auto fi = folder->get_folder_info(*cluster->get_device());
+            auto queue = queue_t{fi};
+            while (!queue.empty()) {
+                ++files;
+                auto p = queue.front();
+                queue.pop_front();
+                for (auto c : p->get_children()) {
+                    queue.push_back(c);
+                }
+            }
+            --files;
         }
         auto pending_folders_sz = std::distance(pending_folders.begin(), pending_folders.end());
         LOG_DEBUG(log,
@@ -295,8 +295,6 @@ void net_supervisor_t::commit_loading() noexcept {
                   devices.size(), folders.size(), files, cluster->get_blocks().size(), ignored_devices.size(),
                   ignored_folders.size(), pending_folders_sz, pending_devices.size());
     }
-#endif
-    std::abort();
 }
 
 void net_supervisor_t::on_start() noexcept {
@@ -304,93 +302,6 @@ void net_supervisor_t::on_start() noexcept {
     parent_t::on_start();
     send<syncspirit::model::payload::thread_up_t>(address);
 }
-
-auto net_supervisor_t::apply(const model::diff::modify::upsert_folder_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto r = parent_t::apply(diff, custom);
-#if 0
-    if (r) {
-        auto folder_id = db::get_id(diff.db);
-        auto folder = cluster->get_folders().by_id(folder_id);
-        if (!folder->get_augmentation()) {
-            auto folder_entity = presentation::folder_entity_ptr_t(new presentation::folder_entity_t(folder));
-            folder->set_augmentation(folder_entity);
-        }
-    }
-#endif
-    return r;
-}
-
-auto net_supervisor_t::apply(const model::diff::modify::upsert_folder_info_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-    auto r = parent_t::apply(diff, custom);
-#if 0
-    if (r) {
-        auto &folder = *cluster->get_folders().by_id(diff.folder_id);
-        auto &device = *cluster->get_devices().by_sha256(diff.device_id);
-        auto folder_info = folder.is_shared_with(device);
-        if (&device != cluster->get_device()) {
-            auto augmentation = folder.get_augmentation().get();
-            auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
-            folder_entity->on_insert(*folder_info);
-        }
-    }
-#endif
-    return r;
-}
-
-auto net_supervisor_t::apply(const model::diff::advance::advance_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-#if 0
-    auto r = parent_t::apply(diff, custom);
-    if (r) {
-        auto folder = cluster->get_folders().by_id(diff.folder_id);
-        if (folder) {
-            auto augmentation = folder->get_augmentation().get();
-            auto folder_entity = static_cast<presentation::folder_entity_t *>(augmentation);
-            if (folder_entity) {
-                auto &local_fi = *folder->get_folder_info(*cluster->get_device());
-                auto file_name = proto::get_name(diff.proto_local);
-                auto local_file = local_fi.get_file_infos().by_name(file_name);
-                if (local_file) {
-                    folder_entity->on_insert(*local_file, local_fi);
-                }
-            }
-        }
-    }
-    return r;
-#endif
-    std::abort();
-}
-
-auto net_supervisor_t::apply(const model::diff::peer::update_folder_t &diff, void *custom) noexcept
-    -> outcome::result<void> {
-#if 0
-    auto r = parent_t::apply(diff, custom);
-    if (r) {
-        auto folder = cluster->get_folders().by_id(diff.folder_id);
-        auto folder_aug = folder->get_augmentation().get();
-        auto folder_entity = static_cast<presentation::folder_entity_t *>(folder_aug);
-
-        auto &devices_map = cluster->get_devices();
-        auto peer = devices_map.by_sha256(diff.peer_id);
-        auto &folder_info = *folder->get_folder_info(*peer);
-        auto &files_map = folder_info.get_file_infos();
-
-        for (auto &file : diff.files) {
-            auto file_name = proto::get_name(file);
-            auto file_info = files_map.by_name(file_name);
-            auto augmentation = file_info->get_augmentation().get();
-            if (!augmentation) {
-                folder_entity->on_insert(*file_info, folder_info);
-            }
-        }
-    }
-    return r;
-#endif
-    std::abort();
-}
-
 void net_supervisor_t::on_stop_services(message::stop_services_t &) noexcept {
     auto_restart_services = false;
     LOG_TRACE(log, "on_stop_services");

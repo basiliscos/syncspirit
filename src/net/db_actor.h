@@ -8,6 +8,7 @@
 #include "model/messages.h"
 #include "model/cluster.h"
 #include "model/diff/cluster_visitor.h"
+#include "model/diff/load/file_infos.h"
 #include "model_actor.hpp"
 #include "mdbx.h"
 #include "db/transaction.h"
@@ -79,6 +80,7 @@ struct SYNCSPIRIT_API db_actor_t final : public model_actor_t<r::actor_base_t>, 
     using known_hashes_t = std::unordered_set<utils::bytes_view_t>;
     using unique_keys_t = std::set<utils::bytes_t, utils::bytes_comparator_t>;
     using folder_infos_uuids_t = std::unordered_set<std::string>;
+    using unpacked_files_t = model::diff::load::file_infos_t::container_t;
 
     struct payload {
         struct commit_t {
@@ -102,6 +104,7 @@ struct SYNCSPIRIT_API db_actor_t final : public model_actor_t<r::actor_base_t>, 
             db::container_t::pointer block_next;
             db::container_t files;
             db::container_t::pointer files_next;
+            unpacked_files_t unpacked_files;
             folder_infos_uuids_t folder_infos_uuids;
             unique_keys_t corrupted_files;
             db::transaction_t txn;

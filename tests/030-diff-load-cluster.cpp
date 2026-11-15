@@ -13,6 +13,7 @@
 #include "model/diff/load/folders.h"
 #include "model/diff/load/pending_devices.h"
 #include "db/prefix.h"
+#include <algorithm>
 
 using namespace syncspirit;
 using namespace syncspirit::model;
@@ -410,6 +411,8 @@ TEST_CASE("loading cluster (file info + block)", "[model]") {
             container.emplace_back(item_t{key_dir, std::move(db_d)});
         }
 
+        auto comparator = [](auto &a, auto &b) { return db::get_name(a.second) < db::get_name(b.second); };
+        std::sort(container.begin(), container.end(), comparator);
         auto diff = diff::cluster_diff_ptr_t(new diff::load::file_infos_t(std::move(container)));
         REQUIRE(diff->apply(*controller, {}));
 

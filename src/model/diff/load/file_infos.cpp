@@ -9,10 +9,7 @@
 
 using namespace syncspirit::model::diff::load;
 
-file_infos_t::file_infos_t(container_t container_) noexcept : container{std::move(container_)} {
-    std::sort(container.begin(), container.end(),
-              [](auto &a, auto &b) { return db::get_name(a.second) < db::get_name(b.second); });
-}
+file_infos_t::file_infos_t(container_t container_) noexcept : container{std::move(container_)} {}
 
 auto file_infos_t::apply_forward(apply_controller_t &controller, void *custom) const noexcept -> outcome::result<void> {
     return controller.apply(*this, custom);
