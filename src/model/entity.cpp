@@ -46,6 +46,7 @@ void entity_t::set_parent(entity_t *value) noexcept {
 void entity_t::add_presense(presence_t &item) noexcept {
     assert(std::find(presences.begin(), presences.end(), &item) == presences.end());
     presences.push_back(&item);
+    best = {};
 }
 
 void entity_t::remove_presense(presence_t &item) noexcept {
@@ -53,6 +54,7 @@ void entity_t::remove_presense(presence_t &item) noexcept {
     assert(it != presences.end());
     item.forget_entity();
     presences.erase(it);
+    best = {};
 }
 
 presence_t *entity_t::get_presence(const model::device_t *device) noexcept {
@@ -76,16 +78,21 @@ void entity_t::commit(const utils::path_t &, const model::device_t *) noexcept {
     // TODO
 }
 
-file_info_t *entity_t::find_best() noexcept {
-    auto it = presences.begin();
-    auto best = static_cast<file_info_t *>(it->get());
-    ++it;
-    while (it != presences.end()) {
-        auto other = static_cast<file_info_t *>(it->get());
-        auto r = model::compare(*best, *other, default_comparator);
-        ++it;
-        if (r < 0) {
-            best = other;
+file_info_t *entity_t::get_best() noexcept {
+    if (!best && presences.size()) {
+        auto it = presences.begin();
+        auto p = it++->get();
+        auto ok = p->get_features() & (F::file | F::directory | F::symblink);
+        if (ok) {
+            auto candidate = static_cast<file_info_t *>(p);
+            while (it != presences.end()) {
+                auto other = static_cast<file_info_t *>(it++->get());
+                auto r = model::compare(*candidate, *other, default_comparator);
+                if (r < 0) {
+                    candidate = other;
+                }
+            }
+            best = candidate;
         }
     }
     return best;

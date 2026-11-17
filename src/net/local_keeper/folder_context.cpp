@@ -708,7 +708,7 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
         for (auto child_entity : dir_presence->get_entity()->get_children()) {
             auto filename = child_entity->get_path()->get_filename();
             if (!checked_children.count(filename)) {
-                auto best = child_entity->find_best();
+                auto best = child_entity->get_best();
                 if (best->get_features() & F::deleted) {
                     queue.emplace_back(child_entity.get());
                 }
@@ -717,12 +717,12 @@ void folder_context_t::post_process(fs::task::scan_dir_t &task, stack_context_t 
         while (!queue.empty()) {
             auto child_entity = queue.front();
             queue.pop_back();
-            auto peer_file = child_entity->find_best();
+            auto peer_file = child_entity->get_best();
             auto pr_file = peer_file->as_proto(true);
             ctx.local_update(std::move(pr_file), folder_id);
             if (peer_file->get_features() & F::directory) {
                 for (auto c : child_entity->get_children()) {
-                    auto best = child_entity->find_best();
+                    auto best = child_entity->get_best();
                     if (best->get_features() & F::deleted) {
                         queue.emplace_back(c.get());
                     }

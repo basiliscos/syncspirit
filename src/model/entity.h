@@ -52,7 +52,7 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
 
     inline entity_t *get_parent() noexcept { return parent; }
     inline const entity_t *get_parent() const noexcept { return parent; }
-    file_info_t *find_best() noexcept;
+    file_info_t *get_best() noexcept;
 
     void add_child(entity_t &child) noexcept;
     entity_t *get_or_create_child(std::string_view name) noexcept;
@@ -88,7 +88,7 @@ struct SYNCSPIRIT_API entity_t : model::augmentable_t {
     utils::path_ptr_t path;
     children_t children;
     entity_stats_t statistics;
-    const presence_t *best;
+    file_info_t *best{nullptr};
     entities_monitor_t *entities_monitor;
 };
 
