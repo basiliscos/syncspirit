@@ -105,6 +105,9 @@ after the core completion.
  - [core, fs, bugfix] do not report errors upon successful metadata update
  - [core, bugfix] fix app crash caused by race condition
  - [core, bugfix] path `contains()` method now works correctly
+ - [core, win32, apple, bugfix] allow app restart
+ - [core, mdbx] log only warn-related information into console
+ - [core, mdbx] upgrade to v0.14.4
 
 ## 0.4.7 (27-Sep-2026)
  - [core, bugfix] allow to specify custom dns servers
