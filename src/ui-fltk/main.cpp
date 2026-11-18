@@ -316,7 +316,7 @@ int app_main(app_context_t &app_ctx) {
             }
         }
     }
-    auto init_result = utils::init_loggers(cfg.log_configs);
+    auto init_result = utils::init_loggers(cfg.log_configs, cfg.flush_logs);
     if (!init_result) {
         logger->error("loggers initialization failed :: {}", init_result.error());
         return -1;
@@ -361,7 +361,10 @@ int app_main(app_context_t &app_ctx) {
                            .shutdown_flag(bouncer_shutdown_flag, r::pt::millisec{50})
                            .finish();
     bouncer_sup->do_process();
-    auto bouncer_actor = bouncer_sup->create_actor<bouncer::bouncer_actor_t>().timeout(timeout * 9 / 8).finish();
+    auto bouncer_actor = bouncer_sup->create_actor<bouncer::bouncer_actor_t>()
+                             .timeout(timeout * 9 / 8)
+                             .flush_logs(cfg.flush_logs)
+                             .finish();
     bouncer_sup->do_process();
 
     auto sup_net = sys_context->create_supervisor<net::net_supervisor_t>()
@@ -400,6 +403,7 @@ int app_main(app_context_t &app_ctx) {
         auto &ctx = hasher_ctxs.back();
         auto sup = ctx->create_supervisor<hasher::hasher_supervisor_t>()
                        .poll_duration(poll_timeout)
+                       .flush_logs(cfg.flush_logs)
                        .timeout(timeout * 8 / 9)
                        .registry_address(sup_net->get_registry_address())
                        .index(i)
@@ -429,6 +433,7 @@ int app_main(app_context_t &app_ctx) {
 
     auto fs_context = fs_context_t(pt::milliseconds{cfg.fs_config.poll_timeout});
     auto fs_sup = fs_context.create_supervisor<syncspirit::fs::fs_supervisor_t>()
+                      .flush_logs(cfg.flush_logs)
                       .shutdown_flag(shutdown_flag, r::pt::millisec{50})
                       .timeout(timeout)
                       .poll_duration(poll_timeout)

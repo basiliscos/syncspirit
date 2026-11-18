@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: 2024-2025 Ivan Baidakou
+// SPDX-FileCopyrightText: 2024-2026 Ivan Baidakou
 
 #pragma once
 
@@ -15,7 +15,8 @@ enum class advance_action_t {
     resolve_remote_win,
 };
 
-int SYNCSPIRIT_API compare(const file_info_t &file_1, const file_info_t &file_2) noexcept;
+int SYNCSPIRIT_API compare(const file_info_t &file_1, const file_info_t &file_2,
+                           const utils::metadata_comparator_t &comparator) noexcept;
 
 advance_action_t SYNCSPIRIT_API resolve(const file_info_t &remote, const file_info_t *local,
                                         const folder_info_t &local_folder) noexcept;

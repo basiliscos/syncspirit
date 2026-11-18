@@ -11,7 +11,9 @@
 
 namespace syncspirit::model {
 
-static advance_action_t compare_by_version(const file_info_t &remote, const file_info_t &local) noexcept {
+static advance_action_t compare_by_version(const file_info_t &remote, const file_info_t &local,
+                                           const utils::metadata_comparator_t &comparator) noexcept {
+    using O = utils::metadata_comparator_t::ordening_t;
     auto &r_v = remote.get_version();
     auto &l_v = local.get_version();
 
@@ -49,12 +51,10 @@ static advance_action_t compare_by_version(const file_info_t &remote, const file
             return advance_action_t::ignore;
         }
 
-        auto rm = remote.get_modified_s();
-        auto lm = local.get_modified_s();
-
-        if (rm > lm) {
+        auto ts_order = comparator.compare(remote.get_modification(), local.get_modification());
+        if (ts_order == O::greater) {
             return advance_action_t::resolve_remote_win;
-        } else if (lm > rm) {
+        } else if (ts_order == O::less) {
             return advance_action_t::ignore;
         }
 
@@ -62,11 +62,12 @@ static advance_action_t compare_by_version(const file_info_t &remote, const file
     }
 }
 
-int compare(const file_info_t &file_1, const file_info_t &file_2) noexcept {
+int compare(const file_info_t &file_1, const file_info_t &file_2,
+            const utils::metadata_comparator_t &comparator) noexcept {
     if (file_1.is_deleted() && file_2.is_deleted()) {
         return 0;
     }
-    auto action = compare_by_version(file_2, file_1);
+    auto action = compare_by_version(file_2, file_1, comparator);
     if (action == advance_action_t::ignore) {
         return 1;
     }
@@ -114,7 +115,7 @@ static advance_action_t _resolve(const file_info_t &remote, const file_info_t *l
         return advance_action_t::ignore;
     }
 
-    return compare_by_version(remote, *local);
+    return compare_by_version(remote, *local, local_folder.get_metadata_comparator());
 }
 
 advance_action_t resolve(const file_info_t &remote, const file_info_t *local,

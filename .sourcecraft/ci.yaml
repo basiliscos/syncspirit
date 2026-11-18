@@ -68,6 +68,7 @@ tasks:
           - sudo apt install -y build-essential
           - sudo apt install -y autoconf automake autopoint bash bison bzip2 flex g++ g++-multilib gettext git gperf intltool libc6-dev-i386 libclang-dev libgdk-pixbuf2.0-dev libltdl-dev libgl-dev libpcre2-dev libssl-dev libtool-bin libxml-parser-perl lzip make openssl p7zip-full patch perl python3 python3-mako python3-packaging python3-pkg-resources python3-setuptools python-is-python3 ruby sed sqlite3 unzip wget xz-utils
           - sudo apt install -y curl p7zip-full coreutils zip
+          - sudo apt install -y python3-venv
           - g++ --version
           - gcc --version
           - git clone --branch build-2022-04-09  --depth 1 https://github.com/mxe/mxe
@@ -111,6 +112,7 @@ tasks:
           - sudo apt install -y build-essential
           - sudo apt install -y autoconf automake autopoint bash bison bzip2 flex g++ g++-multilib gettext git gperf intltool libc6-dev-i386 libclang-dev libgdk-pixbuf2.0-dev libltdl-dev libgl-dev libpcre2-dev libssl-dev libtool-bin libxml-parser-perl lzip make openssl p7zip-full patch perl python3 python3-mako python3-packaging python3-pkg-resources python3-setuptools python-is-python3 ruby sed sqlite3 unzip wget xz-utils
           - sudo apt install -y curl p7zip-full coreutils zip
+          - sudo apt install -y python3-venv
           - g++ --version
           - gcc --version
           - git clone --branch build-2022-04-09  --depth 1 https://github.com/mxe/mxe
@@ -148,7 +150,7 @@ tasks:
       - name: prepare
         image: ubuntu:focal
         script:
-          - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$PATH
+          - export PATH=$HOME/my-gcc/bin:$HOME/.local/bin:$HOME/b2/bin/:$PATH
           - apt update
           - apt install -y software-properties-common
           - apt update
@@ -156,10 +158,18 @@ tasks:
           - apt install -y cmake python3-venv pkgconf
           - pip install conan
           - conan profile detect
-          - echo "going to install custom b2/5.5.3"
-          - conan install -r conancenter --tool-requires=b2/5.5.3 -o "&:use_cxx_env=True" --build="&"
-          - echo "going to installed custom b2/5.5.3"
-          - wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
+          # - echo "going to install custom b2/5.6.1"
+          #- conan install -r conancenter --tool-requires=b2/5.5.3 -o "&:use_cxx_env=True" --build="&"
+          - conan install -r conancenter --tool-requires=b2/5.6.1 -o "&:use_cxx_env=True" --build="&"
+          # - git clone https://github.com/bfgroup/b2.git
+          # - cd b2
+          # - git checkout 5.5.3
+          # - ./bootstrap.sh
+          # - ./b2 install --prefix=$HOME/b2
+          # - cd ..
+          # - b2 --version
+          # - wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
+          - wget https://mirror.yandex.ru/mirrors/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz
           - tar -xf gcc-14.3.0.tar.xz
           - cd gcc-14.3.0
           - ./contrib/download_prerequisites

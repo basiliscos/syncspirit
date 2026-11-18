@@ -21,6 +21,7 @@ struct resolver_actor_config_t : public r::actor_config_t {
     std::string_view hosts_path;
     std::string server_addresses;
     std::uint64_t random_number = 0;
+    bool flush_logs = false;
 };
 
 template <typename Actor> struct resolver_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -42,6 +43,10 @@ template <typename Actor> struct resolver_actor_config_builder_t : r::actor_conf
     }
     builder_t &&random_number(std::uint64_t value) && noexcept {
         parent_t::config.random_number = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&flush_logs(bool value) && noexcept {
+        parent_t::config.flush_logs = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -107,6 +112,7 @@ struct SYNCSPIRIT_API resolver_actor_t : public r::actor_base_t {
     fmt::memory_buffer rx_buff;
     unsigned char *tx_buff;
     std::uint64_t random_number;
+    bool flush_logs = false;
 };
 
 } // namespace syncspirit::net

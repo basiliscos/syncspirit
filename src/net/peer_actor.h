@@ -27,6 +27,7 @@ struct peer_actor_config_t : public r::actor_config_t {
     r::address_ptr_t coordinator;
     model::cluster_ptr_t cluster;
     utils::uri_ptr_t uri;
+    bool flush_logs = false;
 };
 
 template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -43,34 +44,32 @@ template <typename Actor> struct peer_actor_config_builder_t : r::actor_config_b
         parent_t::config.peer_state = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&device_name(std::string_view value) && noexcept {
         parent_t::config.device_name = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&bep_config(const config::bep_config_t &value) && noexcept {
         parent_t::config.bep_config = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&coordinator(const r::address_ptr_t &value) && noexcept {
         parent_t::config.coordinator = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&transport(transport::stream_sp_t value) && noexcept {
         parent_t::config.transport = std::move(value);
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&uri(utils::uri_ptr_t &&value) && noexcept {
         parent_t::config.uri = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&flush_logs(bool value) && noexcept {
+        parent_t::config.flush_logs = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -126,6 +125,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     bool read_hello(proto::message::message_t &&msg, void *) noexcept;
     bool read_controlled(proto::message::message_t &&msg, void *) noexcept;
 
+    void send_ping() noexcept;
     void reset_ping_timer() noexcept;
     void reset_stats_timer() noexcept;
 
@@ -142,6 +142,7 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     model::device_state_t peer_state;
     transport::stream_sp_t transport;
     utils::uri_ptr_t url;
+    bool flush_logs = false;
     std::optional<r::request_id_t> ping_timer_request;
     std::optional<r::request_id_t> stats_timer_request;
 
@@ -156,12 +157,11 @@ struct SYNCSPIRIT_API peer_actor_t : public r::actor_base_t {
     std::size_t tx_bytes;
     tx_size_ptr_t tx_bytes_in_progress;
     received_queue_t received_queue;
+    std::uint_fast32_t pings_left{0};
     bool finished = false;
     bool io_error = false;
 
     bool had_writes = false;
-    bool had_reads = false;
-    bool had_ping = false;
 };
 
 } // namespace net

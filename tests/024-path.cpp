@@ -52,8 +52,14 @@ TEST_CASE("path", "[model]") {
         CHECK(!p.contains(path_t::make_generic("a")));
         CHECK(path_t::make_generic("a").contains(p));
         CHECK(path_t::make_generic("a/").contains(p));
-        CHECK(path_t::make_generic("a/b").contains(p));
-        CHECK(path_t::make_generic("a/bb/c").contains(p));
+        CHECK(!path_t::make_generic("a/b").contains(p));
+        CHECK(!path_t::make_generic("a/bb/c").contains(p));
+    }
+    SECTION("contains") {
+        auto p1 = path_t::make_generic("a");
+        auto p2 = path_t::make_generic("aa");
+        CHECK(!p1.contains(p2));
+        CHECK(!p2.contains(p1));
     }
     SECTION("dir/file.bin") {
         auto p = path_t::make_generic("dir/file.bin");

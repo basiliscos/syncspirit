@@ -19,6 +19,7 @@ struct upnp_actor_config_t : r::actor_config_t {
     std::uint16_t external_port;
     model::cluster_ptr_t cluster;
     bool debug;
+    bool flush_logs = false;
 };
 
 template <typename Actor> struct upnp_actor_config_builder_t : r::actor_config_builder_t<Actor> {
@@ -30,24 +31,24 @@ template <typename Actor> struct upnp_actor_config_builder_t : r::actor_config_b
         parent_t::config.descr_url = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&external_port(std::uint16_t value) && noexcept {
         parent_t::config.external_port = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&rx_buff_size(std::uint32_t value) && noexcept {
         parent_t::config.rx_buff_size = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&cluster(const model::cluster_ptr_t &value) && noexcept {
         parent_t::config.cluster = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
-
     builder_t &&debug(bool value) && noexcept {
         parent_t::config.debug = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&flush_logs(bool value) && noexcept {
+        parent_t::config.flush_logs = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -92,6 +93,7 @@ struct SYNCSPIRIT_API upnp_actor_t : public r::actor_base_t {
     std::uint32_t rx_buff_size;
     std::uint16_t external_port;
     bool debug;
+    bool flush_logs = false;
     std::uint16_t local_port;
     asio::ip::address external_addr;
     unlink_request_t unlink_request;

@@ -5,7 +5,6 @@
 #include "folder_context.h"
 #include "hash_context.h"
 #include "constants.h"
-#include "fs/utils.h"
 #include "model/diff/advance/advance.h"
 #include "model/diff/local/blocks_availability.h"
 #include "model/diff/local/file_availability.h"
@@ -16,7 +15,6 @@
 #include "presentation/folder_presence.h"
 #include "presentation/local_file_presence.h"
 #include "proto/proto-helpers-bep.h"
-#include "utils/platform.h"
 #include "utils/utf8.h"
 #include "utils/format.hpp"
 #include "utils/path_view.hpp"
@@ -99,9 +97,9 @@ folder_context_ptr_t make_context(model::folder_info_ptr_t local_folder, unexami
 folder_context_t::folder_context_t(model::folder_info_ptr_t local_folder_, local_keeper::stack_t stack_,
                                    const utils::path_base_t &initial_path) noexcept
     : local_folder{local_folder_}, stack(std::move(stack_)) {
-    log = utils::get_logger(fmt::format("net.f/{}", local_folder->get_folder()->get_id()));
+    log = utils::make_logger(fmt::format("net.f/{}", local_folder->get_folder()->get_id()));
     auto folder = local_folder->get_folder();
-    ignore_permissions = folder->are_permissions_ignored() || !utils::platform_t::permissions_supported(initial_path);
+    ignore_permissions = folder->are_permissions_ignored();
 }
 
 bool folder_context_t::process_stack(stack_context_t &ctx) noexcept {
@@ -269,13 +267,13 @@ int folder_context_t::process(child_ready_t &info, stack_context_t &ctx) noexcep
     } else {
         bool match = false;
         auto type = info.file_type;
-        auto modification_match =
-            (type == FT::SYMLINK) || (type == FT::DIRECTORY) || (info.last_write_time == file->get_modified_s());
+        auto &comparator = local_folder->get_metadata_comparator();
+        auto modification_match = (type == FT::SYMLINK) || (type == FT::DIRECTORY) ||
+                                  comparator.equal(file->get_modification(), info.last_write_time);
         if (modification_match) {
             if (type == model::file_info_t::as_type(file->get_type())) {
-                auto ignore_perms = ignore_permissions || file->has_no_permissions();
-                auto perms_match = ignore_perms || info.permissions == file->get_permissions();
-                if (perms_match) {
+                auto perms = utils::permissions_t{info.permissions, ignore_permissions};
+                if (comparator.equal(file->get_permissions(), perms)) {
                     if (type == FT::SYMLINK) {
                         auto &target = info.target;
                         match = file->get_link_target() == target.get_full_name();
@@ -486,7 +484,7 @@ int folder_context_t::process(rehashed_incomplete_t &item, stack_context_t &ctx)
         }
         if (matched == blocks.size()) {
             LOG_DEBUG(log, "scheduling finalization of '{}", item.path);
-            auto modified_s = peer_file.get_modified_s();
+            auto modified_s = peer_file.get_modification().seconds;
             auto name = [&]() -> utils::poly_path_view_t {
                 if (item.action == model::advance_action_t::remote_copy) {
                     return peer_file.get_name()->get_view(ctx.allocator);

@@ -48,6 +48,7 @@ struct main_t {
     std::uint32_t poll_timeout; // in microseconds
     strings_t dns_servers;
     bool start_offline;
+    bool flush_logs;
 
     main_t() noexcept = default;
 
@@ -76,8 +77,9 @@ struct main_t {
         device_name = orig.device_name;
         hasher_threads = orig.hasher_threads;
         poll_timeout = orig.poll_timeout;
-        start_offline = orig.start_offline;
         dns_servers = orig.dns_servers;
+        start_offline = orig.start_offline;
+        flush_logs = orig.flush_logs;
 
         return *this;
     }

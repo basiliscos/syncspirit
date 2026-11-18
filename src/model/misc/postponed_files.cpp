@@ -74,10 +74,8 @@ void postponed_files_t::advance(model::block_info_ptr_t &block) noexcept {
         auto f_range = files_proj.equal_range(file);
         if (std::distance(f_range.first, f_range.second) == 1) {
             ready.insert(bit->file);
-            bit = block_proj.erase(bit);
-        } else {
-            ++bit;
         }
+        bit = block_proj.erase(bit);
     }
 }
 

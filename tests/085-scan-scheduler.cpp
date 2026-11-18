@@ -35,7 +35,7 @@ struct fixture_t {
 
     fixture_t() noexcept {
         test::init_logging();
-        log = utils::get_logger("fixture");
+        log = utils::get_logger("fixture", true);
     }
 
     void run() noexcept {

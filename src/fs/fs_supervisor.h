@@ -17,6 +17,7 @@ namespace rth = rotor::thread;
 struct SYNCSPIRIT_API fs_supervisor_config_t : r::supervisor_config_t {
     config::fs_config_t fs_config;
     uint32_t hasher_threads;
+    bool flush_logs = false;
 };
 
 template <typename Supervisor> struct fs_supervisor_config_builder_t : r::supervisor_config_builder_t<Supervisor> {
@@ -30,6 +31,10 @@ template <typename Supervisor> struct fs_supervisor_config_builder_t : r::superv
     }
     builder_t &&hasher_threads(uint32_t value) && noexcept {
         parent_t::config.hasher_threads = value;
+        return std::move(*static_cast<typename parent_t::builder_t *>(this));
+    }
+    builder_t &&flush_logs(bool value) && noexcept {
+        parent_t::config.flush_logs = value;
         return std::move(*static_cast<typename parent_t::builder_t *>(this));
     }
 };
@@ -52,6 +57,7 @@ struct SYNCSPIRIT_API fs_supervisor_t : rth::supervisor_thread_t {
     utils::logger_t log;
     config::fs_config_t fs_config;
     uint32_t hasher_threads;
+    bool flush_logs = false;
 };
 
 } // namespace fs

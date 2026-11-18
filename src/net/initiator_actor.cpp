@@ -33,9 +33,9 @@ initiator_actor_t::initiator_actor_t(config_t &cfg)
     : r::actor_base_t{cfg}, peer_device_id{cfg.peer_device_id}, peer_state{model::device_state_t::make_offline()},
       relay_key(std::move(cfg.relay_session)), ssl_pair{*cfg.ssl_pair}, sock(std::move(cfg.sock)),
       cluster{std::move(cfg.cluster)}, sink(std::move(cfg.sink)), custom(std::move(cfg.custom)), router{*cfg.router},
-      alpn(cfg.alpn), ssl_verify_store(std::move(cfg.ssl_verify_store)) {
+      alpn(cfg.alpn), ssl_verify_store(std::move(cfg.ssl_verify_store)), flush_logs{cfg.flush_logs} {
     auto tmp_identity = "net.init/unknown";
-    auto log = utils::get_logger(tmp_identity);
+    auto log = utils::get_logger(tmp_identity, flush_logs);
     for (auto &uri : cfg.uris) {
         if (uri->scheme() != "tcp" && uri->scheme() != "relay") {
             LOG_DEBUG(log, "unsupported scheme in the url '{}'", uri);
@@ -91,7 +91,7 @@ void initiator_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
         }
         }
         p.set_identity("net." + value, false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&initiator_actor_t::on_resolve);

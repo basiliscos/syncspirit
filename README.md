@@ -96,10 +96,23 @@ after the core completion.
 
 # changes
 
+## 0.4.8 (18-Nov-2026)
+ - [core, bugfix] requeue downloading of postponed files with duplicate blocks
+ - [core, bugfix] respond to ping activity and prevent peer connection close
+ - [core, bugfix] rm local file if peer side already deleted it and has more
+   recent version
+ - [core, fs] improve FAT32 filesystems support
+ - [core, fs, bugfix] do not report errors upon successful metadata update
+ - [core, bugfix] fix app crash caused by race condition
+ - [core, bugfix] path `contains()` method now works correctly
+ - [core, win32, apple, bugfix] allow app restart
+ - [core, mdbx] log only warn-related information into console
+ - [core, mdbx] upgrade to v0.14.4
+
 ## 0.4.7 (27-Sep-2026)
-- [core, bugfix] allow to specify custom dns servers
-- [core, fix] do not crash upon dns server unavailability
-- [fltk, bugfix] dynamically update max sequence number
+ - [core, bugfix] allow to specify custom dns servers
+ - [core, fix] do not crash upon dns server unavailability
+ - [fltk, bugfix] dynamically update max sequence number
 
 ## 0.4.6 (26-Sep-2026)
  - [core, fltk] intoduce patterns (using Perl-compatible regular expressions)

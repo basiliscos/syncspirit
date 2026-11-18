@@ -15,6 +15,7 @@
 #include "model/diff/modify/add_pending_device.h"
 #include "model/diff/peer/rx_tx.h"
 #include "net/messages.h"
+#include "constants.h"
 
 #include <algorithm>
 #include <iterator>
@@ -38,7 +39,7 @@ r::plugin::resource_id_t finalization = 4;
 peer_actor_t::peer_actor_t(config_t &config)
     : r::actor_base_t{config}, cluster{config.cluster}, device_name{config.device_name}, bep_config{config.bep_config},
       coordinator{config.coordinator}, peer_device_id{config.peer_device_id}, peer_state{std::move(config.peer_state)},
-      transport(std::move(config.transport)), url(config.uri), rx_bytes{0}, tx_bytes{0} {
+      transport(std::move(config.transport)), url(config.uri), flush_logs{config.flush_logs}, rx_bytes{0}, tx_bytes{0} {
     rx_buff.resize(config.bep_config.rx_buff_size);
     assert(bep_config.ping_timeout);
     assert(bep_config.stats_interval);
@@ -51,7 +52,7 @@ void peer_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         auto id = fmt::format("{}/{}", peer_device_id.get_short(), url);
         p.set_identity(id, false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) {
         p.discover_name(names::coordinator, coordinator, false).link(false).callback([&](auto phase, auto &ee) {
@@ -244,7 +245,7 @@ void peer_actor_t::on_read(std::size_t bytes) noexcept {
     if (read_next && !resources->has(resource::finalization)) {
         read_more();
     }
-    had_reads = true;
+    pings_left = constants::pings_limit;
 
     if (messages.size() && controller) {
         send<payload::forwarded_messages_t>(controller, std::move(messages));
@@ -455,7 +456,10 @@ bool peer_actor_t::handle_hello(proto::Hello &&msg) noexcept {
     return continue_reading;
 }
 
-void peer_actor_t::handle_ping(proto::Ping &&) noexcept { log->trace("handle_ping"); }
+void peer_actor_t::handle_ping(proto::Ping &&) noexcept {
+    LOG_TRACE(log, "handle_ping");
+    send_ping();
+}
 
 void peer_actor_t::handle_close(proto::Close &&message) noexcept {
     auto reason = proto::get_reason(message);
@@ -474,6 +478,7 @@ void peer_actor_t::reset_ping_timer() noexcept {
         auto timeout = pt::milliseconds(bep_config.ping_timeout);
         ping_timer_request = start_timer(timeout, *this, &peer_actor_t::on_ping_timeout);
         resources->acquire(resource::ping_timer);
+        had_writes = false;
     }
 }
 
@@ -493,16 +498,27 @@ void peer_actor_t::on_ping_timeout(r::request_id_t, bool cancelled) noexcept {
         if (resources->has(resource::finalization)) {
             LOG_DEBUG(log, "going to cancel I/O (finalization)");
             cancel_io();
-        } else if (had_writes && had_reads) {
-            had_reads = had_writes = had_ping = true;
-            reset_ping_timer();
-        } else if (!had_ping) {
-            had_ping = true;
+        } else if (read_action == &peer_actor_t::read_hello) {
+            LOG_INFO(log, "shudown due to I/O inactivity (missing hello)");
+            cancel_io();
+        } else if (!pings_left) {
+            LOG_INFO(log, "shudown due to I/O inactivity");
+            cancel_io();
+        } else if (had_writes) {
             reset_ping_timer();
         } else {
-            LOG_DEBUG(log, "shudown due to I/O inactivity");
-            cancel_io();
+            send_ping();
+            reset_ping_timer();
         }
+    }
+}
+
+void peer_actor_t::send_ping() noexcept {
+    LOG_DEBUG(log, "sending ping, left = {}", pings_left);
+    if (pings_left) {
+        auto bytes = proto::serialize(proto::Ping{}, proto::Compression::NEVER);
+        --pings_left;
+        push_write(std::move(bytes), false);
     }
 }
 

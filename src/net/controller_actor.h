@@ -44,6 +44,7 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
         std::uint32_t advances_per_iteration = 10;
         utils::path_t default_path;
         r::address_ptr_t fs_address;
+        bool flush_logs = false;
     };
 
     template <typename Actor> struct config_builder_t : parent_t::template config_builder_t<Actor> {
@@ -55,54 +56,48 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
             base_t::config.request_pool = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
-
         builder_t &&peer(const model::device_ptr_t &value) && noexcept {
             base_t::config.peer = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
-
         builder_t &&peer_addr(const r::address_ptr_t &value) && noexcept {
             base_t::config.peer_addr = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
-
         builder_t &&fs_address(const r::address_ptr_t &value) && noexcept {
             base_t::config.fs_address = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
-
         builder_t &&blocks_max_kept(size_t value) && noexcept {
             base_t::config.blocks_max_kept = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
-
         builder_t &&hasher_threads(uint32_t value) && noexcept {
             base_t::config.hasher_threads = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
-
         builder_t &&blocks_max_requested(uint32_t value) && noexcept {
             base_t::config.blocks_max_requested = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
-
         builder_t &&advances_per_iteration(uint32_t value) && noexcept {
             base_t::config.advances_per_iteration = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
-
         builder_t &&outgoing_buffer_max(uint32_t value) && noexcept {
             base_t::config.outgoing_buffer_max = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
-
         builder_t &&sequencer(model::sequencer_ptr_t value) && noexcept {
             base_t::config.sequencer = std::move(value);
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
-
         builder_t &&default_path(const utils::path_t &value) && noexcept {
             base_t::config.default_path = value.clone();
+            return std::move(*static_cast<typename base_t::builder_t *>(this));
+        }
+        builder_t &&flush_logs(bool value) && noexcept {
+            base_t::config.flush_logs = value;
             return std::move(*static_cast<typename base_t::builder_t *>(this));
         }
     };
@@ -196,7 +191,8 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
     folder_synchronization_t &get_sync_info(std::string_view folder_id) noexcept;
     void cancel_sync(model::file_info_t *) noexcept;
     bool is_unflushed(model::file_info_t *peer_file, model::folder_info_t &peer_folder) noexcept;
-    local_difference_t compare_with_local(model::file_info_t &peer_file, model::file_info_t *local_file) noexcept;
+    local_difference_t compare_with_local(model::file_info_t &peer_file, model::file_info_t *local_file,
+                                          const model::folder_info_t &local_folder) noexcept;
 
     outcome::result<void> operator()(const model::diff::advance::advance_t &, void *) noexcept override;
     outcome::result<void> operator()(const model::diff::contact::peer_state_t &, void *) noexcept override;
@@ -241,6 +237,7 @@ struct SYNCSPIRIT_API controller_actor_t final : public model_actor_t<r::actor_b
     std::optional<r::request_id_t> fs_ack_timer;
     hasher::hasher_plugin_t *hasher;
     bool announced;
+    bool flush_logs = false;
 
     friend stack_context_t;
 };

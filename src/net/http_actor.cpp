@@ -21,13 +21,13 @@ r::plugin::resource_id_t lock = 3;
 http_actor_t::http_actor_t(config_t &config)
     : r::actor_base_t{config}, resolve_timeout(config.resolve_timeout), request_timeout(config.request_timeout),
       registry_name{config.registry_name}, ssl_verify_store(std::move(config.ssl_verify_store)),
-      keep_alive{config.keep_alive} {}
+      keep_alive{config.keep_alive}, flush_logs{config.flush_logs} {}
 
 void http_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(registry_name, false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
         p.subscribe_actor(&http_actor_t::on_lock);

@@ -53,7 +53,7 @@ struct fixture_t {
 
     fixture_t() : ctx(io_ctx), path_quard{unique_path()}, remote_resolver{io_ctx} {
         test::init_logging();
-        log = utils::get_logger("fixture");
+        log = utils::get_logger("fixture", true);
         rx_buff.resize(1500);
     }
 

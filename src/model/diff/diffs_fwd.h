@@ -45,6 +45,7 @@ struct scan_request_t;
 struct scan_start_t;
 struct synchronization_start_t;
 struct synchronization_finish_t;
+struct update_metadata_t;
 } // namespace local
 
 namespace peer {

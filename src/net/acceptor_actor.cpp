@@ -20,14 +20,15 @@ r::plugin::resource_id_t accepting = 0;
 } // namespace
 
 acceptor_actor_t::acceptor_actor_t(config_t &config)
-    : r::actor_base_t{config}, strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()},
-      acceptor(strand.context()), peer(strand.context()), cluster{config.cluster} {}
+    : r::actor_base_t{config}, flush_logs{config.flush_logs},
+      strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, acceptor(strand.context()),
+      peer(strand.context()), cluster{config.cluster} {}
 
 void acceptor_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity("net.acceptor", false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>(
         [&](auto &p) { p.discover_name(names::coordinator, coordinator, true).link(false); });

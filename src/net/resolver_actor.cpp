@@ -30,7 +30,7 @@ resolver_actor_t::resolver_actor_t(resolver_actor_t::config_t &config)
     : r::actor_base_t{config}, io_timeout{config.resolve_timeout}, hosts_path{config.hosts_path},
       server_addresses{std::move(config.server_addresses)},
       strand{static_cast<ra::supervisor_asio_t *>(config.supervisor)->get_strand()}, channel{nullptr},
-      random_number{config.random_number} {
+      random_number{config.random_number}, flush_logs(config.flush_logs) {
 
     rx_buff.resize(1500);
     tx_buff = nullptr;
@@ -112,7 +112,7 @@ void resolver_actor_t::configure(r::plugin::plugin_base_t &plugin) noexcept {
     r::actor_base_t::configure(plugin);
     plugin.with_casted<r::plugin::address_maker_plugin_t>([&](auto &p) {
         p.set_identity(names::resolver, false);
-        log = utils::get_logger(identity);
+        log = utils::get_logger(identity, flush_logs);
     });
     plugin.with_casted<r::plugin::registry_plugin_t>([&](auto &p) { p.register_name(names::resolver, get_address()); });
     plugin.with_casted<r::plugin::starter_plugin_t>([&](auto &p) {
