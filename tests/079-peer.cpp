@@ -243,18 +243,27 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     virtual void on_client_read(std::size_t bytes) noexcept {
         LOG_INFO(log, "client received {} bytes", bytes);
         auto result = proto::parse_bep(utils::bytes_view_t(rx_buff, bytes)).value();
-        auto hello = std::get_if<proto::Hello>(&result.message);
         // On some platforms 'on_client_read' triggers before 'on_server_send', but as we
         // check server code here, there might be problems. So, give server-side
         // some time via timer.
-        if (hello) {
-            assert(!hello_timer);
-            hello_timer.reset(new timer_t(ctx.get_io_context()));
-            hello_timer->expires_from_now(r::pt::milliseconds{1});
-            hello_timer->async_wait([hello = std::move(*hello), this](const sys::error_code &ec) mutable {
+        if (auto hello = std::get_if<proto::Hello>(&result.message); hello) {
+            assert(!read_timer);
+            read_timer.reset(new timer_t(ctx.get_io_context()));
+            read_timer->expires_from_now(r::pt::milliseconds{1});
+            read_timer->async_wait([msg = std::move(*hello), this](const sys::error_code &ec) mutable {
                 LOG_INFO(log, "on hello timer, ec: {}", ec.value());
-                on_hello(hello);
-                hello_timer.reset();
+                on_hello(msg);
+                read_timer.reset();
+            });
+        }
+        if (auto ping = std::get_if<proto::Ping>(&result.message); ping) {
+            assert(!read_timer);
+            read_timer.reset(new timer_t(ctx.get_io_context()));
+            read_timer->expires_from_now(r::pt::milliseconds{1});
+            read_timer->async_wait([msg = std::move(*ping), this](const sys::error_code &ec) mutable {
+                LOG_INFO(log, "on ping timer, ec: {}", ec.value());
+                on_ping(msg);
+                read_timer.reset();
             });
         }
     }
@@ -266,6 +275,8 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         LOG_INFO(log, "client received hello message from {}, {}/{}", device_name, client_name, client_version);
     }
 
+    virtual void on_ping(proto::Ping &) noexcept { LOG_INFO(log, "ping"); }
+
     virtual void send_hello() noexcept {
         tx_buff = proto::make_hello_message("self-name");
         transport::io_fn_t on_write = [&](size_t bytes) { on_client_write(bytes); };
@@ -274,15 +285,15 @@ struct fixture_t : private model::diff::cluster_visitor_t {
         client_trans->async_send(tx_buff_, on_write, on_error);
     }
 
-    virtual void read_hello() noexcept {
+    virtual void read_message() noexcept {
         transport::io_fn_t on_read = [&](size_t bytes) { on_client_read(bytes); };
         transport::error_fn_t on_error = [&](auto &ec) { on_client_error(ec); };
         auto rx_buff_ = asio::buffer(rx_buff, sizeof(rx_buff));
         client_trans->async_recv(rx_buff_, on_read, on_error);
     }
 
-    virtual void send_and_read_hello() noexcept {
-        read_hello();
+    virtual void send_and_read_message() noexcept {
+        read_message();
         send_hello();
     }
 
@@ -322,7 +333,7 @@ struct fixture_t : private model::diff::cluster_visitor_t {
     transport::stream_sp_t peer_trans;
     transport::stream_sp_t client_trans;
     utils::bytes_t tx_buff;
-    timer_ptr_t hello_timer;
+    timer_ptr_t read_timer;
     unsigned char rx_buff[2000];
     bool known_peer = false;
     int pre_main_counter;
@@ -343,8 +354,8 @@ void test_shutdown_on_hello_timeout() {
 void test_no_send_hello_timeout() {
     struct F : fixture_t {
         void main() noexcept override {
-            peer_actor = create_actor(1);
-            read_hello();
+            peer_actor = create_actor(5);
+            read_message();
         }
 
         void on_hello(proto::Hello &) noexcept override {
@@ -365,7 +376,7 @@ void test_online_on_hello() {
     struct F : fixture_t {
         void main() noexcept override {
             create_actor();
-            send_and_read_hello();
+            send_and_read_message();
         }
 
         void on_hello(proto::Hello &) noexcept override {
@@ -383,6 +394,76 @@ void test_online_on_hello() {
     F().run();
 }
 
+void test_ping() {
+    struct F : fixture_t {
+        int got_hello{0};
+        int got_ping{0};
+
+        void main() noexcept override {
+            create_actor(50);
+            send_and_read_message();
+        }
+
+        void on_hello(proto::Hello &) noexcept override {
+            auto peer = cluster->get_devices().by_sha256(peer_device->device_id().get_sha256());
+            REQUIRE(peer->get_state().is_online());
+            read_message();
+            ++got_hello;
+        }
+
+        void on_ping(proto::Ping &) noexcept override {
+            ++got_ping;
+            sup->do_shutdown();
+            sup->do_process();
+        }
+
+        void on_shutdown() noexcept override {
+            auto peer = cluster->get_devices().by_sha256(peer_device->device_id().get_sha256());
+            CHECK(peer->get_state().is_offline());
+            CHECK(got_hello == 1);
+            CHECK(got_ping == 1);
+        }
+    };
+    F().run();
+}
+
+void test_unanswered_pings() {
+    struct F : fixture_t {
+        int got_hello{0};
+        int got_ping{0};
+
+        void main() noexcept override {
+            create_actor(100);
+            send_and_read_message();
+        }
+
+        void on_hello(proto::Hello &) noexcept override {
+            auto peer = cluster->get_devices().by_sha256(peer_device->device_id().get_sha256());
+            REQUIRE(peer->get_state().is_online());
+            read_message();
+            ++got_hello;
+        }
+
+        void on_ping(proto::Ping &) noexcept override {
+            ++got_ping;
+            LOG_DEBUG(log, "on_ping");
+            read_message();
+            if (got_ping == constants::pings_limit) {
+                sup->do_shutdown();
+                sup->do_process();
+            }
+        }
+
+        void on_shutdown() noexcept override {
+            auto peer = cluster->get_devices().by_sha256(peer_device->device_id().get_sha256());
+            CHECK(peer->get_state().is_offline());
+            CHECK(got_hello == 1);
+            CHECK(got_ping == constants::pings_limit);
+        }
+    };
+    F().run();
+}
+
 void test_hello_read_then_write() {
     struct F : fixture_t {
 
@@ -391,7 +472,7 @@ void test_hello_read_then_write() {
 
         void main() noexcept override {
             peer_actor = create_actor();
-            read_hello();
+            read_message();
         }
 
         void on_hello(proto::Hello &) noexcept override {
@@ -429,7 +510,7 @@ void test_hello_from_unknown() {
     struct F : fixture_t {
         void main() noexcept override {
             create_actor();
-            send_and_read_hello();
+            send_and_read_message();
         }
 
         void on_hello(proto::Hello &) noexcept override {
@@ -461,7 +542,7 @@ void test_hello_from_known_unknown() {
             diff_builder_t(*cluster).add_unknown_device(peer_device->device_id(), {}).apply(*sup);
             REQUIRE(cluster->get_pending_devices().size() == 1);
             create_actor();
-            send_and_read_hello();
+            send_and_read_message();
         }
 
         void on_hello(proto::Hello &) noexcept override {
@@ -493,7 +574,7 @@ void test_hello_from_ignored() {
             diff_builder_t(*cluster).add_ignored_device(peer_device->device_id(), {}).apply(*sup);
             REQUIRE(cluster->get_ignored_devices().size() == 1);
             create_actor();
-            send_and_read_hello();
+            send_and_read_message();
         }
 
         void on_hello(proto::Hello &) noexcept override {
@@ -522,7 +603,7 @@ void test_cancel_write() {
 
         void main() noexcept override {
             create_actor();
-            read_hello();
+            read_message();
         }
 
         void on_hello(proto::Hello &) noexcept override {
@@ -539,6 +620,7 @@ void test_cancel_write() {
         }
 
         outcome::result<void> operator()(const model::diff::contact::peer_state_t &diff, void *) noexcept override {
+            LOG_DEBUG(log, "diff, online: {}", diff.state.is_online());
             if (diff.state.is_online()) {
                 seen_online = true;
                 auto coordinator = sup->get_address();
@@ -549,6 +631,7 @@ void test_cancel_write() {
                     auto data = as_owned_bytes(str);
                     sup->send<net::payload::transfer_data_t>(peer_addr, std::move(data));
                 }
+                LOG_DEBUG(log, "sent: {} bytes of payload", length);
 
                 auto ec = r::make_error_code(r::error_code_t::cancelled);
                 auto ee = sup->make_error(ec);
@@ -574,7 +657,7 @@ void test_forwarding_messages() {
 
         void main() noexcept override {
             create_actor();
-            send_and_read_hello();
+            send_and_read_message();
         }
 
         void on_hello(proto::Hello &) noexcept override {
@@ -634,6 +717,8 @@ int _init() {
     REGISTER_TEST_CASE(test_shutdown_on_hello_timeout, "test_shutdown_on_hello_timeout", "[peer]");
     REGISTER_TEST_CASE(test_no_send_hello_timeout, "test_no_send_hello_timeout", "[peer]");
     REGISTER_TEST_CASE(test_online_on_hello, "test_online_on_hello", "[peer]");
+    REGISTER_TEST_CASE(test_ping, "test_ping", "[peer]");
+    REGISTER_TEST_CASE(test_unanswered_pings, "test_unanswered_pings", "[peer]");
     REGISTER_TEST_CASE(test_hello_read_then_write, "test_hello_read_then_write", "[peer]");
     REGISTER_TEST_CASE(test_hello_from_unknown, "test_hello_from_unknown", "[peer]");
     REGISTER_TEST_CASE(test_hello_from_known_unknown, "test_hello_from_known_unknown", "[peer]");
