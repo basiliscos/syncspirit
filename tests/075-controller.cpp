@@ -53,6 +53,14 @@ struct mock_supervisor_t : supervisor_t {
         }
     }
 
+    void process_io(fs::payload::remote_copy_t &req) noexcept override {
+        ++io_copies;
+        if (req.deleted) {
+            ++io_removes;
+        }
+        supervisor_t::process_io(req);
+    }
+
     void process_io(fs::payload::append_block_t &req) noexcept override {
         auto copy =
             fs::payload::append_block_t({}, req.folder_id, req.path.clone(), req.data, req.offset, req.file_size);
@@ -97,6 +105,8 @@ struct mock_supervisor_t : supervisor_t {
     appended_blocks_t appended_blocks;
     file_finishes_t file_finishes;
     int bypass_io_messages = -1;
+    int io_copies = 0;
+    int io_removes = 0;
     io_messages_t io_messages;
 };
 
@@ -548,7 +558,7 @@ void test_downloading() {
                 auto &my_index_update = std::get<proto::Index>(*msg);
                 REQUIRE(proto::get_files_size(my_index_update) == 1);
 
-                SECTION("don't redownload file only if metadata has changed") {
+                SECTION("don't redownload file only if version has changed") {
                     auto index_update = proto::IndexUpdate{};
                     proto::set_folder(index_update, proto::get_folder(index));
                     proto::set_sequence(file, 11);
@@ -566,6 +576,27 @@ void test_downloading() {
                     CHECK(folder_my->get_by_path(path) == f);
                     CHECK(f->is_locally_available());
                     CHECK(f->get_sequence() == 2ul);
+                }
+                SECTION("don't download if is deleted, locally rm it") {
+                    auto index_update = proto::IndexUpdate{};
+                    proto::set_folder(index_update, proto::get_folder(index));
+                    proto::set_sequence(file, 11);
+                    proto::set_value(counter, 2);
+                    proto::set_size(file, 0);
+                    proto::set_block_size(file, 0);
+                    proto::set_deleted(file, true);
+                    proto::clear_blocks(file);
+                    proto::add_files(index_update, file);
+
+                    peer_actor->forward(index_update);
+                    sup->do_process();
+                    CHECK(sup->io_copies == 1);
+                    CHECK(sup->io_removes == 1);
+                    CHECK(folder_my->get_max_sequence() == 2ul);
+                    f = *folder_my->get_file_infos().begin();
+                    CHECK(f->is_locally_available());
+                    CHECK(f->get_sequence() == 2ul);
+                    CHECK(f->is_deleted());
                 }
             }
             SECTION("download 2 files") {
@@ -1354,6 +1385,12 @@ void test_download_from_scratch() {
                 auto &folder = proto::get_folders(*cc, 0);
                 CHECK(proto::get_id(folder) == folder_1->get_id());
             }
+            {
+                auto &device = proto::add_devices(folder);
+                proto::set_id(device, my_device->device_id().get_sha256());
+                proto::set_max_sequence(device, 0);
+                proto::set_index_id(device, 0);
+            }
 
             auto index = proto::Index{};
             proto::set_folder(index, folder_1->get_id());
@@ -1525,6 +1562,82 @@ void test_download_resuming() {
         }
     };
     F(false, 10, false).run();
+}
+
+void test_download_duplicates() {
+    static constexpr std::size_t COPIES{9};
+    struct F : fixture_t {
+        using fixture_t::fixture_t;
+        void main(diff_builder_t &) noexcept override {
+            sup->do_process();
+            auto builder = diff_builder_t(*cluster);
+            auto sha256 = peer_device->device_id().get_sha256();
+
+            auto cc = proto::ClusterConfig{};
+            auto &folder = proto::add_folders(cc);
+            proto::set_id(folder, folder_1->get_id());
+            auto &d_peer = proto::add_devices(folder);
+            proto::set_id(d_peer, peer_device->device_id().get_sha256());
+            proto::set_max_sequence(d_peer, 10 + COPIES);
+            proto::set_index_id(d_peer, 0x12345);
+
+            peer_actor->forward(cc);
+            sup->do_process();
+
+            auto folder_peer = folder_1->get_folder_infos().by_device(*peer_device);
+
+            auto index = proto::Index{};
+            proto::set_folder(index, folder_1->get_id());
+
+            auto data_1 = as_owned_bytes("12345");
+            auto data_1_hash = utils::sha256_digest(data_1).value();
+
+            auto data_2 = as_owned_bytes("67890");
+            auto data_2_hash = utils::sha256_digest(data_2).value();
+            peer_actor->push_response(data_1, 0);
+            peer_actor->push_response(data_2, 1);
+
+            for (std::size_t i = 1; i <= COPIES; ++i) {
+                auto filename = fmt::format("file.{:02d}", i);
+                auto &file = proto::add_files(index);
+                proto::set_name(file, filename);
+                proto::set_type(file, proto::FileInfoType::FILE);
+                proto::set_sequence(file, 10 + i);
+                proto::set_block_size(file, 5);
+                proto::set_size(file, 10);
+                auto &v = proto::get_version(file);
+                auto &counter = proto::add_counters(v);
+                proto::set_id(counter, 1);
+
+                auto &b1 = proto::add_blocks(file);
+                proto::set_hash(b1, data_1_hash);
+                proto::set_size(b1, 5);
+
+                auto &b2 = proto::add_blocks(file);
+                proto::set_hash(b2, data_2_hash);
+                proto::set_size(b2, 5);
+                proto::set_offset(b2, 5);
+            }
+
+            peer_actor->forward(index);
+            sup->do_process();
+
+            auto local_folder = folder_1->get_folder_infos().by_device(*my_device);
+            CHECK(local_folder->get_max_sequence() == COPIES);
+            CHECK(!local_folder->get_folder()->is_synchronizing());
+
+            for (std::size_t i = 1; i <= COPIES; ++i) {
+                auto filename = fmt::format("file.{:02d}", i);
+                auto f = local_folder->get_file_infos().by_name(filename);
+                REQUIRE(f);
+                CHECK(f->get_size() == 10);
+                CHECK(f->get_block_size() == 5);
+                CHECK(f->iterate_blocks().get_total() == 2);
+                CHECK(f->is_locally_available());
+            }
+        }
+    };
+    F(true, 10, true).run();
 }
 
 void test_uniqueness() {
@@ -2703,6 +2816,7 @@ int _init() {
     REGISTER_TEST_CASE(test_downloading_errors, "test_downloading_errors", "[net]");
     REGISTER_TEST_CASE(test_download_from_scratch, "test_download_from_scratch", "[net]");
     REGISTER_TEST_CASE(test_download_resuming, "test_download_resuming", "[net]");
+    REGISTER_TEST_CASE(test_download_duplicates, "test_download_duplicates", "[net]");
     REGISTER_TEST_CASE(test_uniqueness, "test_uniqueness", "[net]");
     REGISTER_TEST_CASE(test_initiate_my_sharing, "test_initiate_my_sharing", "[net]");
     REGISTER_TEST_CASE(test_initiate_peer_sharing, "test_initiate_peer_sharing", "[net]");

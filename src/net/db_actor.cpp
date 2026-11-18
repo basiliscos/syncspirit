@@ -103,7 +103,7 @@ db_actor_t::db_actor_t(config_t &config)
     : parent_t{config}, env{nullptr}, db_dir{std::move(config.db_dir)}, db_config{config.db_config},
       max_files_per_diff(config.max_files_per_diff), flush_logs{config.flush_logs} {
     // mdbx_module_handler({}, {}, {});
-    // mdbx_setup_debug(MDBX_LOG_TRACE, MDBX_DBG_ASSERT, &_my_log);
+    mdbx_setup_debug(MDBX_LOG_WARN, MDBX_DBG_DONTCHANGE, MDBX_LOGGER_DONTCHANGE);
     assert(max_files_per_diff);
     auto r = mdbx_env_create(&env);
     if (r != MDBX_SUCCESS) {
